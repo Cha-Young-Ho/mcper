@@ -1,0 +1,12 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<div class="alert alert--error" style="margin-top:0">
+  <strong>주의:</strong> <code>global_rule_versions</code> 와 <code>app_rule_versions</code> 의 <strong>모든 행을 삭제</strong>한 뒤 기본 시드로 다시 채웁니다.
+</div>
+<p class="muted">운영 DB 에서는 백업 없이 실행하지 마세요.</p>
+<form method="post" action="/admin/seed/force" class="form-actions" style="margin-top:1rem" data-confirm-delete="정말 전체 재시드할까? 삭제 후 복구 안 돼.">
+  <input type="hidden" name="confirm" value="yes" />
+  <button type="submit" class="btn btn-danger">실행</button>
+  <a href="/admin" class="btn btn-secondary">취소</a>
+</form>
+{% endblock %}

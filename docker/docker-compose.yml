@@ -1,0 +1,41 @@
+name: spec-mcp
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8001:8000"
+    volumes:
+      - ..:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/mcpdb
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=changeme
+      # Docker Desktop(Mac/Win)에서 호스트 파일 변경이 inotify로 안 잡힐 때 폴링으로 핫리로드 안정화
+      - WATCHFILES_FORCE_POLLING=1
+
+  db:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mcpdb
+    # 호스트에 이미 Postgres(5432)가 있으면 충돌남 → 호스트만 5433으로 노출
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mcpdb"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+volumes:
+  pgdata:

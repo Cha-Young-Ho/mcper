@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>{{ title }} — MCPER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/admin/admin.css" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="admin-layout" id="admin-layout">
+    <aside class="admin-sidebar" aria-label="주 메뉴">
+      <div class="admin-sidebar__brand">
+        <a href="/admin">MCPER</a>
+        <small>기획서 · 룰 · Tools</small>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin" class="nav-link" data-nav="home"><span class="admin-nav__icon" aria-hidden="true">⌂</span> 대시보드</a>
+        <a href="/admin/plans" class="nav-link" data-nav="plans"><span class="admin-nav__icon" aria-hidden="true">📄</span> 기획서</a>
+        <a href="/admin/plan-code" class="nav-link" data-nav="plan-code"><span class="admin-nav__icon" aria-hidden="true">🔗</span> 기획서–코드</a>
+        <details class="admin-nav-group" data-nav-rules-group>
+          <summary class="admin-nav-group__summary"><span class="admin-nav__icon" aria-hidden="true">◇</span> Rules</summary>
+          <div class="admin-nav-group__sub">
+            <a href="/admin/global-rules" class="nav-link nav-link--sub" data-nav="global-rules">Global rules</a>
+            <a href="/admin/repo-rules" class="nav-link nav-link--sub" data-nav="repo-rules">Repository rules</a>
+            <a href="/admin/app-rules" class="nav-link nav-link--sub" data-nav="app-rules">Apps rules</a>
+          </div>
+        </details>
+        <a href="/admin/tools" class="nav-link" data-nav="tools"><span class="admin-nav__icon" aria-hidden="true">⚙</span> Tools</a>
+        <a href="/admin/seed/confirm" class="nav-link" data-nav="seed"><span class="admin-nav__icon" aria-hidden="true">↻</span> 재시드</a>
+      </nav>
+      <div class="admin-sidebar__foot">
+        <a href="/health" target="_blank" rel="noopener">/health ↗</a>
+      </div>
+    </aside>
+
+    <div class="admin-backdrop" data-nav-backdrop aria-hidden="true"></div>
+
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <button type="button" class="nav-toggle" data-nav-toggle aria-label="메뉴 열기" aria-expanded="false">☰</button>
+        <h1 class="admin-page-title">{{ title }}</h1>
+      </header>
+
+      <div class="admin-content">
+        <div class="card">
+          {% block body %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/static/admin/admin.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

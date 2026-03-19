@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<div class="toolbar toolbar--with-flag">
+  <form class="search-form" method="get" action="/admin/repo-rules" role="search">
+    <input type="search" name="q" class="input search-form__input" placeholder="검색" value="{{ q }}" autocomplete="off" />
+    <button type="submit" class="btn btn-primary">검색</button>
+    {% if q %}<a href="/admin/repo-rules" class="btn btn-secondary">초기화</a>{% endif %}
+  </form>
+  <a href="/admin/repo-rules/new" class="btn btn-primary toolbar__cta">+ 새 패턴</a>
+  <form method="post" action="/admin/repo-rules/mcp-options" class="toolbar-flag">
+    <span class="toolbar-flag__label">MCP+default</span>
+    <span class="toolbar-flag__state {% if include_repo_default %}is-on{% endif %}">{% if include_repo_default %}ON{% else %}OFF{% endif %}</span>
+    <button type="submit" class="btn btn-secondary btn-sm">전환</button>
+  </form>
+</div>
+
+<div class="app-card-grid">
+  {% for c in cards %}
+  <div class="app-card app-card--compound">
+    {% if c.is_default %}<div class="app-card-corner">default</div>{% endif %}
+    <a class="app-card__main" href="{{ c.url }}">
+      <div class="app-card__head">
+        <span class="app-card__name">{{ c.display }}</span>
+        <span class="ver-badge ver-badge--sm">{{ c.latest_version }}</span>
+      </div>
+      <span class="app-card__cta">열기 →</span>
+    </a>
+    {% if c.can_delete_stream %}
+    <div class="app-card__foot">
+      <form method="post" action="{{ c.url }}/delete" onsubmit="return confirm('이 패턴 스트림 전체를 삭제할까요?');">
+        <button type="submit" class="btn btn-danger btn-xs">삭제</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty-state app-card-grid__empty">Repository 룰이 없습니다.</div>
+  {% endfor %}
+</div>
+{% endblock %}

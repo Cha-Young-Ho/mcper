@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/repo-rules/pat/{{ pat_url }}">← 목록</a>
+</p>
+<p><span class="ver-badge">버전 {{ row.version }}</span> <span class="muted">{{ row.created_at }}</span></p>
+<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/save-as-new" class="form-stack">
+  <div class="field">
+    <label class="field-label" for="body">본문 (Markdown)</label>
+    <textarea class="input" id="body" name="body" required rows="22">{{ row.body }}</textarea>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
+  </div>
+</form>
+{% if can_delete_version %}
+<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/v/{{ row.version }}/delete" class="form-stack" style="margin-top:1rem" onsubmit="return confirm('이 버전 행을 삭제할까요?');">
+  <button type="submit" class="btn btn-danger">이 버전 삭제</button>
+</form>
+{% endif %}
+{% endblock %}

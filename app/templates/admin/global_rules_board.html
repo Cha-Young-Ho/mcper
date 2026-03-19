@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0"><a href="/admin">← 대시보드</a></p>
+
+<div class="table-wrap board-table">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:6rem">Ver</th>
+        <th style="width:14rem">시각</th>
+        <th>미리보기</th>
+        <th class="cell-actions" style="width:10rem">동작</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr class="board-row">
+        <td><span class="ver-badge">{{ r.version }}</span></td>
+        <td class="muted" style="font-size:0.85rem">{{ r.created_at }}</td>
+        <td><pre class="preview-text">{{ r.body[:200] }}{% if r.body|length > 200 %}…{% endif %}</pre></td>
+        <td class="cell-actions">
+          <a class="btn btn-ghost btn-sm" href="/admin/global-rules/v/{{ r.version }}">보기</a>
+          {% if can_delete_any_version %}
+          <form method="post" action="/admin/global-rules/v/{{ r.version }}/delete" class="inline-form" onsubmit="return confirm('Global 버전 {{ r.version }}을 삭제할까요?');">
+            <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4"><div class="empty-state">버전 없음</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="publish-box">
+  <h2 class="publish-box__title">새 global 버전</h2>
+  <form method="post" action="/admin/global-rules/publish" class="form-stack">
+    <div class="field">
+      <label class="field-label" for="gbody">본문 (Markdown)</label>
+      <textarea class="input" id="gbody" name="body" required rows="12"></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">발행</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

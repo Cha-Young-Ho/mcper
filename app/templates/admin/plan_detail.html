@@ -1,0 +1,18 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/plans/app/{{ app_enc }}">← {{ row.app_target }} 목록</a>
+</p>
+<p>
+  <strong>{{ spec_display_title(row) }}</strong>
+  <span class="muted">· id {{ row.id }} · branch {{ row.base_branch }}</span>
+</p>
+
+{% if hide_body %}
+<div class="alert alert--info">
+  본문이 <strong>벡터·바이너리 형태</strong>로 보입니다. 제목·메타만 표시합니다. (필요 시 DB에서 직접 확인)
+</div>
+{% else %}
+<pre class="full-body">{{ row.content }}</pre>
+{% endif %}
+{% endblock %}

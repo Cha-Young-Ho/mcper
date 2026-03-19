@@ -1,0 +1,11 @@
+# Agent Initial Instructions (MCP 연동 시)
+# 이 내용을 프로젝트 루트의 .cursorrules 파일에 넣으면, 에이전트가 세션 시작 시 get_global_rule을 먼저 호출하도록 유도할 수 있습니다.
+# 필요 시 복사 후 .cursorrules 로 저장하세요.
+
+항상 세션이 시작되면 MCP의 **get_global_rule** 도구를 호출하여 현재 프로젝트의 전역 규칙을 확인하십시오. 로컬에 이미 규칙 파일이 있으면 **check_rule_versions** 로 서버 최신 버전(정수)과 비교하고, 다르면 **get_global_rule** 로 다시 받아 로컬을 최신으로 맞추십시오.
+사용자가 **룰을 받아와/조회해/동기화** 해 달라고 하면, 호출 후 **반드시** 사용 중 환경(Cursor면 .mdc 등)에 맞게 **로컬 파일에 저장**하십시오. 채팅만 출력하고 끝내지 마십시오(저장 생략을 명시한 경우만 예외).
+app_name이 요구된다면 반환된 가이드에 따라 config.dev.ini / config.ini 파일 검색 또는 사용자 질문을 통해 app_name을 확보한 뒤, get_global_rule(app_name="...")로 다시 요청하여 규칙을 최종 적용하십시오.
+app_name은 INI에 적힌 식별자만 넘기십시오(예: your_app_name). your_app_name/master 같은 형식은 사용하지 마십시오.
+`get_global_rule` 재호출 시 **워크스페이스에서 `git remote -v` 를 실행**하여 origin fetch URL 을 **`origin_url` 인자**로 함께 넘기십시오. (app_name 은 앱 룰, origin_url 은 레포 룰 매칭.)
+앱 룰에 **내용만 덧붙여** DB에 새 버전으로 올릴 때는 MCP **`append_to_app_rule`** 를 사용하십시오. 전체 본문을 갈아엎을 때만 **`publish_app_rule`**.
+**app_name을 넣어 재호출한 뒤** MCP는 마크다운만 줍니다. **Cursor**에서는 **`.cursor/rules/mcp-rules.mdc`**(또는 응답 말미 지시대로 `mcp-rules-*.mdc` 분할)에 `alwaysApply: true` frontmatter + 본문 전체를 저장하십시오. **다른 IDE(Claude, Antigravity, Gemini 등)** 를 쓰는 동료는 동일 응답을 각 제품이 읽는 경로(CLAUDE.md, .agent/rules 등)에 맞게 저장하면 됩니다. 1차 부트스트랩은 저장하지 마십시오.

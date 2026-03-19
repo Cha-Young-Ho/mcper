@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/plans">← 앱 목록</a>
+</p>
+<p>앱 <code>{{ app_name }}</code> — 항목을 누르면 본문(텍스트)을 봅니다.</p>
+<div class="board-list">
+  {% for r in rows %}
+  <article class="board-item">
+    <a href="/admin/plans/{{ r.id }}" class="board-item__link">
+      <div class="board-item__meta">
+        <strong>{{ spec_display_title(r) }}</strong>
+        <span class="muted" style="font-size:0.8rem">#{{ r.id }} · {{ r.base_branch }}</span>
+      </div>
+      <p class="muted board-item__excerpt" style="margin:0;font-size:0.85rem">
+        {% if r.content and r.content|length > 120 %}{{ r.content[:120] }}…{% else %}{{ r.content }}{% endif %}
+      </p>
+    </a>
+  </article>
+  {% else %}
+  <div class="empty-state">이 앱에 기획서가 없습니다.</div>
+  {% endfor %}
+</div>
+{% endblock %}

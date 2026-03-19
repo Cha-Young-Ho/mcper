@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/plan-code/app/{{ app_enc }}">← {{ row.app_target }} 목록</a>
+</p>
+<p>
+  <strong>{{ spec_display_title(row) }}</strong>
+  <span class="muted">· id {{ row.id }}</span>
+</p>
+
+<h3 class="tool-doc__h3" style="margin-top:1rem">연결된 코드 경로</h3>
+{% set files = row.related_files or [] %}
+{% if files %}
+<ul class="tool-doc__list" style="font-family:var(--mono);font-size:0.88rem">
+  {% for p in files %}
+  <li><code>{{ p }}</code></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">연결된 파일이 없습니다. <code>upload_spec_to_db</code> 의 <code>related_files</code> 를 채우면 여기에 표시됩니다.</p>
+{% endif %}
+
+<p class="page-actions" style="margin-top:1.5rem">
+  <a class="btn btn-secondary btn-sm" href="/admin/plans/{{ row.id }}">같은 기획서 본문 보기 (기획서 탭)</a>
+</p>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/app-rules/app/{{ app_url_encoded }}">← {{ app_name }} 버전 목록</a>
+</p>
+<p>다음으로 저장될 버전: <span class="ver-badge">{{ next_version }}</span></p>
+<form class="form-stack" method="post" action="/admin/app-rules/app/{{ app_url_encoded }}/publish">
+  <div class="field">
+    <label class="field-label" for="body">본문 (Markdown)</label>
+    <textarea class="input" id="body" name="body" required rows="18" placeholder="이 앱 전용 룰 (레포/도메인 가이드 등 한 덩어리로)"></textarea>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">입력한 내용 최신 버전으로 수정 추가</button>
+  </div>
+</form>
+{% endblock %}

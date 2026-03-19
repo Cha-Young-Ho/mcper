@@ -1,0 +1,11 @@
+---
+description: MCP get_global_rule 2차 응답으로 동기화된 워크스페이스 규칙
+alwaysApply: true
+---
+
+<!-- MCP get_global_rule 2차 응답 마크다운으로 아래를 통째 교체.
+     Cursor 기본 저장 경로: `.cursor/rules/mcp-rules.mdc`
+     분할 시: mcp-rules-global.mdc / mcp-rules-repository.mdc / mcp-rules-app.mdc
+     Claude / Antigravity / Gemini 등은 응답 말미 CRITICAL 절에 따라 각 제품 경로에 저장. -->
+
+# (여기부터 도구 응답 본문 전체)
