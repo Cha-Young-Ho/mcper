@@ -15,6 +15,7 @@ from app.db.models import Base
 
 import app.db.rule_models  # noqa: F401 — register rule_* tables on Base.metadata
 import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
+import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -84,6 +85,88 @@ def _apply_lightweight_migrations(connection) -> None:
     )
 
 
+def _apply_rag_indexes(connection) -> None:
+    """FTS generated columns + GIN + HNSW for RAG tables (idempotent)."""
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.spec_chunks') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'spec_chunks'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE spec_chunks ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.spec_chunks') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS spec_chunks_content_tsv_idx
+                  ON spec_chunks USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS spec_chunks_embedding_hnsw_idx
+                  ON spec_chunks USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.code_nodes') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'code_nodes'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE code_nodes ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.code_nodes') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS code_nodes_content_tsv_idx
+                  ON code_nodes USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS code_nodes_embedding_hnsw_idx
+                  ON code_nodes USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+
+
 def init_db(
     *,
     max_attempts: int = 30,
@@ -96,10 +179,13 @@ def init_db(
     """
     for attempt in range(1, max_attempts + 1):
         try:
+            with engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             Base.metadata.create_all(bind=engine)
             with engine.begin() as conn:
                 # 예전 볼륨: specs 는 있는데 title 컬럼 없음 → 시드 INSERT 실패 방지 (Postgres)
                 _apply_lightweight_migrations(conn)
+                _apply_rag_indexes(conn)
             return
         except OperationalError as exc:
             if attempt == max_attempts:

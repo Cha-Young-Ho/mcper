@@ -3,6 +3,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from app.tools.global_rules import register_global_rule_tool
+from app.tools.rag_tools import register_rag_tools
 from app.tools.specs import register_spec_tools
 
 # Cursor는 URL 기반 MCP에 Streamable HTTP를 우선 사용한다.
@@ -29,4 +30,5 @@ mcp = FastMCP(
 )
 
 register_spec_tools(mcp)
+register_rag_tools(mcp)
 register_global_rule_tool(mcp)

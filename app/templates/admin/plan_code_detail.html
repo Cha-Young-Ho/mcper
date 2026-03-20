@@ -3,9 +3,15 @@
 <p class="muted" style="margin-top:0">
   <a href="/admin/plan-code/app/{{ app_enc }}">← {{ row.app_target }} 목록</a>
 </p>
-<p>
-  <strong>{{ spec_display_title(row) }}</strong>
-  <span class="muted">· id {{ row.id }}</span>
+<p style="display:flex;flex-wrap:wrap;align-items:center;gap:0.75rem 1rem">
+  <span>
+    <strong>{{ spec_display_title(row) }}</strong>
+    <span class="muted">· id {{ row.id }}</span>
+  </span>
+  <span class="form-actions" style="margin:0">
+    <a href="/admin/plans/{{ row.id }}/edit" class="btn btn-primary btn-sm">수정</a>
+    <a href="/admin/plans/{{ row.id }}/delete/confirm" class="btn btn-danger btn-sm">삭제…</a>
+  </span>
 </p>
 
 <h3 class="tool-doc__h3" style="margin-top:1rem">연결된 코드 경로</h3>

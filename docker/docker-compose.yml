@@ -12,12 +12,41 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/mcpdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - EMBEDDING_DIM=384
+      # - LOCAL_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
       - ADMIN_USER=admin
       - ADMIN_PASSWORD=changeme
-      # Docker Desktop(Mac/Win)에서 호스트 파일 변경이 inotify로 안 잡힐 때 폴링으로 핫리로드 안정화
       - WATCHFILES_FORCE_POLLING=1
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info
+    volumes:
+      - ..:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/mcpdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - EMBEDDING_DIM=384
+
+  redis:
+    image: redis:7-alpine
+    # 호스트에 redis가 있으면 6379 충돌 방지
+    ports:
+      - "6380:6379"
 
   db:
     image: ankane/pgvector:latest
@@ -25,7 +54,6 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: mcpdb
-    # 호스트에 이미 Postgres(5432)가 있으면 충돌남 → 호스트만 5433으로 노출
     ports:
       - "5433:5432"
     volumes:
@@ -37,5 +65,16 @@ services:
       retries: 15
       start_period: 10s
 
+  # Optional: 로컬 전용 임베딩/LLM 실험 (호스트 설치 대신 Docker만 사용)
+  ollama:
+    profiles:
+      - local-embed
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
 volumes:
   pgdata:
+  ollama_data:

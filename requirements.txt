@@ -6,4 +6,7 @@ psycopg2-binary
 sqlalchemy
 jinja2
 python-multipart
-
+pgvector
+celery[redis]
+redis
+sentence-transformers

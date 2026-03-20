@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<div class="alert alert--error" style="margin-top:0">
+  <strong>삭제:</strong> 기획서 <strong>#{{ row.id }}</strong> — {{ spec_display_title(row) }}<br />
+  DB에서 행이 제거되고, 연결된 스펙 청크(<code>spec_chunks</code>)는 함께 삭제됩니다(CASCADE).
+</div>
+<p class="muted" style="margin-top:0">
+  <a href="/admin/plans/{{ row.id }}">← 상세로 돌아가기</a>
+</p>
+<form class="form-stack" method="post" action="/admin/plans/{{ row.id }}/delete" style="max-width:28rem">
+  <div class="field">
+    <label class="field-label" for="confirm">확인</label>
+    <input class="input" id="confirm" name="confirm" required autocomplete="off" placeholder="대문자 DELETE 입력" />
+    <p class="field-hint">계속하려면 <kbd>DELETE</kbd> 를 그대로 입력하세요.</p>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-danger">영구 삭제</button>
+    <a href="/admin/plans/{{ row.id }}" class="btn btn-secondary">취소</a>
+  </div>
+</form>
+{% endblock %}

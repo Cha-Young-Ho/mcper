@@ -22,6 +22,7 @@ docker/
   docker-compose.yml
 docs/
   mcp-rules.example.mdc   # Cursor `.cursor/rules/mcp-rules.mdc` 템플릿 (alwaysApply)
+  repository-rule-mcper-specs.md  # 클라이언트 에이전트용: 기획서 업로드·검색 룰 (Repo rules / CLAUDE.md / .cursor 에 복사)
 main.py                  # uvicorn 호환 진입점 (app.main re-export)
 requirements.txt
 ```
@@ -35,6 +36,10 @@ requirements.txt
 | `ADMIN_PASSWORD` | 어드민 UI 비밀번호 (**운영에서는 반드시 변경**) | `changeme` |
 | `GIT_DEFAULT_BASE_BRANCH` | Git에서 base를 못 쓸 때 기본 기준 브랜치 | `main` |
 | `GIT_REPO_ROOT` | `git` 명령 실행 기준 경로 (선택) | `/path/to/repo` |
+| `CELERY_BROKER_URL` | Redis 브로커 (비우면 스펙 청크 자동 인덱싱·코드 큐 비활성) | `redis://redis:6379/0` |
+| `CELERY_RESULT_BACKEND` | Celery 결과 백엔드 (선택, 기본은 broker와 동일) | `redis://redis:6379/0` |
+| `EMBEDDING_DIM` | 벡터 차원(**선택한 sentence-transformers 모델 출력과 동일**해야 함). 기본 MiniLM → `384` | `384` |
+| `LOCAL_EMBEDDING_MODEL` | HuggingFace / sentence-transformers 모델 id | `sentence-transformers/all-MiniLM-L6-v2` |
 
 ## Docker로 실행
 
@@ -52,8 +57,11 @@ docker compose -f docker/docker-compose.yml up --build
 
 - **HTTP (호스트)**: `http://localhost:8001` → 컨테이너 내부 `8000`
 - **헬스체크**: `GET http://localhost:8001/health`
-- **MCPER 어드민 (HTTP Basic)**: `http://localhost:8001/admin` — 대시보드(MCP **호출 수**), **기획서** / **기획서–코드**, **Rules**(접이식: Global / Repository / Apps), **Tools**(접이식 상세), 재시드. Compose 기본 계정은 `ADMIN_USER` / `ADMIN_PASSWORD` (기본값 `admin` / `changeme`).
+- **MCPER 어드민 (HTTP Basic)**: `http://localhost:8001/admin` — 대시보드(MCP **호출 수**), **기획서**(상세에서 **수정·삭제**, 삭제 시 `spec_chunks` CASCADE) / **기획서–코드**, **Rules**(접이식: Global / Repository / Apps), **Tools**(접이식 상세), 재시드. Compose 기본 계정은 `ADMIN_USER` / `ADMIN_PASSWORD` (기본값 `admin` / `changeme`).
 - **Postgres (호스트에서 접속할 때만)**: `localhost:5433` → 컨테이너 `5432` (`web`은 Docker 네트워크 안에서 `db:5432`로 붙으므로 `DATABASE_URL` 변경 없음)
+- **Redis (호스트)**: `localhost:6380` → 컨테이너 `6379` (Celery 브로커)
+- **워커**: `worker` 서비스가 `celery`로 `index_spec` / `index_code_batch` 처리(임베딩·DB 쓰기는 FastAPI 메인과 분리)
+- **Ollama (선택)**: `docker compose --profile local-embed -f docker/docker-compose.yml up` 시 `ollama` 컨테이너만 추가(호스트 직접 설치 대신 로컬 실험용). **임베딩은 기본적으로 sentence-transformers(로컬 CPU)** 만 사용한다.
 
 이미지만 빌드할 때:
 
@@ -84,18 +92,21 @@ Docker가 떠 있는지, 포트가 `8001`인지 먼저 확인할 것.
 ## MCP 툴
 
 1. **`upload_spec_to_db`** — `content`, `app_target`, `base_branch`, `related_files` → `specs` INSERT.
-2. **`search_spec_and_code`** — `query`, `app_target` → 본문·`related_files` ILIKE 검색 (최대 50건, JSON).
-3. **`get_global_rule`** — **조회 전용**. 인자: `app_name` (선택), `version` (선택), **`origin_url` (선택, 권장 — 에이전트가 `git remote -v` 로 얻은 origin fetch URL)**, `repo_root` (선택).  
+2. **`search_spec_and_code`** — `query`, `app_target` → `spec_chunks`가 있으면 **벡터+FTS+RRF** 하이브리드, 없으면 기존 ILIKE (JSON).
+3. **`push_code_index`** — 코드 노드/엣지 JSON을 큐에 넣어 워커가 임베딩 후 `code_nodes`/`code_edges`에 저장.
+4. **`analyze_code_impact`** — 질의로 시드 노드 후 그래프 상·하류 JSON.
+5. **`find_historical_reference`** — 신규 기획 텍스트와 유사한 과거 스펙 청크·`related_files`.
+6. **`get_global_rule`** — **조회 전용**. 인자: `app_name` (선택), `version` (선택), **`origin_url` (선택, 권장 — 에이전트가 `git remote -v` 로 얻은 origin fetch URL)**, `repo_root` (선택).  
    - `app_name` 없음: **global 만**. `version` 은 **global** 에 적용.  
    - `app_name` 있음: **global 최신** + **repository 룰**(URL 패턴; **`origin_url` 우선**, 없으면 서버 Git) + **앱 룰**; `version` 은 **앱 룰** 에만 적용.  
    - 요청한 `version` 행이 없으면 서버가 **최신으로 폴백**하고 본문에 안내 문구를 붙임.  
    - INI **`app_name` 만** (예: `your_app_name`). `/master` 등 금지.  
    - 2차 응답: MCP는 본문만 제공 → 에이전트가 환경별로 저장. Cursor 기본: `.cursor/rules/mcp-rules.mdc`. 예시: [`docs/mcp-rules.example.mdc`](docs/mcp-rules.example.mdc).
-4. **`check_rule_versions`** — `app_name`·`origin_url`·`repo_root` (선택). 서버 DB **최신** global / app / repo 의 **버전 정수**만 JSON. 로컬 `rule_meta` 와 다르면 `get_global_rule` 로 다시 받아 로컬을 최신으로 맞출 것.
-5. **`publish_global_rule`** — `body` 만. **버전 번호는 서버가 자동 증가** (클라이언트가 버전 지정 불가). JSON `{ "scope", "version" }` 반환.
-6. **`publish_repo_rule`** — `pattern`, `body`. origin URL에 매칭되는 **패턴별** 다음 버전을 서버가 부여. JSON `{ "scope", "pattern", "version" }`.
-7. **`publish_app_rule`** — `app_name`, `body` 만. **앱 룰 전체 본문**을 새 버전으로. JSON `{ "scope", "app_name", "version" }`.
-8. **`append_to_app_rule`** — `app_name`, `append_markdown`. **최신 앱 룰 뒤에** 덧붙여 새 버전. JSON `{ "scope", "app_name", "version", "appended": true }`.
+7. **`check_rule_versions`** — `app_name`·`origin_url`·`repo_root` (선택). 서버 DB **최신** global / app / repo 의 **버전 정수**만 JSON. 로컬 `rule_meta` 와 다르면 `get_global_rule` 로 다시 받아 로컬을 최신으로 맞출 것.
+8. **`publish_global_rule`** — `body` 만. **버전 번호는 서버가 자동 증가** (클라이언트가 버전 지정 불가). JSON `{ "scope", "version" }` 반환.
+9. **`publish_repo_rule`** — `pattern`, `body`. origin URL에 매칭되는 **패턴별** 다음 버전을 서버가 부여. JSON `{ "scope", "pattern", "version" }`.
+10. **`publish_app_rule`** — `app_name`, `body` 만. **앱 룰 전체 본문**을 새 버전으로. JSON `{ "scope", "app_name", "version" }`.
+11. **`append_to_app_rule`** — `app_name`, `append_markdown`. **최신 앱 룰 뒤에** 덧붙여 새 버전. JSON `{ "scope", "app_name", "version", "appended": true }`.
 
 **에이전트 트리거:** 프로젝트 루트에 `.cursorrules`를 두고 "세션 시작 시 get_global_rule 호출" 문구를 넣으면 유리하다. 예시는 [`.cursorrules.example`](.cursorrules.example) 참고.
 

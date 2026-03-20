@@ -157,6 +157,41 @@ MCP_TOOLS: list[dict[str, Any]] = [
             '`search_spec_and_code(query="결제", app_target="your_app_name")`',
         ],
     },
+    {
+        "name": "push_code_index",
+        "one_liner": "코드 AST/심볼 인덱스를 Celery 워커 큐에 넣음 (임베딩은 워커에서)",
+        "title": "push_code_index — 코드 그래프 인덱싱",
+        "summary": (
+            "노드·엣지 JSON을 받아 `index_code_batch` 태스크를 큐에 넣는다. "
+            "`file_paths`에 해당하는 기존 노드는 삭제 후 재삽입된다."
+        ),
+        "params": [
+            "app_target (필수)",
+            "file_paths: 경로 리스트 또는 JSON 배열 문자열",
+            "nodes: stable_id, file_path, symbol_name, kind, content",
+            "edges: source_stable_id, target_stable_id, relation (예: CALLS)",
+        ],
+        "notes": ["CELERY_BROKER_URL + worker 컨테이너 필요"],
+        "examples": [],
+    },
+    {
+        "name": "analyze_code_impact",
+        "one_liner": "질의로 시드 코드 노드 찾고 호출 그래프 상·하류 수집",
+        "title": "analyze_code_impact — 영향도(그래프)",
+        "summary": "pgvector+FTS로 시드 노드 후 code_edges BFS로 upstream/downstream JSON 반환.",
+        "params": ["query", "app_target"],
+        "notes": ["push_code_index로 인덱스가 있어야 의미 있음"],
+        "examples": [],
+    },
+    {
+        "name": "find_historical_reference",
+        "one_liner": "신규 기획서 텍스트와 유사한 과거 스펙 청크 + related_files",
+        "title": "find_historical_reference — 유사 기획 참조",
+        "summary": "임베딩 유사도로 spec_chunks 상위 N건과 연결 파일 경로를 반환 (Few-shot 참고용).",
+        "params": ["new_spec_text", "app_target", "top_n (선택, 기본 5)"],
+        "notes": ["스펙 청크 인덱스(Celery index_spec) 선행"],
+        "examples": [],
+    },
 ]
 
 

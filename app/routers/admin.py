@@ -26,6 +26,7 @@ from app.db.rule_models import (
 from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 from app.services import versioned_rules as vr
+from app.services.celery_client import enqueue_index_spec
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
 security = HTTPBasic(auto_error=False)
@@ -63,6 +64,10 @@ def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)) 
 
 def _count(db: Session, model) -> int:
     return int(db.scalar(select(func.count()).select_from(model)) or 0)
+
+
+def _related_files_from_textarea(raw: str) -> list[str]:
+    return [ln.strip() for ln in (raw or "").splitlines() if ln.strip()]
 
 
 def _spec_app_cards(db: Session) -> list[dict]:
@@ -986,6 +991,97 @@ def plan_detail(
             "app_enc": quote(row.app_target, safe=""),
         },
     )
+
+
+@router.get("/plans/{spec_id:int}/edit")
+def plan_edit_form(
+    request: Request,
+    spec_id: int,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(Spec, spec_id)
+    if row is None:
+        raise HTTPException(404, "Not found")
+    related_lines = "\n".join(row.related_files or [])
+    return templates.TemplateResponse(
+        "admin/plan_edit.html",
+        {
+            "request": request,
+            "title": f"수정 — {spec_display_title(row)}",
+            "row": row,
+            "related_lines": related_lines,
+            "spec_display_title": spec_display_title,
+            "app_enc": quote(row.app_target, safe=""),
+        },
+    )
+
+
+@router.post("/plans/{spec_id:int}/edit")
+def plan_edit_submit(
+    spec_id: int,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+    title: str = Form(""),
+    app_target: str = Form(...),
+    base_branch: str = Form(...),
+    content: str = Form(...),
+    related_files_text: str = Form(""),
+):
+    row = db.get(Spec, spec_id)
+    if row is None:
+        raise HTTPException(404, "Not found")
+    app_key = app_target.strip()
+    if not app_key:
+        raise HTTPException(400, "app_target 필수")
+    row.title = (title or "").strip() or None
+    row.app_target = app_key
+    row.base_branch = (base_branch or "").strip() or "main"
+    row.content = content or ""
+    row.related_files = _related_files_from_textarea(related_files_text)
+    db.commit()
+    enqueue_index_spec(spec_id)
+    return RedirectResponse(f"/admin/plans/{spec_id}", status_code=303)
+
+
+@router.get("/plans/{spec_id:int}/delete/confirm")
+def plan_delete_confirm(
+    request: Request,
+    spec_id: int,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(Spec, spec_id)
+    if row is None:
+        raise HTTPException(404, "Not found")
+    return templates.TemplateResponse(
+        "admin/plan_delete_confirm.html",
+        {
+            "request": request,
+            "title": f"삭제 확인 — {spec_display_title(row)}",
+            "row": row,
+            "spec_display_title": spec_display_title,
+            "app_enc": quote(row.app_target, safe=""),
+        },
+    )
+
+
+@router.post("/plans/{spec_id:int}/delete")
+def plan_delete(
+    spec_id: int,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+    confirm: str = Form(""),
+):
+    if confirm.strip().upper() != "DELETE":
+        raise HTTPException(400, '확인 입력란에 대문자 DELETE 를 입력하세요.')
+    row = db.get(Spec, spec_id)
+    if row is None:
+        raise HTTPException(404, "Not found")
+    app_enc = quote(row.app_target, safe="")
+    db.delete(row)
+    db.commit()
+    return RedirectResponse(f"/admin/plans/app/{app_enc}", status_code=303)
 
 
 # ----- 기획서–코드 (연결 파일) -----
