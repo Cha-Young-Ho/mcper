@@ -1,0 +1,22 @@
+{# Expects: md_label, md_name, md_id, md_value, md_required (optional), md_rows (optional) #}
+<div class="field">
+  <label class="field-label" for="{{ md_id }}">{{ md_label }}</label>
+  <div class="md-split-root" data-markdown-split>
+    <div class="md-split__grid">
+      <div class="md-split__editor-col">
+        <div class="md-split__editor-mount" aria-label="마크다운 편집"></div>
+        <textarea
+          class="input md-split__fallback"
+          name="{{ md_name }}"
+          id="{{ md_id }}"
+          {% if md_required %}required{% endif %}
+          rows="{{ md_rows|default(18) }}"
+          style="min-height:12rem;font-family:var(--mono,monospace);font-size:0.88rem"
+          {% if md_placeholder is defined %}placeholder="{{ md_placeholder }}"{% endif %}
+        >{{ md_value }}</textarea>
+      </div>
+      <div class="md-split__preview md-prose" aria-label="미리보기"></div>
+    </div>
+  </div>
+  <p class="field-hint muted" style="font-size:0.8rem;margin-top:0.35rem">왼쪽: 문법 색상 · 오른쪽: 미리보기 (JS 비활성 시 아래 칸만 사용)</p>
+</div>

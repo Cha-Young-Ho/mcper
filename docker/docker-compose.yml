@@ -1,7 +1,11 @@
 name: spec-mcp
 
+# 빌드 팁: 코드만 바꿀 땐 --build 없이 up (볼륨 + reload). requirements/Dockerfile 바뀐 뒤만 build.
+# web 과 worker 는 동일 image 태그 → 이미지 빌드·export 가 한 번만 (이전: web/worker 각각 export).
+
 services:
   web:
+    image: spec-mcp:local
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -15,6 +19,9 @@ services:
       redis:
         condition: service_started
     environment:
+      # MCP 허용 Host 는 /admin → «MCP 연결» 에서 DB 등록 (TransportSecurity 정식). 421 방지용 Host 가짜 조작 제거됨.
+      # 선택: config.yaml 마운트 시 MCPER_CONFIG=/app/config.yaml
+      # Origins 가 필요하면 MCP_ALLOWED_ORIGINS=http://공인IP:8001 또는 config.yaml security.allowed_origins
       - DATABASE_URL=postgresql://user:password@db:5432/mcpdb
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -25,9 +32,7 @@ services:
       - WATCHFILES_FORCE_POLLING=1
 
   worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: spec-mcp:local
     command: celery -A app.worker.celery_app.celery_app worker --loglevel=info
     volumes:
       - ..:/app

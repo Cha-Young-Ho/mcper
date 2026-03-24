@@ -4,7 +4,7 @@
 {% if show_pull_default_toggle %}
 <div class="toolbar toolbar--with-flag" style="margin-bottom:1rem">
   <form method="post" action="/admin/app-rules/app/{{ app_url_encoded }}/pull-default-toggle" class="toolbar-flag">
-    <span class="toolbar-flag__label">rule pull 시 default 포함</span>
+    <span class="toolbar-flag__label">default 포함</span>
     <span class="toolbar-flag__state {% if include_app_pull_default %}is-on{% endif %}">{% if include_app_pull_default %}ON{% else %}OFF{% endif %}</span>
     <button type="submit" class="btn btn-secondary btn-sm" title="get_global_rule 등 rule pull 시 __default__ 앱 스트림도 함께 내려줍니다.">전환</button>
   </form>

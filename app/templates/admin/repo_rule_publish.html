@@ -1,16 +1,22 @@
 {% extends "admin/base.html" %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
 <p class="muted" style="margin-top:0">
   <a href="/admin/repo-rules/pat/{{ pat_url }}">← {{ pattern_display }} 버전 목록</a>
 </p>
 <p>다음으로 저장될 버전: <span class="ver-badge">{{ next_version }}</span></p>
 <form class="form-stack" method="post" action="/admin/repo-rules/pat/{{ pat_url }}/publish">
-  <div class="field">
-    <label class="field-label" for="body">본문 (Markdown)</label>
-    <textarea class="input" id="body" name="body" required rows="18" placeholder="이 origin URL 패턴용 룰"></textarea>
-  </div>
+  {% set md_label = "본문 (Markdown)" %}
+  {% set md_name = "body" %}
+  {% set md_id = "body" %}
+  {% set md_value = "" %}
+  {% set md_required = true %}
+  {% set md_rows = 18 %}
+  {% set md_placeholder = "이 origin URL 패턴용 룰" %}
+  {% include "admin/partials/markdown_split_field.html" %}
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
   </div>
 </form>
 {% endblock %}
+{% block scripts %}{% include "admin/partials/markdown_editor_assets.html" %}{{ super() }}{% endblock %}

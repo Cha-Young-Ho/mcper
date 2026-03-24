@@ -109,7 +109,8 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
 
         - `app_name` 없음: `global_version` 만 채우고 app/repo 필드는 null. `mcp_include_app_default` 는 null.
         - `app_name` 있음: global + (origin_url/repo_root 로 매칭된) repository + 해당 앱 스트림의 최신 버전.
-          `mcp_include_app_default` 는 그 앱에 대해 /admin 에서 켠 «rule pull 시 default 포함» 여부.
+          `mcp_include_app_default` 는 앱 카드·보드에서 켠 값(앱별 행 없으면 Global 보드 전역 기본).
+          `mcp_include_repo_default` 는 매칭된 repository 패턴 카드 설정.
 
         반환 예: `{"global_version":3,"app_name":"your_app_name","app_version":2,"repo_pattern":"api","repo_version":1}`.
         """

@@ -12,7 +12,10 @@ FastAPI 앱에 **MCP(Model Context Protocol)** 서버를 **Streamable HTTP**로 
 ```text
 app/                     # 애플리케이션 패키지
   main.py                # FastAPI 앱, /health, MCP 마운트
+  config.py              # config.yaml + 환경변수 병합 (Settings)
   mcp_app.py             # FastMCP 인스턴스 + 툴 등록
+  mcp_dynamic_mount.py   # MCP 마운트 + Host 게이트 (DB 매 요청)
+  asgi/mcp_host_gate.py  # MCP 앞단 Host/Origin 검사
   db/
   tools/
   services/
@@ -40,6 +43,22 @@ requirements.txt
 | `CELERY_RESULT_BACKEND` | Celery 결과 백엔드 (선택, 기본은 broker와 동일) | `redis://redis:6379/0` |
 | `EMBEDDING_DIM` | 벡터 차원(**선택한 sentence-transformers 모델 출력과 동일**해야 함). 기본 MiniLM → `384` | `384` |
 | `LOCAL_EMBEDDING_MODEL` | HuggingFace / sentence-transformers 모델 id | `sentence-transformers/all-MiniLM-L6-v2` |
+| `MCPER_CONFIG` / `MCPER_CONFIG_PATH` | 부트스트랩 YAML 경로 (선택) | `/app/config.yaml` |
+| `MCP_ALLOWED_ORIGINS` | MCP `TransportSecurity`용 Origin 목록, 쉼표 구분 (선택) | `http://203.0.113.7:8001` |
+
+루트에 [`config.example.yaml`](config.example.yaml) 을 참고해 `config.yaml` 을 두면 `server` / `mcp.mount_path` / `security.allowed_origins` / `database` / `celery` 등을 한곳에서 읽는다. YAML 문자열 안에는 ``${VAR}`` / ``${VAR:-기본값}`` 치환을 지원한다. **같은 항목은 표준 환경변수가 YAML 보다 우선**한다 (`DATABASE_URL`, `PORT`, `CELERY_BROKER_URL` 등 — [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) 의 `EnvBootstrapSettings`). **MCP에 허용할 `Host` 헤더** 는 YAML이 아니라 **어드민 → «MCP 연결»** DB.
+
+**Docker 리빌드:** [`docker/Dockerfile`](docker/Dockerfile) 은 `requirements.txt` → `pip` → 소스 순으로 레이어를 쌓고, 루트 [`.dockerignore`](.dockerignore) 로 컨텍스트를 줄였다. `requirements.txt` 를 안 바꿨으면 코드만 고친 뒤 **이미지 리빌드 없이** 볼륨 마운트 + `uvicorn --reload` 만으로 반영된다.
+
+**빌드 로그가 수 분 걸리는 흔한 이유**
+
+| 구간 | 설명 |
+|------|------|
+| 의존성 설치 | [`sentence-transformers`](requirements.txt) 가 **PyTorch** 를 끌어오는데, 기본 PyPI 는 **CUDA(수 GB)** 휠을 잡는 경우가 많음. [`docker/Dockerfile`](docker/Dockerfile) 에서 **먼저** `torch` 를 [CPU 인덱스](https://download.pytorch.org/whl/cpu)로 깔고, 나머지는 **`uv pip install`** 로 처리해 시간·이미지 크기를 줄였음. |
+| `exporting layers` | 레이어가 무거우면 압축·저장이 길어짐. **web / worker 가 같은 이미지 태그** (`spec-mcp:local`) 를 쓰면 동일 Dockerfile 을 **한 번만** 빌드·내보내기(이전에는 서비스마다 export 가 중복될 수 있음). |
+| 매번 `--build` | **코드만** 고친 거면 `docker compose up` 만으로 충분하고 **`--build`는 생략**하는 게 맞음(볼륨 `..:/app` + `--reload`). **의존성/Dockerfile을 바꿨을 때만** `build` 또는 `up --build`. |
+
+**가이드와의 차이 (이 레포 기준)** MCP 허용 **Host** 는 **어드민 «MCP 연결» + DB** 에 등록하고, **매 MCP 요청** [`app/asgi/mcp_host_gate.py`](app/asgi/mcp_host_gate.py) 에서 조회해 검사한다 (재시작·ASGI 갈아끼우기 불필요). SDK 쪽 DNS 리바인딩 검사는 끄고, **Origin** 은 `config`/환경변수 `allowed_origins` 로 [`mcp_host_gate`](app/asgi/mcp_host_gate.py) 에서 검사한다.
 
 ## Docker로 실행
 
@@ -88,6 +107,10 @@ docker build -f docker/Dockerfile -t spec-mcp .
 | Streamable HTTP (MCP 본체) | `http://localhost:8001/mcp` |
 
 Docker가 떠 있는지, 포트가 `8001`인지 먼저 확인할 것.
+
+**EC2 / 공인 IP로 붙일 때:** 클라이언트가 보내는 `Host` 와 정확히 같아야 한다. 예: `ports: "8001:8000"` 이면 Cursor URL 은 `http://<공인IP>:8001/mcp` 이고, 어드민 **«MCP 연결»** 에 `<공인IP>:8001` 을 등록한다. (이전의 Host 헤더를 `127.0.0.1` 로 바꾸는 우회 ASGI 는 제거되었다.)
+
+**`/health` 는 200인데 MCP 만 `421` / `Invalid Host`:** DB·어드민에 **클라이언트가 보내는 `Host` 와 동일한** `host:port` 가 들어가 있는지 확인한다. 게이트는 [`mcp_host_gate`](app/asgi/mcp_host_gate.py) 가 **매 요청** DB를 본다. 여전히 이상하면 `mcp>=1.26.0` 과 이미지 재빌드를 확인한다.
 
 ## MCP 툴
 
@@ -140,8 +163,9 @@ docker compose -f docker/docker-compose.yml exec web python scripts/seed_rules.p
 | `global_rule_versions` | 전역 룰, 버전 순증 (`version` 유니크, `body`, `created_at`) |
 | `repo_rule_versions` | origin URL 패턴별 룰 (`pattern` + `version` 유니크, `sort_order`, `body`, `created_at`) |
 | `app_rule_versions` | 앱별 룰 이력 (`app_name` + `version` 유니크, `body`, `created_at`) |
-| `mcp_app_pull_options` | 앱별로 `get_global_rule` 시 `__default__` 앱 스트림을 **추가로** 붙일지 (`app_name` PK, `include_app_default`) — `/admin` 해당 앱 보드에서 토글 |
-| `mcp_rule_return_options` | id=1 한 행. **Repository** `default`(빈 패턴) 스트림 병합 여부 (`include_repo_default`) — `/admin` Repository rules 목록에서 토글 |
+| `mcp_app_pull_options` | 앱별로 `get_global_rule` 시 `__default__` 앱 스트림을 **추가로** 붙일지 (`app_name` PK, `include_app_default`) — `/admin` 앱 카드·앱 보드에서 토글. 행이 없으면 `mcp_rule_return_options.include_app_default` 전역 기본값 사용 |
+| `mcp_repo_pattern_pull_options` | Repository **패턴**(카드)마다 `default`(빈 패턴) repo 스트림 병합 여부 (`pattern` PK, `include_repo_default`) — `/admin` Repository rules 카드에서 토글. 행이 없으면 `mcp_rule_return_options.include_repo_default` 로 폴백 |
+| `mcp_rule_return_options` | id=1 한 행. `include_repo_default`: 패턴별 옵션 행이 없을 때 repo default 병합 폴백. `include_app_default`: 앱별 옵션 행이 없을 때 앱 default 병합 기본값 — `/admin` Global rules 보드에서 전역 토글 |
 | `mcp_tool_call_stats` | MCP 툴별 누적 호출 수 (`tool_name` PK, `call_count`) — `/admin` 대시보드 |
 
 *(예전 `rule_templates` / `app_target_rules` / `repo_profile_rules` 테이블은 DB에 남아 있을 수 있으나 앱은 사용하지 않는다. 깨끗이 하려면 DB에서 수동 DROP.)*

@@ -1,0 +1,45 @@
+# 빌드 컨텍스트 = 레포 루트 (docker-compose context: ..)
+# .git / 캐시 / 로컬 데이터가 데몬으로 전송되지 않게 해 리빌드·전송 시간을 줄임.
+
+**/.git
+.github
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+.venv
+venv
+env
+ENV
+.env
+.env.*
+!.env.example
+.cursor
+.idea
+*.egg-info
+.DS_Store
+docker-compose.override.yml
+
+# 로컬 볼륨/데이터 디렉터리(호스트에 생기면 컨텍스트에 섞이지 않게)
+**/pgdata
+pgdata
+ollama_data
+**/ollama_data
+
+# Dockerfile·compose 는 클라이언트 경로로 읽히므로 컨텍스트에서 빼도 빌드에 불필요
+docker/
+
+*.zip
+*.tar.gz
+*.tgz
+
+# 프론트/도구가 생기면 컨텍스트 폭증 방지
+node_modules
+**/node_modules
+
+# 기타 (레포에 생길 수 있는 대용량·불필요 산출물)
+htmlcov
+dist
+build

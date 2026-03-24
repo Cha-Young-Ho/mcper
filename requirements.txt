@@ -1,7 +1,14 @@
+# torch 는 Docker 빌드 시 CPU 인덱스로 먼저 설치됨 (docker/Dockerfile).
+# 로컬 venv 에서만 전체 설치할 때는: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# 한 뒤 pip install -r requirements.txt 권장.
 fastapi
 uvicorn[standard]
-mcp
+# streamable_http_app(transport_security=...) 필수 — 미만이면 어드민 Host 등록해도 421 (원격 MCP 불가)
+# PyPI 최신 기준 2026-03: 1.26.x
+mcp>=1.26.0
 pydantic
+pydantic-settings
+pyyaml
 psycopg2-binary
 sqlalchemy
 jinja2

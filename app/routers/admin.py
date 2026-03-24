@@ -12,9 +12,12 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.database import get_db
+from app.db.mcp_security import McpAllowedHost
 from app.db.mcp_tool_stats import McpToolCallStat
 from app.db.models import Spec
 from app.db.rule_models import (
@@ -26,6 +29,7 @@ from app.db.rule_models import (
 from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 from app.services import versioned_rules as vr
+from app.services.mcp_transport_config import effective_allowed_hosts
 from app.services.celery_client import enqueue_index_spec
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
@@ -109,6 +113,7 @@ def admin_home(
         db.scalar(select(func.coalesce(func.sum(McpToolCallStat.call_count), 0))) or 0
     )
     return templates.TemplateResponse(
+        request,
         "admin/index.html",
         {
             "request": request,
@@ -137,6 +142,7 @@ def admin_tools(
         db.scalar(select(func.coalesce(func.sum(McpToolCallStat.call_count), 0))) or 0
     )
     return templates.TemplateResponse(
+        request,
         "admin/tools.html",
         {
             "request": request,
@@ -145,6 +151,65 @@ def admin_tools(
             "mcp_calls_total": mcp_calls_total,
         },
     )
+
+
+@router.get("/mcp-transport")
+def admin_mcp_transport(
+    request: Request,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    rows = db.scalars(select(McpAllowedHost).order_by(McpAllowedHost.id)).all()
+    effective = effective_allowed_hosts(db, settings.server.port)
+    return templates.TemplateResponse(
+        request,
+        "admin/mcp_transport.html",
+        {
+            "request": request,
+            "title": "MCP 연결 (허용 Host)",
+            "rows": rows,
+            "effective_hosts": effective,
+            "listen_port": settings.server.port,
+            "mcp_mount_path": settings.mcp.mount_path,
+        },
+    )
+
+
+@router.post("/mcp-transport/host")
+def admin_mcp_transport_add_host(
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+    host_entry: str = Form(""),
+    note: str = Form(""),
+):
+    h = (host_entry or "").strip()
+    if not h:
+        return RedirectResponse(
+            "/admin/mcp-transport?err=empty", status_code=303
+        )
+    n = (note or "").strip() or None
+    db.add(McpAllowedHost(host_entry=h, note=n))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return RedirectResponse(
+            "/admin/mcp-transport?err=duplicate", status_code=303
+        )
+    return RedirectResponse("/admin/mcp-transport?msg=added", status_code=303)
+
+
+@router.post("/mcp-transport/host/{host_id}/delete")
+def admin_mcp_transport_delete_host(
+    host_id: int,
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(McpAllowedHost, host_id)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/admin/mcp-transport?msg=deleted", status_code=303)
 
 
 # ----- Global rules (version board) -----
@@ -161,14 +226,27 @@ def global_rules_board(
     ).all()
     n = len(rows)
     return templates.TemplateResponse(
+        request,
         "admin/global_rules_board.html",
         {
             "request": request,
             "title": "Global rules (버전)",
             "rows": rows,
             "can_delete_any_version": n > 1,
+            "include_app_default_global": vr.get_mcp_include_app_default_global(db),
         },
     )
+
+
+@router.post("/global-rules/mcp-app-default-toggle")
+def global_mcp_app_default_toggle(
+    _user: str = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """앱별 옵션 행이 없을 때 쓰는 전역 기본: rule pull 시 __default__ 앱 스트림 포함."""
+    cur = vr.get_mcp_include_app_default_global(db)
+    vr.set_mcp_include_app_default_global(db, not cur)
+    return RedirectResponse("/admin/global-rules", status_code=303)
 
 
 @router.get("/global-rules/v/{version}")
@@ -187,6 +265,7 @@ def global_rule_view(
         db.scalar(select(func.count()).select_from(GlobalRuleVersion)) or 0
     )
     return templates.TemplateResponse(
+        request,
         "admin/global_rule_view.html",
         {
             "request": request,
@@ -285,11 +364,17 @@ def app_rules_cards(
                 "is_default": is_def,
                 "can_delete_stream": not is_def,
                 "latest_version": latest.version,
+                "app_url_encoded": quote(name, safe=""),
                 "url": f"/admin/app-rules/app/{quote(name, safe='')}",
+                "show_pull_toggle": not is_def,
+                "include_app_pull_default": (
+                    vr.get_mcp_include_app_default_for_app(db, name) if not is_def else False
+                ),
             }
         )
 
     return templates.TemplateResponse(
+        request,
         "admin/app_rules_cards.html",
         {
             "request": request,
@@ -311,14 +396,20 @@ def _sort_repo_patterns(patterns: list[str]) -> list[str]:
     return sorted(patterns, key=key)
 
 
-@router.post("/repo-rules/mcp-options")
-def repo_rules_mcp_options_toggle(
+@router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")
+def repo_pattern_include_repo_default_toggle(
+    pat_segment: str,
     _user: str = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """MCP 응답에 repository `default`(빈 패턴) 스트림을 추가로 붙일지 토글."""
-    cur = vr.get_mcp_include_repo_default(db)
-    vr.set_mcp_include_repo_default(db, not cur)
+    """패턴(카드)마다 repository default 스트림 병합 여부."""
+    key = vr.repo_pattern_from_url_segment(pat_segment)
+    if not db.scalars(
+        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
+    ).first():
+        raise HTTPException(404, "Unknown repository pattern")
+    cur = vr.get_mcp_include_repo_default_for_pattern(db, key)
+    vr.set_mcp_include_repo_default_for_pattern(db, key, not cur)
     return RedirectResponse("/admin/repo-rules", status_code=303)
 
 
@@ -328,6 +419,7 @@ def new_app_form(
     _user: str = Depends(require_admin),
 ):
     return templates.TemplateResponse(
+        request,
         "admin/app_rule_new_app.html",
         {
             "request": request,
@@ -348,6 +440,7 @@ def new_app_submit(
     key = app_name.strip().lower()
     if not key:
         return templates.TemplateResponse(
+            request,
             "admin/app_rule_new_app.html",
             {
                 "request": request,
@@ -361,6 +454,7 @@ def new_app_submit(
     ).first()
     if existing is not None:
         return templates.TemplateResponse(
+            request,
             "admin/app_rule_new_app.html",
             {
                 "request": request,
@@ -413,6 +507,7 @@ def app_rule_board(
     )
 
     return templates.TemplateResponse(
+        request,
         "admin/app_rule_board.html",
         {
             "request": request,
@@ -434,6 +529,7 @@ def app_rule_pull_default_toggle(
     app_name: str,
     _user: str = Depends(require_admin),
     db: Session = Depends(get_db),
+    return_to: str = Form(""),
 ):
     """
     이 앱으로 `get_global_rule` 호출 시 `__default__` 앱 스트림을 함께 내려줄지 (앱별).
@@ -450,6 +546,8 @@ def app_rule_pull_default_toggle(
         raise HTTPException(404, "Unknown app")
     cur = vr.get_mcp_include_app_default_for_app(db, key)
     vr.set_mcp_include_app_default_for_app(db, key, not cur)
+    if (return_to or "").strip().lower() == "cards":
+        return RedirectResponse("/admin/app-rules", status_code=303)
     return RedirectResponse(
         f"/admin/app-rules/app/{quote(key, safe='')}",
         status_code=303,
@@ -531,6 +629,7 @@ def app_rule_publish_form(
         raise HTTPException(404, "Unknown app")
     next_v = vr.next_app_version(db, key)
     return templates.TemplateResponse(
+        request,
         "admin/app_rule_publish.html",
         {
             "request": request,
@@ -595,6 +694,7 @@ def app_rule_version_view(
     )
     can_delete_version = n >= 1 and (key != "__default__" or n > 1)
     return templates.TemplateResponse(
+        request,
         "admin/app_rule_version_view.html",
         {
             "request": request,
@@ -631,8 +731,6 @@ def repo_rules_cards(
 
         patterns = [p for p in patterns if _repo_pattern_matches_query(p)]
 
-    inc_repo = vr.get_mcp_include_repo_default(db)
-
     cards: list[dict] = []
     for pat in patterns:
         latest = db.scalars(
@@ -654,17 +752,19 @@ def repo_rules_cards(
                 "can_delete_stream": not is_def,
                 "latest_version": latest.version,
                 "url": f"/admin/repo-rules/pat/{seg}",
+                "pat_segment": seg,
+                "include_repo_default": vr.get_mcp_include_repo_default_for_pattern(db, pat),
             }
         )
 
     return templates.TemplateResponse(
+        request,
         "admin/repo_rules_cards.html",
         {
             "request": request,
             "title": "Repository rules",
             "cards": cards,
             "q": q,
-            "include_repo_default": inc_repo,
         },
     )
 
@@ -675,6 +775,7 @@ def new_repo_pattern_form(
     _user: str = Depends(require_admin),
 ):
     return templates.TemplateResponse(
+        request,
         "admin/repo_rule_new_pattern.html",
         {
             "request": request,
@@ -696,6 +797,7 @@ def new_repo_pattern_submit(
     key = pattern.strip()
     if key == vr.REPO_PATTERN_URL_DEFAULT:
         return templates.TemplateResponse(
+            request,
             "admin/repo_rule_new_pattern.html",
             {
                 "request": request,
@@ -709,6 +811,7 @@ def new_repo_pattern_submit(
     ).first()
     if existing is not None:
         return templates.TemplateResponse(
+            request,
             "admin/repo_rule_new_pattern.html",
             {
                 "request": request,
@@ -753,6 +856,7 @@ def repo_rule_board(
         return n_ver >= 1
 
     return templates.TemplateResponse(
+        request,
         "admin/repo_rule_board.html",
         {
             "request": request,
@@ -840,6 +944,7 @@ def repo_rule_publish_form(
     pat_url = vr.repo_pat_href_segment(key)
     display = vr.repo_pattern_card_display(key)
     return templates.TemplateResponse(
+        request,
         "admin/repo_rule_publish.html",
         {
             "request": request,
@@ -908,6 +1013,7 @@ def repo_rule_version_view(
     )
     can_delete_version = n >= 1 and ((key or "").strip() != "" or n > 1)
     return templates.TemplateResponse(
+        request,
         "admin/repo_rule_version_view.html",
         {
             "request": request,
@@ -931,6 +1037,7 @@ def plans_app_index(
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse(
+        request,
         "admin/spec_apps_cards.html",
         {
             "request": request,
@@ -956,6 +1063,7 @@ def plans_list_for_app(
         .order_by(Spec.id.desc())
     ).all()
     return templates.TemplateResponse(
+        request,
         "admin/specs_list_by_app.html",
         {
             "request": request,
@@ -981,6 +1089,7 @@ def plan_detail(
         raise HTTPException(404, "Not found")
     hide_body = content_looks_like_vector_or_blob(row.content)
     return templates.TemplateResponse(
+        request,
         "admin/plan_detail.html",
         {
             "request": request,
@@ -1005,6 +1114,7 @@ def plan_edit_form(
         raise HTTPException(404, "Not found")
     related_lines = "\n".join(row.related_files or [])
     return templates.TemplateResponse(
+        request,
         "admin/plan_edit.html",
         {
             "request": request,
@@ -1055,6 +1165,7 @@ def plan_delete_confirm(
     if row is None:
         raise HTTPException(404, "Not found")
     return templates.TemplateResponse(
+        request,
         "admin/plan_delete_confirm.html",
         {
             "request": request,
@@ -1094,6 +1205,7 @@ def plan_code_app_index(
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse(
+        request,
         "admin/spec_apps_cards.html",
         {
             "request": request,
@@ -1119,6 +1231,7 @@ def plan_code_list_for_app(
         .order_by(Spec.id.desc())
     ).all()
     return templates.TemplateResponse(
+        request,
         "admin/spec_code_list_by_app.html",
         {
             "request": request,
@@ -1142,6 +1255,7 @@ def plan_code_detail(
     if row is None:
         raise HTTPException(404, "Not found")
     return templates.TemplateResponse(
+        request,
         "admin/plan_code_detail.html",
         {
             "request": request,
@@ -1162,6 +1276,7 @@ def seed_confirm(
     _user: str = Depends(require_admin),
 ):
     return templates.TemplateResponse(
+        request,
         "admin/seed_confirm.html",
         {"request": request, "title": "Re-seed from defaults"},
     )

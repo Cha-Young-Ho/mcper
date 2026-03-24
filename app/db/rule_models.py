@@ -81,6 +81,20 @@ class McpRuleReturnOptions(Base):
     )
 
 
+class McpRepoPatternPullOption(Base):
+    """
+    Repository 패턴(카드)마다 MCP 응답에 빈 패턴(default) repo 스트림을 추가로 붙일지.
+    `pattern` 은 `repo_rule_versions.pattern` 과 동일(빈 문자열 = default 스트림).
+    """
+
+    __tablename__ = "mcp_repo_pattern_pull_options"
+
+    pattern: Mapped[str] = mapped_column(String(256), primary_key=True)
+    include_repo_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+
+
 class McpAppPullOption(Base):
     """
     `get_global_rule` / `check_rule_versions` 에서 **요청한 app_name** 기준으로

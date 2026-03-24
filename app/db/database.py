@@ -16,11 +16,24 @@ from app.db.models import Base
 import app.db.rule_models  # noqa: F401 — register rule_* tables on Base.metadata
 import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
 import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
+import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/mcpdb",
-)
+
+def _resolve_database_url() -> str:
+    try:
+        from app.config import settings as app_settings
+
+        if app_settings.database.url:
+            return str(app_settings.database.url)
+    except Exception:
+        pass
+    return os.environ.get(
+        "DATABASE_URL",
+        "postgresql://user:password@localhost:5432/mcpdb",
+    )
+
+
+DATABASE_URL = _resolve_database_url()
 
 engine: Engine = create_engine(
     DATABASE_URL,
@@ -80,6 +93,42 @@ def _apply_lightweight_migrations(connection) -> None:
             FROM app_rule_versions arv
             LEFT JOIN mcp_rule_return_options mro ON mro.id = 1
             ON CONFLICT (app_name) DO NOTHING
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS mcp_repo_pattern_pull_options (
+                pattern VARCHAR(256) PRIMARY KEY,
+                include_repo_default BOOLEAN NOT NULL DEFAULT false
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            INSERT INTO mcp_repo_pattern_pull_options (pattern, include_repo_default)
+            SELECT DISTINCT r.pattern,
+                COALESCE((SELECT include_repo_default FROM mcp_rule_return_options WHERE id = 1), false)
+            FROM repo_rule_versions r
+            WHERE NOT EXISTS (
+                SELECT 1 FROM mcp_repo_pattern_pull_options o
+                WHERE o.pattern = r.pattern
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS mcp_allowed_hosts (
+                id SERIAL PRIMARY KEY,
+                host_entry VARCHAR(255) NOT NULL UNIQUE,
+                note VARCHAR(512),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
             """
         )
     )

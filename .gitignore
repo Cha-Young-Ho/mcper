@@ -93,3 +93,6 @@ coverage.xml
 *.sqlite3
 *.db
 
+# Local YAML secrets (example: config.example.yaml)
+/config.yaml
+

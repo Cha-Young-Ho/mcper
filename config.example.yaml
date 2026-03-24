@@ -1,0 +1,31 @@
+# MCPER 부트스트랩 예시. 복사: cp config.example.yaml config.yaml
+# 경로: MCPER_CONFIG 또는 MCPER_CONFIG_PATH
+#
+# 문자열에 ${VAR} / ${VAR:-기본값} 를 쓸 수 있음(로드 시 os.environ 으로 치환).
+# 같은 키는 표준 환경변수가 YAML 보다 우선 (DATABASE_URL, PORT, …).
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+mcp:
+  mount_path: "/mcp"
+
+security:
+  # MCP TransportSecurity allowed_origins (Host 는 어드민 «MCP 연결» DB)
+  allowed_origins: []
+  # 예: [ "http://203.0.113.7:8001" ]
+
+database:
+  # null 이면 DATABASE_URL env (없으면 앱 기본값)
+  url: null
+  # 예: url: "${DATABASE_URL}"
+
+celery:
+  broker_url: null
+  result_backend: null
+  # 예: broker_url: "${CELERY_BROKER_URL:-redis://redis:6379/0}"
+
+# RAG/pgvector — DB 스키마·임베딩 길이와 맞출 것 (env: EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL)
+embedding_dim: 384
+local_embedding_model: "sentence-transformers/all-MiniLM-L6-v2"

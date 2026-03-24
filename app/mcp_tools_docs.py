@@ -26,7 +26,8 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "발행(publish)과 달리 조회만 한다. 버전 저장은 publish_* 툴이 서버에서 자동 증가한다.",
             "`origin_url` 이 있으면 repository 매칭에 우선 사용. 서버 Git 실패와 무관하게 api/web 패턴 룰 적용 가능.",
             "app_name 있을 때 응답 말미에 로컬 저장 절차 포함. MCP는 마크다운만 제공.",
-            "`__default__` 앱 스트림을 전용 앱과 함께 줄지는 **앱별** 설정(/admin 앱 보드의 «rule pull 시 default 포함»).",
+            "`__default__` 앱 스트림을 전용 앱과 함께 줄지는 **앱별** 설정(/admin 앱 카드·앱 보드). 앱별 행이 없으면 Global rules 보드의 **전역 기본값**.",
+            "Repository `default` 스트림을 매칭된 패턴과 함께 줄지는 **패턴별** 설정(/admin Repository rules 카드).",
         ],
         "examples": [
             "첫 부트스트랩(앱 모름): `get_global_rule()`",
@@ -52,7 +53,7 @@ MCP_TOOLS: list[dict[str, Any]] = [
         ],
         "notes": [
             "버전 표기는 정수 1,2,3… 만 (문자열 v1 형식 아님).",
-            "`mcp_include_app_default` 는 `app_name` 이 있을 때만 true/false, 없으면 null (앱별 pull 옵션).",
+            "`mcp_include_app_default` 는 `app_name` 이 있을 때만 true/false, 없으면 null (앱별·전역 기본 반영). `mcp_include_repo_default` 는 매칭된 repository 패턴 기준.",
         ],
         "examples": [
             '`check_rule_versions()`',

@@ -1,6 +1,18 @@
 {% extends "admin/base.html" %}
+{% block head %}
+<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
+{% endblock %}
 {% block body %}
 <p class="muted" style="margin-top:0"><a href="/admin">← 대시보드</a></p>
+
+<div class="toolbar toolbar--with-flag" style="margin-bottom:1rem">
+  <form method="post" action="/admin/global-rules/mcp-app-default-toggle" class="toolbar-flag">
+    <span class="toolbar-flag__label">default 포함 (전역 기본)</span>
+    <span class="toolbar-flag__state {% if include_app_default_global %}is-on{% endif %}">{% if include_app_default_global %}ON{% else %}OFF{% endif %}</span>
+    <button type="submit" class="btn btn-secondary btn-sm" title="앱별 옵션 행이 없을 때, get_global_rule 에서 __default__ 앱 스트림을 함께 내려줄지">전환</button>
+  </form>
+</div>
+<p class="muted" style="font-size:0.875rem;margin-top:-0.5rem;margin-bottom:1rem">앱 카드에서 따로 켠 값이 있으면 그게 우선이고, 없을 때만 이 전역 값을 씁니다.</p>
 
 <div class="table-wrap board-table">
   <table class="data-table">
@@ -37,13 +49,20 @@
 <div class="publish-box">
   <h2 class="publish-box__title">새 global 버전</h2>
   <form method="post" action="/admin/global-rules/publish" class="form-stack">
-    <div class="field">
-      <label class="field-label" for="gbody">본문 (Markdown)</label>
-      <textarea class="input" id="gbody" name="body" required rows="12"></textarea>
-    </div>
+    {% set md_label = "본문 (Markdown)" %}
+    {% set md_name = "body" %}
+    {% set md_id = "gbody" %}
+    {% set md_value = "" %}
+    {% set md_required = true %}
+    {% set md_rows = 12 %}
+    {% include "admin/partials/markdown_split_field.html" %}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">발행</button>
     </div>
   </form>
 </div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+{% include "admin/partials/markdown_editor_assets.html" %}
 {% endblock %}

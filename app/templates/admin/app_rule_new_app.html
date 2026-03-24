@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
 <p class="muted" style="margin-top:0"><a href="/admin/app-rules">← 앱 목록</a></p>
 {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
@@ -8,13 +9,17 @@
     <input class="input" id="app_name" name="app_name" required placeholder="your_app_name" autocomplete="off" />
     <p class="field-hint">INI <code>app_name</code> 과 동일한 식별자 (소문자 저장).</p>
   </div>
-  <div class="field">
-    <label class="field-label" for="body">첫 버전 본문 (Markdown)</label>
-    <textarea class="input" id="body" name="body" required rows="16"></textarea>
-  </div>
+  {% set md_label = "첫 버전 본문 (Markdown)" %}
+  {% set md_name = "body" %}
+  {% set md_id = "body" %}
+  {% set md_value = "" %}
+  {% set md_required = true %}
+  {% set md_rows = 16 %}
+  {% include "admin/partials/markdown_split_field.html" %}
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">입력한 내용으로 첫 버전(1) 저장</button>
     <a href="/admin/app-rules" class="btn btn-secondary">취소</a>
   </div>
 </form>
 {% endblock %}
+{% block scripts %}{% include "admin/partials/markdown_editor_assets.html" %}{{ super() }}{% endblock %}

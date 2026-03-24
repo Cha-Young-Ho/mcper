@@ -1,0 +1,182 @@
+/* Split markdown editor + preview (CodeMirror 5 — CSS co-located under ./vendor/) */
+@import url("./vendor/codemirror/codemirror.min.css");
+
+/* 좌·우 패널이 같은 뷰포트 높이를 쓰고, 각자 안에서만 스크롤
+   (고정 780px 상한 제거 — 큰 화면/EC2에서도 남는 뷰포트를 쓰도록) */
+.md-split-root {
+  --md-split-pane-h: max(280px, min(88vh, calc(100vh - 11rem)));
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-sm, 8px);
+  overflow: hidden;
+  background: var(--bg-card, #fff);
+}
+
+@supports (height: 100dvh) {
+  .md-split-root {
+    --md-split-pane-h: max(280px, min(88vh, calc(100dvh - 11rem)));
+  }
+}
+
+.md-split__grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(280px, var(--md-split-pane-h));
+  gap: 0;
+  align-items: stretch;
+  /* grid 자식이 스크롤을 가지려면 행 높이를 고정하고 min-height:0 필요 */
+}
+
+@media (max-width: 900px) {
+  .md-split__grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, min(44vh, var(--md-split-pane-h)))
+      minmax(220px, min(44vh, var(--md-split-pane-h)));
+  }
+}
+
+.md-split__editor-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border, #e2e8f0);
+}
+
+@media (max-width: 900px) {
+  .md-split__editor-col {
+    border-right: none;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+  }
+}
+
+.md-split__editor-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.md-split__editor-mount .CodeMirror {
+  height: 100% !important;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+  font-size: 0.875rem;
+}
+
+/* Markdown mode token colors (CodeMirror default theme + overrides) */
+.md-split__editor-mount .cm-header-1 {
+  color: #4f46e5;
+  font-weight: 700;
+}
+.md-split__editor-mount .cm-header-2 {
+  color: #6366f1;
+  font-weight: 600;
+}
+.md-split__editor-mount .cm-header-3 {
+  color: #7c3aed;
+  font-weight: 600;
+}
+.md-split__editor-mount .cm-comment,
+.md-split__editor-mount .cm-quote {
+  color: #64748b;
+}
+.md-split__editor-mount .cm-link {
+  color: #0ea5e9;
+}
+.md-split__editor-mount .cm-string,
+.md-split__editor-mount .cm-url {
+  color: #059669;
+}
+.md-split__editor-mount .cm-strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+.md-split__editor-mount .cm-em {
+  font-style: italic;
+  color: #475569;
+}
+/* strikethrough — markdown mode often uses atom/meta */
+.md-split__editor-mount .cm-strikethrough,
+.md-split__editor-mount .cm-deleted {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.md-split__preview {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  max-height: none;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  background: #f8fafc;
+}
+
+.md-split--active .md-split__fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* CodeMirror 없거나 초기화 실패: 왼쪽 열에 일반 textarea + 오른쪽 미리보기 */
+.md-split-root:not(.md-split--active) .md-split__editor-mount {
+  display: none;
+}
+
+.md-split-root:not(.md-split--active) .md-split__fallback {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: auto;
+  resize: none;
+}
+
+.md-prose h1 {
+  font-size: 1.35rem;
+  margin: 0.5em 0 0.35em;
+  color: #1e1b4b;
+}
+.md-prose h2 {
+  font-size: 1.15rem;
+  margin: 0.6em 0 0.3em;
+  color: #312e81;
+}
+.md-prose h3 {
+  font-size: 1.05rem;
+  margin: 0.5em 0 0.25em;
+}
+.md-prose p {
+  margin: 0.4em 0;
+}
+.md-prose code {
+  font-size: 0.88em;
+}
+.md-prose pre {
+  overflow: auto;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+}
+.md-prose ul,
+.md-prose ol {
+  margin: 0.35em 0;
+  padding-left: 1.35rem;
+}
+.md-prose del {
+  color: #94a3b8;
+}

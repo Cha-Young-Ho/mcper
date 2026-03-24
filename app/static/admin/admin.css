@@ -65,6 +65,9 @@ kbd {
 .admin-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .admin-sidebar {
@@ -228,9 +231,14 @@ kbd {
 }
 
 .admin-main {
-  flex: 1;
+  flex: 1 1 0%;
   margin-left: var(--sidebar-w);
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -275,8 +283,73 @@ kbd {
 
 .admin-content {
   padding: 1.25rem 1.5rem 2.5rem;
-  max-width: 1200px;
+  max-width: none;
   width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+
+/* 카드·마크다운 스플릿: :has() 미지원 브라우저·캐시 대비해 항상 가로 100% */
+.admin-content > .card {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.admin-content .form-stack {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.admin-content .md-split-root,
+.admin-content .md-split__grid {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.admin-content .md-split__editor-col,
+.admin-content .md-split__preview {
+  min-width: 0;
+}
+
+/* 마크다운 스플릿: 카드·폼이 남는 높이까지 늘어나 전체 화면에 가깝게 */
+.admin-content:has(.md-split-root) {
+  padding: 0.75rem 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-content:has(.md-split-root) > .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+}
+
+.admin-content:has(.md-split-root) > .card > .form-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-content:has(.md-split-root) .field:has(.md-split-root) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.admin-content:has(.md-split-root) .md-split-root {
+  flex: 1 1 auto;
+  min-height: 280px;
 }
 
 /* ----- cards ----- */
@@ -470,7 +543,8 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 1.15rem;
-  max-width: 52rem;
+  max-width: none;
+  width: 100%;
 }
 
 .field label,
@@ -771,7 +845,7 @@ textarea.input {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 70vh;
+  max-height: min(90vh, calc(100dvh - 6rem));
   overflow: auto;
 }
 
@@ -981,6 +1055,16 @@ textarea.input {
 
 .toolbar-flag__state.is-on {
   color: #15803d;
+}
+
+.toolbar-flag--compact {
+  margin-left: 0;
+}
+
+.app-card__foot--row {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
 /* 복합 카드: 본문 링크 + 카드 안 하단 삭제 */

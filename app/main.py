@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,27 +10,29 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.db.database import SessionLocal, check_db_connection, init_db
 from app.db.seed_defaults import seed_if_empty, seed_repo_if_empty
 from app.db.seed_specs import seed_sample_spec_if_empty
 from app.mcp_app import mcp
+from app.mcp_dynamic_mount import mcp_dynamic_asgi
 from app.routers import admin as admin_routes
 
-MCP_MOUNT_PATH = "/mcp"
+logger = logging.getLogger(__name__)
 
-# session_manager는 streamable_http_app() 호출 후에만 사용 가능
-mcp_http_app = mcp.streamable_http_app()
+MCP_MOUNT_PATH = settings.mcp.mount_path.rstrip("/") or "/mcp"
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """DB 마이그레이션 + MCP Streamable HTTP 세션 매니저."""
+    """DB 마이그레이션 + MCP Streamable HTTP (게이트는 요청마다 DB에서 Host 조회)."""
     init_db()
     db = SessionLocal()
     try:
         seed_if_empty(db)
         seed_repo_if_empty(db)
         seed_sample_spec_if_empty(db)
+        mcp_dynamic_asgi.init(settings)
     finally:
         db.close()
     async with mcp.session_manager.run():
@@ -58,4 +61,4 @@ def health():
 
 
 app.include_router(admin_routes.router)
-app.mount(MCP_MOUNT_PATH, mcp_http_app)
+app.mount(MCP_MOUNT_PATH, mcp_dynamic_asgi)

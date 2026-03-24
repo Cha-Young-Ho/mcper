@@ -13,6 +13,7 @@ from app.db.rule_models import (
     AppRuleVersion,
     GlobalRuleVersion,
     McpAppPullOption,
+    McpRepoPatternPullOption,
     McpRuleReturnOptions,
     RepoRuleVersion,
 )
@@ -195,11 +196,69 @@ def repo_pattern_card_display(pattern: str) -> str:
 
 
 def get_mcp_include_repo_default(session: Session) -> bool:
-    """MCP 응답에 repository 빈 패턴(default) 스트림을 추가로 붙일지."""
+    """레거시 전역 플래그(행 없는 패턴 폴백에만 사용)."""
     row = session.get(McpRuleReturnOptions, 1)
     if row is None:
         return False
     return bool(row.include_repo_default)
+
+
+def get_mcp_include_repo_default_for_pattern(session: Session, pattern: str | None) -> bool:
+    """패턴별로 repository `default`(빈 패턴) 스트림 병합 여부. 행 없으면 전역 플래그 폴백."""
+    key = pattern if pattern is not None else ""
+    row = session.get(McpRepoPatternPullOption, key)
+    if row is not None:
+        return bool(row.include_repo_default)
+    return get_mcp_include_repo_default(session)
+
+
+def set_mcp_include_repo_default_for_pattern(
+    session: Session, pattern: str, value: bool
+) -> None:
+    key = pattern if pattern is not None else ""
+    row = session.get(McpRepoPatternPullOption, key)
+    if row is None:
+        session.add(McpRepoPatternPullOption(pattern=key, include_repo_default=value))
+    else:
+        row.include_repo_default = value
+    session.commit()
+
+
+def ensure_mcp_repo_pattern_pull_option(session: Session, pattern: str) -> None:
+    """새 repo 패턴 첫 버전 후 옵션 행이 없으면 전역 기본값으로 생성."""
+    key = pattern if pattern is not None else ""
+    if session.get(McpRepoPatternPullOption, key) is not None:
+        return
+    session.add(
+        McpRepoPatternPullOption(
+            pattern=key,
+            include_repo_default=get_mcp_include_repo_default(session),
+        )
+    )
+    session.commit()
+
+
+def get_mcp_include_app_default_global(session: Session) -> bool:
+    """앱별 행이 없을 때 쓰는 전역 기본(어드민 Global 보드에서 토글)."""
+    row = session.get(McpRuleReturnOptions, 1)
+    if row is None:
+        return False
+    return bool(row.include_app_default)
+
+
+def set_mcp_include_app_default_global(session: Session, value: bool) -> None:
+    row = session.get(McpRuleReturnOptions, 1)
+    if row is None:
+        session.add(
+            McpRuleReturnOptions(
+                id=1,
+                include_app_default=value,
+                include_repo_default=False,
+            )
+        )
+    else:
+        row.include_app_default = value
+    session.commit()
 
 
 def get_mcp_include_app_default_for_app(session: Session, app_name: str) -> bool:
@@ -211,9 +270,9 @@ def get_mcp_include_app_default_for_app(session: Session, app_name: str) -> bool
     if not key or key == "__default__":
         return False
     row = session.get(McpAppPullOption, key)
-    if row is None:
-        return False
-    return bool(row.include_app_default)
+    if row is not None:
+        return bool(row.include_app_default)
+    return get_mcp_include_app_default_global(session)
 
 
 def set_mcp_include_app_default_for_app(session: Session, app_name: str, value: bool) -> None:
@@ -655,12 +714,13 @@ def get_rules_markdown(
     uncertain = server_uncertain and not agent_origin
 
     inc_app = get_mcp_include_app_default_for_app(session, trimmed)
-    inc_repo = get_mcp_include_repo_default(session)
-    meta_extra.append(f"mcp_include_app_default={'true' if inc_app else 'false'}")
-    meta_extra.append(f"mcp_include_repo_default={'true' if inc_repo else 'false'}")
-
     g, _, _ = resolve_global_row(session, None)
     repo_r = resolve_repo_row(session, repo_match_url)
+    inc_repo = get_mcp_include_repo_default_for_pattern(
+        session, repo_r.pattern if repo_r is not None else ""
+    )
+    meta_extra.append(f"mcp_include_app_default={'true' if inc_app else 'false'}")
+    meta_extra.append(f"mcp_include_repo_default={'true' if inc_repo else 'false'}")
 
     repo_default_row: RepoRuleVersion | None = None
     if inc_repo:
@@ -728,7 +788,7 @@ def get_rule_version_snapshot(
 
     trimmed = (app_name or "").strip()
     if not trimmed:
-        inc_repo = get_mcp_include_repo_default(session)
+        inc_repo = get_mcp_include_repo_default_for_pattern(session, "")
         out["app_name"] = None
         out["app_version"] = None
         out["repo_pattern"] = None
@@ -750,7 +810,9 @@ def get_rule_version_snapshot(
 
     repo_r = resolve_repo_row(session, repo_match_url)
     inc_app = get_mcp_include_app_default_for_app(session, trimmed)
-    inc_repo = get_mcp_include_repo_default(session)
+    inc_repo = get_mcp_include_repo_default_for_pattern(
+        session, repo_r.pattern if repo_r is not None else ""
+    )
     out["mcp_include_app_default"] = inc_app
     out["mcp_include_repo_default"] = inc_repo
 
@@ -878,6 +940,7 @@ def publish_repo(
         RepoRuleVersion(pattern=key, version=nv, body=body.strip(), sort_order=so)
     )
     session.commit()
+    ensure_mcp_repo_pattern_pull_option(session, key)
     return key, nv
 
 

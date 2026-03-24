@@ -1,18 +1,14 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div class="toolbar toolbar--with-flag">
+<div class="toolbar">
   <form class="search-form" method="get" action="/admin/repo-rules" role="search">
     <input type="search" name="q" class="input search-form__input" placeholder="검색" value="{{ q }}" autocomplete="off" />
     <button type="submit" class="btn btn-primary">검색</button>
     {% if q %}<a href="/admin/repo-rules" class="btn btn-secondary">초기화</a>{% endif %}
   </form>
   <a href="/admin/repo-rules/new" class="btn btn-primary toolbar__cta">+ 새 패턴</a>
-  <form method="post" action="/admin/repo-rules/mcp-options" class="toolbar-flag">
-    <span class="toolbar-flag__label">MCP+default</span>
-    <span class="toolbar-flag__state {% if include_repo_default %}is-on{% endif %}">{% if include_repo_default %}ON{% else %}OFF{% endif %}</span>
-    <button type="submit" class="btn btn-secondary btn-sm">전환</button>
-  </form>
 </div>
+<p class="muted" style="margin-top:0.5rem;font-size:0.875rem">각 패턴 카드에서 <strong>default 포함</strong> 을 따로 켜거나 끌 수 있어요. (해당 패턴이 매칭될 때만 repository <code>__default__</code> 스트림을 추가로 붙임)</p>
 
 <div class="app-card-grid">
   {% for c in cards %}
@@ -25,13 +21,18 @@
       </div>
       <span class="app-card__cta">열기 →</span>
     </a>
-    {% if c.can_delete_stream %}
-    <div class="app-card__foot">
+    <div class="app-card__foot app-card__foot--row">
+      <form method="post" action="/admin/repo-rules/pat/{{ c.pat_segment }}/include-repo-default-toggle" class="toolbar-flag toolbar-flag--compact">
+        <span class="toolbar-flag__label">default 포함</span>
+        <span class="toolbar-flag__state {% if c.include_repo_default %}is-on{% endif %}">{% if c.include_repo_default %}ON{% else %}OFF{% endif %}</span>
+        <button type="submit" class="btn btn-secondary btn-xs">전환</button>
+      </form>
+      {% if c.can_delete_stream %}
       <form method="post" action="{{ c.url }}/delete" onsubmit="return confirm('이 패턴 스트림 전체를 삭제할까요?');">
         <button type="submit" class="btn btn-danger btn-xs">삭제</button>
       </form>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
   {% else %}
   <div class="empty-state app-card-grid__empty">Repository 룰이 없습니다.</div>
