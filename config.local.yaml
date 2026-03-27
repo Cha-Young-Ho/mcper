@@ -1,0 +1,41 @@
+# 로컬 개발용 오버레이 — 리포 루트에서 아래처럼 쓰면 이 파일이 config.yaml 위에 병합됨.
+#   export MCPER_ENV=local
+# (또는 APP_ENV=local)
+#
+# 단일 파일만 쓰고 싶으면: export MCPER_CONFIG=/절대/경로/config.yaml
+
+server:
+  host: "127.0.0.1"
+  port: 8000
+
+mcp:
+  mount_path: "/mcp"
+
+security:
+  allowed_origins: []
+
+database:
+  url: null
+
+celery:
+  broker_url: null
+  result_backend: null
+
+# --- 로컬 임베딩 (sentence-transformers, 인프로세스) ---
+# dim 은 모델 출력 차원과 pgvector 스키마가 일치해야 함.
+embedding:
+  provider: local
+  dim: 384
+  local_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+# =============================================================================
+# 나중에 AWS Bedrock 으로 바꿀 때 예시 (아래 주석 해제 + 위 embedding 블록 정리)
+# - DB/인덱스의 embedding 차원이 Titan v2 설정(dim)과 맞아야 함.
+# - 실행 역할에 bedrock:InvokeModel 권한, 리전에 모델 접근 가능해야 함.
+# =============================================================================
+# embedding:
+#   provider: bedrock
+#   dim: 1024
+#   bedrock_region: "ap-northeast-2"
+#   bedrock_model_id: "amazon.titan-embed-text-v2:0"
+#   # 리전은 보통 AWS_REGION / AWS_DEFAULT_REGION 으로도 줄 수 있음 (embedding.bedrock_region 과 동일 역할)

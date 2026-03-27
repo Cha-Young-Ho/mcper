@@ -12,12 +12,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, delete, func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.database import get_db
-from app.db.mcp_security import McpAllowedHost
 from app.db.mcp_tool_stats import McpToolCallStat
 from app.db.models import Spec
 from app.db.rule_models import (
@@ -29,7 +27,6 @@ from app.db.rule_models import (
 from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 from app.services import versioned_rules as vr
-from app.services.mcp_transport_config import effective_allowed_hosts
 from app.services.celery_client import enqueue_index_spec
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
@@ -151,65 +148,6 @@ def admin_tools(
             "mcp_calls_total": mcp_calls_total,
         },
     )
-
-
-@router.get("/mcp-transport")
-def admin_mcp_transport(
-    request: Request,
-    _user: str = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    rows = db.scalars(select(McpAllowedHost).order_by(McpAllowedHost.id)).all()
-    effective = effective_allowed_hosts(db, settings.server.port)
-    return templates.TemplateResponse(
-        request,
-        "admin/mcp_transport.html",
-        {
-            "request": request,
-            "title": "MCP 연결 (허용 Host)",
-            "rows": rows,
-            "effective_hosts": effective,
-            "listen_port": settings.server.port,
-            "mcp_mount_path": settings.mcp.mount_path,
-        },
-    )
-
-
-@router.post("/mcp-transport/host")
-def admin_mcp_transport_add_host(
-    _user: str = Depends(require_admin),
-    db: Session = Depends(get_db),
-    host_entry: str = Form(""),
-    note: str = Form(""),
-):
-    h = (host_entry or "").strip()
-    if not h:
-        return RedirectResponse(
-            "/admin/mcp-transport?err=empty", status_code=303
-        )
-    n = (note or "").strip() or None
-    db.add(McpAllowedHost(host_entry=h, note=n))
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        return RedirectResponse(
-            "/admin/mcp-transport?err=duplicate", status_code=303
-        )
-    return RedirectResponse("/admin/mcp-transport?msg=added", status_code=303)
-
-
-@router.post("/mcp-transport/host/{host_id}/delete")
-def admin_mcp_transport_delete_host(
-    host_id: int,
-    _user: str = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    row = db.get(McpAllowedHost, host_id)
-    if row is not None:
-        db.delete(row)
-        db.commit()
-    return RedirectResponse("/admin/mcp-transport?msg=deleted", status_code=303)
 
 
 # ----- Global rules (version board) -----

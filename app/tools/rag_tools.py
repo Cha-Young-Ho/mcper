@@ -20,6 +20,7 @@ from app.services.search_hybrid import (
     traverse_code_graph,
 )
 from app.services.embeddings import embed_query
+from app.services.spec_indexing import insert_spec_chunks_with_embeddings
 
 
 def _parse_json_list(raw: Any) -> list[Any]:
@@ -100,10 +101,55 @@ def analyze_code_impact_impl(query: str, app_target: str) -> str:
             {
                 "ok": False,
                 "error": str(exc),
-                "action_required": "check EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL, code index",
+                "action_required": "check embedding.dim / provider, code index",
             },
             ensure_ascii=False,
         )
+    finally:
+        db.close()
+
+
+def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str:
+    """로컬에서 임베딩한 청크를 DB에 직접 반영 (서버 워커 큐 밀릴 때 폴백)."""
+    record_mcp_tool_call("push_spec_chunks_with_embeddings")
+    if isinstance(chunks_json, str):
+        s = chunks_json.strip()
+        if not s:
+            return json.dumps(
+                {"ok": False, "error": "chunks_json empty"},
+                ensure_ascii=False,
+            )
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError as exc:
+            return json.dumps(
+                {"ok": False, "error": f"invalid json: {exc}"},
+                ensure_ascii=False,
+            )
+    elif isinstance(chunks_json, list):
+        data = chunks_json
+    else:
+        return json.dumps(
+            {
+                "ok": False,
+                "error": "chunks_json must be JSON array string or list",
+            },
+            ensure_ascii=False,
+        )
+    if not isinstance(data, list):
+        return json.dumps(
+            {"ok": False, "error": "chunks must be a JSON array"},
+            ensure_ascii=False,
+        )
+    db: Session = SessionLocal()
+    try:
+        return json.dumps(
+            insert_spec_chunks_with_embeddings(db, spec_id, data),
+            ensure_ascii=False,
+        )
+    except Exception as exc:
+        db.rollback()
+        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
     finally:
         db.close()
 
@@ -125,7 +171,10 @@ def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: i
                 {
                     "ok": False,
                     "error": f"embed failed: {exc}",
-                    "action_required": "install sentence-transformers and match EMBEDDING_DIM to model",
+                    "action_required": (
+                        "config.yaml embedding.provider(local|openai|localhost|bedrock) 및 "
+                        "embedding.dim·API 키·모델을 맞출 것"
+                    ),
                 },
                 ensure_ascii=False,
             )
@@ -171,6 +220,15 @@ def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: i
 
 
 def register_rag_tools(mcp: FastMCP) -> None:
+    @mcp.tool()
+    def push_spec_chunks_with_embeddings(spec_id: int, chunks_json: Any) -> str:
+        """
+        서버 임베딩 대신 로컬에서 계산한 벡터로 spec_chunks 를 교체한다.
+        chunks_json: [{ "content": "...", "embedding": [float,...], "metadata": {...} }, ...]
+        EMBEDDING_DIM 과 모델 출력 차원이 일치해야 한다.
+        """
+        return push_spec_chunks_with_embeddings_impl(spec_id, chunks_json)
+
     @mcp.tool()
     def push_code_index(
         app_target: str,

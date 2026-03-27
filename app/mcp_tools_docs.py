@@ -159,6 +159,26 @@ MCP_TOOLS: list[dict[str, Any]] = [
         ],
     },
     {
+        "name": "push_spec_chunks_with_embeddings",
+        "one_liner": "로컬에서 임베딩한 기획서 청크를 spec_chunks 에 직접 반영 (워커 부하 폴백)",
+        "title": "push_spec_chunks_with_embeddings — 로컬 벡터 삽입",
+        "summary": (
+            "서버 Celery 큐가 길거나 임베딩 GPU가 병목일 때, 에이전트가 **같은 차원**의 벡터를 만들어 "
+            "한 번에 넣는다. 기존 해당 spec_id 청크는 삭제 후 교체."
+        ),
+        "params": [
+            "spec_id (필수): specs.id",
+            "chunks_json: JSON 배열 문자열 — 각 원소에 content, embedding(float[]), metadata(선택)",
+        ],
+        "notes": [
+            "벡터 차원·모델은 서버 `embedding.dim`·`embedding.provider` 및 해당 모델 필드(local_model·openai_model·localhost_model·bedrock 등)와 맞출 것.",
+            "먼저 `upload_spec_to_db` 로 spec 행을 만든 뒤 이 툴로 청크만 채우는 패턴을 권장.",
+        ],
+        "examples": [
+            '`push_spec_chunks_with_embeddings(spec_id=1, chunks_json="[{\\"content\\":\\"…\\",\\"embedding\\":[…]}]")`',
+        ],
+    },
+    {
         "name": "push_code_index",
         "one_liner": "코드 AST/심볼 인덱스를 Celery 워커 큐에 넣음 (임베딩은 워커에서)",
         "title": "push_code_index — 코드 그래프 인덱싱",

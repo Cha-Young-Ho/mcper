@@ -1,8 +1,19 @@
-# MCPER 부트스트랩 예시. 복사: cp config.example.yaml config.yaml
-# 경로: MCPER_CONFIG 또는 MCPER_CONFIG_PATH
+# MCPER 부트스트랩 예시.
 #
-# 문자열에 ${VAR} / ${VAR:-기본값} 를 쓸 수 있음(로드 시 os.environ 으로 치환).
-# 같은 키는 표준 환경변수가 YAML 보다 우선 (DATABASE_URL, PORT, …).
+# ┌─ 어떤 파일을 쓰나 ─────────────────────────────────────────────────────────
+# 1) 명시 경로 (병합 없음, 이 파일 하나만)
+#    export MCPER_CONFIG=/path/to/my-config.yaml
+#    # 또는 MCPER_CONFIG_PATH (동일)
+#
+# 2) 환경별 병합 (리포 루트 기준)
+#    - 먼저 config.yaml 로드
+#    - MCPER_ENV 또는 APP_ENV 가 있으면 config.<env>.yaml 을 깊게 병합 (환경 파일이 우선)
+#    예: cp config.example.yaml config.yaml
+#        export MCPER_ENV=local
+#        → config.yaml + config.local.yaml
+#
+# 문자열에 ${VAR} / ${VAR:-기본값} 를 쓸 수 있음(로드 후 os.environ 치환).
+# 같은 키는 표준 환경변수가 YAML 보다 우선 (DATABASE_URL, PORT, EMBEDDING_PROVIDER, …).
 
 server:
   host: "0.0.0.0"
@@ -12,7 +23,7 @@ mcp:
   mount_path: "/mcp"
 
 security:
-  # MCP TransportSecurity allowed_origins (Host 는 어드민 «MCP 연결» DB)
+  # MCP TransportSecurity allowed_origins (Host 는 MCP_ALLOWED_HOSTS·기동 시 DB 동기화)
   allowed_origins: []
   # 예: [ "http://203.0.113.7:8001" ]
 
@@ -26,6 +37,26 @@ celery:
   result_backend: null
   # 예: broker_url: "${CELERY_BROKER_URL:-redis://redis:6379/0}"
 
-# RAG/pgvector — DB 스키마·임베딩 길이와 맞출 것 (env: EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL)
-embedding_dim: 384
-local_embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+# RAG/pgvector — embedding.dim 과 DB(pgvector)·인덱스가 일치해야 함
+# provider: local | openai | localhost | bedrock
+# env 로 덮어쓰기: EMBEDDING_PROVIDER, EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL,
+#   OPENAI_API_KEY, OPENAI_EMBEDDING_MODEL, OPENAI_BASE_URL,
+#   LOCALHOST_EMBEDDING_BASE_URL, LOCALHOST_EMBEDDING_MODEL, LOCALHOST_EMBEDDING_API_KEY,
+#   BEDROCK_REGION, BEDROCK_EMBEDDING_MODEL_ID
+embedding:
+  provider: local
+  dim: 384
+  local_model: "sentence-transformers/all-MiniLM-L6-v2"
+  # openai_api_key: "${OPENAI_API_KEY}"
+  # openai_model: "text-embedding-3-small"
+  # openai_base_url: null
+  # --- provider: localhost (OpenAI 호환 /v1/embeddings, 예: Ollama) ---
+  # localhost_base_url: "http://127.0.0.1:11434/v1"
+  # localhost_model: "nomic-embed-text"
+  # localhost_api_key: null
+
+  # --- provider: bedrock (예시 — 실제 전환 시 embedding 블록을 아래처럼 맞추고 dim/DB 정합 유지) ---
+  # provider: bedrock
+  # dim: 1024
+  # bedrock_region: "ap-northeast-2"
+  # bedrock_model_id: "amazon.titan-embed-text-v2:0"

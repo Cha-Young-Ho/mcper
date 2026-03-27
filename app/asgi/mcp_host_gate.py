@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -21,6 +22,12 @@ logger = logging.getLogger(__name__)
 ASGIApp = Callable[[dict[str, Any], Callable, Callable], Any]
 
 
+def _mcp_transport_gate_bypassed() -> bool:
+    """Host/Origin 앱 레벨 검사 생략 — 네트워크는 SG·ALB 등에서 제어할 때 ``MCP_BYPASS_TRANSPORT_GATE=1``."""
+    v = (os.environ.get("MCP_BYPASS_TRANSPORT_GATE") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def _header(scope: dict[str, Any], name: bytes) -> str | None:
     for k, v in scope.get("headers") or []:
         if k.lower() == name.lower():
@@ -36,6 +43,11 @@ def _sync_validate(
     content_type: str | None,
 ) -> tuple[bool, int, bytes]:
     """(통과 여부, 실패 시 status, body)."""
+    if _mcp_transport_gate_bypassed():
+        if method.upper() == "POST" and not content_type_ok_for_mcp_post(content_type):
+            return False, 400, b"Invalid Content-Type header"
+        return True, 0, b""
+
     db = SessionLocal()
     try:
         allowed_hosts = effective_allowed_hosts(db, app_settings.server.port)

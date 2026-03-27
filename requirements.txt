@@ -17,3 +17,5 @@ pgvector
 celery[redis]
 redis
 sentence-transformers
+httpx
+boto3

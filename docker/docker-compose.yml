@@ -19,7 +19,9 @@ services:
       redis:
         condition: service_started
     environment:
-      # MCP 허용 Host 는 /admin → «MCP 연결» 에서 DB 등록 (TransportSecurity 정식). 421 방지용 Host 가짜 조작 제거됨.
+      # MCP Host/Origin 앱 검사 끔 → SG·ALB에서만 제어. 끄려면 0 또는 unset.
+      - MCP_BYPASS_TRANSPORT_GATE=1
+      # MCP 허용 Host: 웹 기동 시 env(MCP_ALLOWED_HOSTS, EC2 IMDS 퍼블릭 IP 등)로 DB 자동 INSERT — 어드민 수동 등록 없음.
       # 선택: config.yaml 마운트 시 MCPER_CONFIG=/app/config.yaml
       # Origins 가 필요하면 MCP_ALLOWED_ORIGINS=http://공인IP:8001 또는 config.yaml security.allowed_origins
       - DATABASE_URL=postgresql://user:password@db:5432/mcpdb

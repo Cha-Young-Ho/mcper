@@ -22,5 +22,10 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
+from app.config import settings as _settings
+from app.services.embeddings import configure_embedding_backend
+
+configure_embedding_backend(_settings.embedding)
+
 from app.worker import tasks as _tasks  # noqa: E402, F401 — register task decorators
 

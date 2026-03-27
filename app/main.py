@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,10 +14,11 @@ from app.db.database import SessionLocal, check_db_connection, init_db
 from app.db.seed_defaults import seed_if_empty, seed_repo_if_empty
 from app.db.seed_specs import seed_sample_spec_if_empty
 from app.mcp_app import mcp
+from app.services.embeddings import configure_embedding_backend
+from app.services.mcp_auto_hosts import sync_mcp_allowed_hosts
+from app.services.rag_health import rag_health_payload
 from app.mcp_dynamic_mount import mcp_dynamic_asgi
 from app.routers import admin as admin_routes
-
-logger = logging.getLogger(__name__)
 
 MCP_MOUNT_PATH = settings.mcp.mount_path.rstrip("/") or "/mcp"
 
@@ -26,12 +26,14 @@ MCP_MOUNT_PATH = settings.mcp.mount_path.rstrip("/") or "/mcp"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """DB 마이그레이션 + MCP Streamable HTTP (게이트는 요청마다 DB에서 Host 조회)."""
+    configure_embedding_backend(settings.embedding)
     init_db()
     db = SessionLocal()
     try:
         seed_if_empty(db)
         seed_repo_if_empty(db)
         seed_sample_spec_if_empty(db)
+        sync_mcp_allowed_hosts(db, settings)
         mcp_dynamic_asgi.init(settings)
     finally:
         db.close()
@@ -58,6 +60,17 @@ def health():
             content={"status": "unhealthy", "database": "down"},
         )
     return {"status": "ok", "database": "up"}
+
+
+@app.get("/health/rag")
+def health_rag():
+    """RAG/Celery 부하 관측: DB + (가능하면) Redis 브로커·기본 큐 깊이."""
+    if not check_db_connection():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "down"},
+        )
+    return {"status": "ok", "database": "up", **rag_health_payload()}
 
 
 app.include_router(admin_routes.router)

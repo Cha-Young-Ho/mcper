@@ -38,7 +38,6 @@
       else if (key === "global-rules" && path.indexOf("/admin/global-rules") === 0) active = true;
       else if (key === "repo-rules" && path.indexOf("/admin/repo-rules") === 0) active = true;
       else if (key === "app-rules" && path.indexOf("/admin/app-rules") === 0) active = true;
-      else if (key === "mcp-transport" && path.indexOf("/admin/mcp-transport") === 0) active = true;
       else if (key === "tools" && path.indexOf("/admin/tools") === 0) active = true;
       else if (key === "seed" && path.indexOf("/admin/seed") === 0) active = true;
       a.classList.toggle("is-active", active);

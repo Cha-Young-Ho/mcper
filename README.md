@@ -24,8 +24,12 @@ docker/
   Dockerfile
   docker-compose.yml
 docs/
+  ARCHITECTURE_MASTER.md    # 온보딩·에이전트용 설계 Q&A + 시스템 프롬프트
+  LOCAL_EMBEDDING_FALLBACK.md  # 서버 부하 시 로컬 임베딩·MCP 툴 절차
   mcp-rules.example.mdc   # Cursor `.cursor/rules/mcp-rules.mdc` 템플릿 (alwaysApply)
   repository-rule-mcper-specs.md  # 클라이언트 에이전트용: 기획서 업로드·검색 룰 (Repo rules / CLAUDE.md / .cursor 에 복사)
+scripts/
+  local_embed_spec.py     # Celery 없이 spec_id 로컬 임베딩 후 DB 반영
 main.py                  # uvicorn 호환 진입점 (app.main re-export)
 requirements.txt
 ```
@@ -44,9 +48,14 @@ requirements.txt
 | `EMBEDDING_DIM` | 벡터 차원(**선택한 sentence-transformers 모델 출력과 동일**해야 함). 기본 MiniLM → `384` | `384` |
 | `LOCAL_EMBEDDING_MODEL` | HuggingFace / sentence-transformers 모델 id | `sentence-transformers/all-MiniLM-L6-v2` |
 | `MCPER_CONFIG` / `MCPER_CONFIG_PATH` | 부트스트랩 YAML 경로 (선택) | `/app/config.yaml` |
-| `MCP_ALLOWED_ORIGINS` | MCP `TransportSecurity`용 Origin 목록, 쉼표 구분 (선택) | `http://203.0.113.7:8001` |
+| `MCP_BYPASS_TRANSPORT_GATE` | `1` 이면 MCP 요청의 **Host·Origin 앱 검사 생략** (421/403 안 냄). 네트워크는 SG/방화벽으로 제어할 때 사용. POST는 여전히 `Content-Type: application/json` 필요 | `1` |
+| `MCP_ALLOWED_ORIGINS` | MCP `TransportSecurity`용 Origin 목록, 쉼표 구분 (선택). 게이트 바이패스 시 무시됨 | `http://203.0.113.7:8001` |
+| `MCP_ALLOWED_HOSTS` | 허용 `Host` 헤더, 쉼표 구분 (ALB DNS 등 공유 DB·오토스케일 시 권장) | `my-alb.region.elb.amazonaws.com:443` |
+| `MCP_PUBLIC_HOST` | 단일 `host:port` (선택) | `mcp.example.com:443` |
+| `MCP_AUTO_EC2_PUBLIC_IP` | EC2 IMDS로 퍼블릭 IPv4 + `MCP_EXTERNAL_PORT` 를 DB에 자동 추가 (기본 `1`, 끄려면 `0`) | `1` |
+| `MCP_EXTERNAL_PORT` | 호스트→컨테이너 포트 매핑의 **바깥** 포트 (기본 `8001`) | `8001` |
 
-루트에 [`config.example.yaml`](config.example.yaml) 을 참고해 `config.yaml` 을 두면 `server` / `mcp.mount_path` / `security.allowed_origins` / `database` / `celery` 등을 한곳에서 읽는다. YAML 문자열 안에는 ``${VAR}`` / ``${VAR:-기본값}`` 치환을 지원한다. **같은 항목은 표준 환경변수가 YAML 보다 우선**한다 (`DATABASE_URL`, `PORT`, `CELERY_BROKER_URL` 등 — [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) 의 `EnvBootstrapSettings`). **MCP에 허용할 `Host` 헤더** 는 YAML이 아니라 **어드민 → «MCP 연결»** DB.
+루트에 [`config.example.yaml`](config.example.yaml) 을 참고해 `config.yaml` 을 두면 `server` / `mcp.mount_path` / `security.allowed_origins` / `database` / `celery` 등을 한곳에서 읽는다. YAML 문자열 안에는 ``${VAR}`` / ``${VAR:-기본값}`` 치환을 지원한다. **같은 항목은 표준 환경변수가 YAML 보다 우선**한다 (`DATABASE_URL`, `PORT`, `CELERY_BROKER_URL` 등 — [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) 의 `EnvBootstrapSettings`). **MCP에 허용할 `Host` 헤더** 는 **기동 시** [`app/services/mcp_auto_hosts.py`](app/services/mcp_auto_hosts.py) 가 위 env 를 읽어 `mcp_allowed_hosts` 테이블에 **없으면 INSERT** 한다(수동 어드민 화면 없음).
 
 **Docker 리빌드:** [`docker/Dockerfile`](docker/Dockerfile) 은 `requirements.txt` → `pip` → 소스 순으로 레이어를 쌓고, 루트 [`.dockerignore`](.dockerignore) 로 컨텍스트를 줄였다. `requirements.txt` 를 안 바꿨으면 코드만 고친 뒤 **이미지 리빌드 없이** 볼륨 마운트 + `uvicorn --reload` 만으로 반영된다.
 
@@ -58,7 +67,7 @@ requirements.txt
 | `exporting layers` | 레이어가 무거우면 압축·저장이 길어짐. **web / worker 가 같은 이미지 태그** (`spec-mcp:local`) 를 쓰면 동일 Dockerfile 을 **한 번만** 빌드·내보내기(이전에는 서비스마다 export 가 중복될 수 있음). |
 | 매번 `--build` | **코드만** 고친 거면 `docker compose up` 만으로 충분하고 **`--build`는 생략**하는 게 맞음(볼륨 `..:/app` + `--reload`). **의존성/Dockerfile을 바꿨을 때만** `build` 또는 `up --build`. |
 
-**가이드와의 차이 (이 레포 기준)** MCP 허용 **Host** 는 **어드민 «MCP 연결» + DB** 에 등록하고, **매 MCP 요청** [`app/asgi/mcp_host_gate.py`](app/asgi/mcp_host_gate.py) 에서 조회해 검사한다 (재시작·ASGI 갈아끼우기 불필요). SDK 쪽 DNS 리바인딩 검사는 끄고, **Origin** 은 `config`/환경변수 `allowed_origins` 로 [`mcp_host_gate`](app/asgi/mcp_host_gate.py) 에서 검사한다.
+**가이드와의 차이 (이 레포 기준)** `MCP_BYPASS_TRANSPORT_GATE=1` 이면 Host/Origin 은 앱에서 안 막는다( EC2 보안 그룹·ALB 등으로만 제어 ). 그렇지 않을 때는 MCP 허용 **Host** 를 **환경변수 + DB** (`sync_mcp_allowed_hosts`) 로 넣고, **매 MCP 요청** [`app/asgi/mcp_host_gate.py`](app/asgi/mcp_host_gate.py) 에서 검사한다. SDK 쪽 DNS 리바인딩 검사는 끄고, **Origin** 은 `config`/환경변수 `allowed_origins` 로 검사한다(바이패스 시 생략).
 
 ## Docker로 실행
 
@@ -75,7 +84,7 @@ docker compose -f docker/docker-compose.yml up --build
 `db`는 `pg_isready` 헬스체크 후에만 `web`이 시작되도록(`depends_on: condition: service_healthy`) 맞춰 두었고, 앱 쪽 `init_db()`도 DB가 늦게 뜨는 경우 짧게 재시도한다.
 
 - **HTTP (호스트)**: `http://localhost:8001` → 컨테이너 내부 `8000`
-- **헬스체크**: `GET http://localhost:8001/health`
+- **헬스체크**: `GET http://localhost:8001/health` — DB 연결. 부하·큐: `GET /health/rag` (Redis 브로커 ping + 기본 Celery 큐 깊이)
 - **MCPER 어드민 (HTTP Basic)**: `http://localhost:8001/admin` — 대시보드(MCP **호출 수**), **기획서**(상세에서 **수정·삭제**, 삭제 시 `spec_chunks` CASCADE) / **기획서–코드**, **Rules**(접이식: Global / Repository / Apps), **Tools**(접이식 상세), 재시드. Compose 기본 계정은 `ADMIN_USER` / `ADMIN_PASSWORD` (기본값 `admin` / `changeme`).
 - **Postgres (호스트에서 접속할 때만)**: `localhost:5433` → 컨테이너 `5432` (`web`은 Docker 네트워크 안에서 `db:5432`로 붙으므로 `DATABASE_URL` 변경 없음)
 - **Redis (호스트)**: `localhost:6380` → 컨테이너 `6379` (Celery 브로커)
@@ -108,28 +117,29 @@ docker build -f docker/Dockerfile -t spec-mcp .
 
 Docker가 떠 있는지, 포트가 `8001`인지 먼저 확인할 것.
 
-**EC2 / 공인 IP로 붙일 때:** 클라이언트가 보내는 `Host` 와 정확히 같아야 한다. 예: `ports: "8001:8000"` 이면 Cursor URL 은 `http://<공인IP>:8001/mcp` 이고, 어드민 **«MCP 연결»** 에 `<공인IP>:8001` 을 등록한다. (이전의 Host 헤더를 `127.0.0.1` 로 바꾸는 우회 ASGI 는 제거되었다.)
+**EC2 / 공인 IP로 붙일 때:** 클라이언트가 보내는 `Host` 와 DB 허용 목록에 **동일 문자열**이 있어야 한다. 예: `ports: "8001:8000"` 이면 Cursor URL 은 `http://<공인IP>:8001/mcp` 이고, 기본적으로 **IMDS**로 `<공인IP>:8001` 이 기동 시 자동 등록된다. ALB/도메인만 쓰면 `MCP_ALLOWED_HOSTS` 로 고정 호스트를 넣고 `MCP_AUTO_EC2_PUBLIC_IP=0` 으로 퍼블릭 IP 행이 쌓이지 않게 할 수 있다.
 
-**`/health` 는 200인데 MCP 만 `421` / `Invalid Host`:** DB·어드민에 **클라이언트가 보내는 `Host` 와 동일한** `host:port` 가 들어가 있는지 확인한다. 게이트는 [`mcp_host_gate`](app/asgi/mcp_host_gate.py) 가 **매 요청** DB를 본다. 여전히 이상하면 `mcp>=1.26.0` 과 이미지 재빌드를 확인한다.
+**`/health` 는 200인데 MCP 만 `421` / `Invalid Host`:** `mcp_allowed_hosts` 에 **클라이언트가 보내는 `Host` 와 동일한** `host:port` 가 있는지 확인한다 (`SELECT * FROM mcp_allowed_hosts` 또는 env 수정 후 재기동). 게이트는 [`mcp_host_gate`](app/asgi/mcp_host_gate.py) 가 **매 요청** DB를 본다. 여전히 이상하면 `mcp>=1.26.0` 과 이미지 재빌드를 확인한다.
 
 ## MCP 툴
 
 1. **`upload_spec_to_db`** — `content`, `app_target`, `base_branch`, `related_files` → `specs` INSERT.
 2. **`search_spec_and_code`** — `query`, `app_target` → `spec_chunks`가 있으면 **벡터+FTS+RRF** 하이브리드, 없으면 기존 ILIKE (JSON).
-3. **`push_code_index`** — 코드 노드/엣지 JSON을 큐에 넣어 워커가 임베딩 후 `code_nodes`/`code_edges`에 저장.
-4. **`analyze_code_impact`** — 질의로 시드 노드 후 그래프 상·하류 JSON.
-5. **`find_historical_reference`** — 신규 기획 텍스트와 유사한 과거 스펙 청크·`related_files`.
-6. **`get_global_rule`** — **조회 전용**. 인자: `app_name` (선택), `version` (선택), **`origin_url` (선택, 권장 — 에이전트가 `git remote -v` 로 얻은 origin fetch URL)**, `repo_root` (선택).  
+3. **`push_spec_chunks_with_embeddings`** — `spec_id`, `chunks_json`(로컬에서 임베딩한 청크 배열) → 워커 없이 `spec_chunks` 교체. 큐 밀림·서버 GPU 병목 시 [`docs/LOCAL_EMBEDDING_FALLBACK.md`](docs/LOCAL_EMBEDDING_FALLBACK.md) 참고.
+4. **`push_code_index`** — 코드 노드/엣지 JSON을 큐에 넣어 워커가 임베딩 후 `code_nodes`/`code_edges`에 저장.
+5. **`analyze_code_impact`** — 질의로 시드 노드 후 그래프 상·하류 JSON.
+6. **`find_historical_reference`** — 신규 기획 텍스트와 유사한 과거 스펙 청크·`related_files`.
+7. **`get_global_rule`** — **조회 전용**. 인자: `app_name` (선택), `version` (선택), **`origin_url` (선택, 권장 — 에이전트가 `git remote -v` 로 얻은 origin fetch URL)**, `repo_root` (선택).  
    - `app_name` 없음: **global 만**. `version` 은 **global** 에 적용.  
    - `app_name` 있음: **global 최신** + **repository 룰**(URL 패턴; **`origin_url` 우선**, 없으면 서버 Git) + **앱 룰**; `version` 은 **앱 룰** 에만 적용.  
    - 요청한 `version` 행이 없으면 서버가 **최신으로 폴백**하고 본문에 안내 문구를 붙임.  
    - INI **`app_name` 만** (예: `your_app_name`). `/master` 등 금지.  
    - 2차 응답: MCP는 본문만 제공 → 에이전트가 환경별로 저장. Cursor 기본: `.cursor/rules/mcp-rules.mdc`. 예시: [`docs/mcp-rules.example.mdc`](docs/mcp-rules.example.mdc).
-7. **`check_rule_versions`** — `app_name`·`origin_url`·`repo_root` (선택). 서버 DB **최신** global / app / repo 의 **버전 정수**만 JSON. 로컬 `rule_meta` 와 다르면 `get_global_rule` 로 다시 받아 로컬을 최신으로 맞출 것.
-8. **`publish_global_rule`** — `body` 만. **버전 번호는 서버가 자동 증가** (클라이언트가 버전 지정 불가). JSON `{ "scope", "version" }` 반환.
-9. **`publish_repo_rule`** — `pattern`, `body`. origin URL에 매칭되는 **패턴별** 다음 버전을 서버가 부여. JSON `{ "scope", "pattern", "version" }`.
-10. **`publish_app_rule`** — `app_name`, `body` 만. **앱 룰 전체 본문**을 새 버전으로. JSON `{ "scope", "app_name", "version" }`.
-11. **`append_to_app_rule`** — `app_name`, `append_markdown`. **최신 앱 룰 뒤에** 덧붙여 새 버전. JSON `{ "scope", "app_name", "version", "appended": true }`.
+8. **`check_rule_versions`** — `app_name`·`origin_url`·`repo_root` (선택). 서버 DB **최신** global / app / repo 의 **버전 정수**만 JSON. 로컬 `rule_meta` 와 다르면 `get_global_rule` 로 다시 받아 로컬을 최신으로 맞출 것.
+9. **`publish_global_rule`** — `body` 만. **버전 번호는 서버가 자동 증가** (클라이언트가 버전 지정 불가). JSON `{ "scope", "version" }` 반환.
+10. **`publish_repo_rule`** — `pattern`, `body`. origin URL에 매칭되는 **패턴별** 다음 버전을 서버가 부여. JSON `{ "scope", "pattern", "version" }`.
+11. **`publish_app_rule`** — `app_name`, `body` 만. **앱 룰 전체 본문**을 새 버전으로. JSON `{ "scope", "app_name", "version" }`.
+12. **`append_to_app_rule`** — `app_name`, `append_markdown`. **최신 앱 룰 뒤에** 덧붙여 새 버전. JSON `{ "scope", "app_name", "version", "appended": true }`.
 
 **에이전트 트리거:** 프로젝트 루트에 `.cursorrules`를 두고 "세션 시작 시 get_global_rule 호출" 문구를 넣으면 유리하다. 예시는 [`.cursorrules.example`](.cursorrules.example) 참고.
 
