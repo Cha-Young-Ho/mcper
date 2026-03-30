@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import difflib
+import json
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, delete, func, select
@@ -26,7 +28,7 @@ from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 from app.services import versioned_rules as vr
 from app.services.celery_client import enqueue_index_spec, enqueue_or_index_sync
-from app.services.document_parser import parse_uploaded_file
+from app.services.document_parser import fetch_url_as_text, parse_uploaded_file
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -1204,6 +1206,46 @@ async def plan_bulk_upload_submit(
     )
 
 
+@router.post("/documents/urls")
+async def bulk_register_urls(
+    urls: list[str] = Body(...),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """Bulk register URLs as documents. Fetches text for each URL, saves as Spec, and enqueues indexing."""
+    app_key = ""
+    base_branch = "main"
+    results = []
+    for url in urls:
+        url = url.strip()
+        if not url:
+            continue
+        try:
+            text = await fetch_url_as_text(url)
+            if not text.strip():
+                results.append({"url": url, "ok": False, "error": "URL 내용이 비어 있습니다"})
+                continue
+            spec = Spec(
+                title=url,
+                content=text,
+                app_target=app_key,
+                base_branch=(base_branch or "main").strip() or "main",
+                related_files=[],
+            )
+            db.add(spec)
+            db.flush()
+            index_result = enqueue_or_index_sync(spec.id)
+            db.commit()
+            results.append({"url": url, "ok": True, "spec_id": spec.id, **index_result})
+        except Exception as exc:
+            db.rollback()
+            results.append({"url": url, "ok": False, "error": str(exc)})
+
+    ok_count = sum(1 for r in results if r["ok"])
+    fail_count = len(results) - ok_count
+    return JSONResponse({"ok_count": ok_count, "fail_count": fail_count, "results": results})
+
+
 # ----- 기획서–코드 (연결 파일) -----
 
 
@@ -1277,6 +1319,132 @@ def plan_code_detail(
 
 
 # ----- Destructive re-seed -----
+
+
+# ----- Rule 편의성 기능 (㉚ diff / ㉛ rollback / ㉜ export-import) -----
+
+
+@router.get("/rules/{rule_id}/diff")
+def rule_diff(
+    rule_id: int,
+    v1: int,
+    v2: int,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Return unified diff between two versions of a global rule.
+    rule_id is accepted for API consistency but global rules use a single stream.
+    Returns JSON: {"v1": int, "v2": int, "diff": str}
+    """
+    row1 = db.scalars(
+        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v1)
+    ).first()
+    row2 = db.scalars(
+        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v2)
+    ).first()
+
+    if row1 is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v1} not found")
+    if row2 is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v2} not found")
+
+    lines1 = row1.body.splitlines(keepends=True)
+    lines2 = row2.body.splitlines(keepends=True)
+    diff_lines = list(
+        difflib.unified_diff(
+            lines1,
+            lines2,
+            fromfile=f"v{v1}",
+            tofile=f"v{v2}",
+        )
+    )
+    return JSONResponse({"v1": v1, "v2": v2, "diff": "".join(diff_lines)})
+
+
+@router.post("/rules/{rule_id}/rollback")
+def rule_rollback(
+    rule_id: int,
+    target_version: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Roll back a global rule to a specific version by creating a new version
+    with the content of the target version (append-only principle).
+    """
+    try:
+        new_version = vr.rollback_global_rule(db, target_version)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return JSONResponse(
+        {"ok": True, "rolled_back_to": target_version, "new_version": new_version}
+    )
+
+
+@router.get("/rules/export")
+def export_rules(
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """Export all rules (global + app + repo latest versions) as JSON."""
+    data = vr.export_rules_json(db)
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": "attachment; filename=rules_export.json"},
+    )
+
+
+@router.post("/rules/import")
+async def import_rules(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Import rules from a JSON export file.
+    Expects the same structure produced by GET /admin/rules/export.
+    Each rule type is published as a new version (append-only).
+    """
+    raw = await file.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid JSON: {exc}") from exc
+
+    results: dict[str, object] = {}
+
+    # global
+    global_section = data.get("global", {})
+    global_body = (global_section.get("body") or "").strip() if isinstance(global_section, dict) else ""
+    if global_body:
+        new_gv = vr.publish_global(db, global_body)
+        results["global"] = {"new_version": new_gv}
+
+    # apps
+    apps_imported: dict[str, int] = {}
+    for app_name, info in (data.get("apps") or {}).items():
+        body = (info.get("body") or "").strip() if isinstance(info, dict) else ""
+        if not body:
+            continue
+        _, new_v = vr.publish_app(db, app_name, body)
+        apps_imported[app_name] = new_v
+    if apps_imported:
+        results["apps"] = apps_imported
+
+    # repos
+    repos_imported: dict[str, int] = {}
+    for pat_key, info in (data.get("repos") or {}).items():
+        body = (info.get("body") or "").strip() if isinstance(info, dict) else ""
+        if not body:
+            continue
+        pattern = "" if pat_key == "__default__" else pat_key
+        _, new_v = vr.publish_repo(db, pattern, body)
+        repos_imported[pat_key] = new_v
+    if repos_imported:
+        results["repos"] = repos_imported
+
+    return JSONResponse({"ok": True, "imported": results})
 
 
 @router.get("/seed/confirm")

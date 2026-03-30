@@ -1,41 +1,41 @@
 # ── Core Web Framework ─────────────────────────────────────────
-fastapi==0.115.12
-uvicorn[standard]==0.34.2
-python-multipart==0.0.20
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+python-multipart==0.0.22
 jinja2==3.1.6
 
 # ── MCP ────────────────────────────────────────────────────────
 # transport_security 파라미터 필수 (미만이면 원격 MCP 421 발생)
-mcp>=1.26.0
+mcp==1.26.0
 
 # ── Data / Validation ──────────────────────────────────────────
-pydantic==2.11.3
-pydantic-settings==2.8.1
-pyyaml==6.0.2
+pydantic==2.12.5
+pydantic-settings==2.13.1
+pyyaml==6.0.3
 
 # ── Database ───────────────────────────────────────────────────
-sqlalchemy==2.0.40
-psycopg2-binary==2.9.10
-pgvector==0.3.6
-alembic==1.15.2
+sqlalchemy==2.0.48
+psycopg2-binary==2.9.11
+pgvector==0.4.2
+alembic==1.18.4
 
 # ── Task Queue ─────────────────────────────────────────────────
-celery[redis]==5.5.1
-redis==5.2.1
+celery[redis]==5.6.3
+redis==7.4.0
 
 # ── Embedding ──────────────────────────────────────────────────
-sentence-transformers==4.1.0
-boto3==1.37.23          # Bedrock 백엔드 (opt-in)
+sentence-transformers==5.3.0
+boto3==1.42.78
 
 # ── HTTP Client ────────────────────────────────────────────────
 httpx==0.28.1
 
 # ── Auth (MCPER_AUTH_ENABLED=true 시 사용) ─────────────────────
-python-jose[cryptography]==3.3.0   # JWT
-passlib[bcrypt]==1.7.4             # 패스워드 해싱
-bcrypt==4.2.1
-authlib==1.5.1                     # OAuth2 (Google, GitHub SSO)
-itsdangerous==2.2.0                # 세션 서명
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==5.0.0
+authlib==1.6.9
+itsdangerous==2.2.0
 
 # ── Optional: Document Parsing (MCPER_DOC_PARSE_ENABLED=true) ──
 # pdfminer.six==20221105   # PDF 파싱
