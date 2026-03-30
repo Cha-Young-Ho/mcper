@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcper-config
+  namespace: mcper
+data:
+  EMBEDDING_DIM: "384"
+  EMBEDDING_PROVIDER: "local"
+  LOCAL_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  MCP_BYPASS_TRANSPORT_GATE: "false"
+  MCP_AUTO_EC2_PUBLIC_IP: "false"   # K8s에서는 IMDS 불필요
+  LOG_FORMAT: "json"                # K8s에서는 JSON 로그 권장 (Fluent Bit 등)
+  LOG_LEVEL: "INFO"
+  MCPER_DOC_PARSE_ENABLED: "false"
+  MCPER_AUTH_ENABLED: "true"        # 사내망 배포 시 인증 활성화 권장

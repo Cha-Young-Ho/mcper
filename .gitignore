@@ -31,8 +31,11 @@ MANIFEST
 venv/
 env/
 ENV/
+.env
 .env/
 .env.*.local
+infra/docker/.env
+infra/kubernetes/secret.yaml
 .venv.*
 
 # PyInstaller

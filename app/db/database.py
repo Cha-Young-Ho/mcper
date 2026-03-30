@@ -17,6 +17,7 @@ import app.db.rule_models  # noqa: F401 — register rule_* tables on Base.metad
 import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
 import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
 import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
+import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
 
 
 def _resolve_database_url() -> str:
@@ -129,6 +130,26 @@ def _apply_lightweight_migrations(connection) -> None:
                 note VARCHAR(512),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
+            """
+        )
+    )
+    # code_edges 중복 방지 unique constraint (기존 테이블에 추가)
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.code_edges') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM pg_constraint
+                  WHERE conname = 'uq_code_edges_app_src_tgt_rel'
+                ) THEN
+                  ALTER TABLE code_edges
+                    ADD CONSTRAINT uq_code_edges_app_src_tgt_rel
+                    UNIQUE (app_target, source_id, target_id, relation);
+                END IF;
+              END IF;
+            END $$;
             """
         )
     )

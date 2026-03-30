@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '## 세션 종료: '$(date '+%Y-%m-%d %H:%M') >> docs/dev_log.md"
+          }
+        ]
+      }
+    ]
+  }
+}

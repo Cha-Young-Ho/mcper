@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcper-worker
+  namespace: mcper
+  labels:
+    app: mcper-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcper-worker
+  template:
+    metadata:
+      labels:
+        app: mcper-worker
+    spec:
+      containers:
+      - name: mcper-worker
+        image: your-registry/mcper:VERSION    # web/admin과 동일 이미지
+        command:
+        - celery
+        - -A
+        - app.worker.celery_app.celery_app
+        - worker
+        - --loglevel=info
+        - --concurrency=2
+        envFrom:
+        - configMapRef:
+            name: mcper-config
+        - secretRef:
+            name: mcper-secret
+        env:
+        - name: MCPER_ADMIN_ENABLED
+          value: "false"
+        - name: MCPER_MCP_ENABLED
+          value: "false"
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - celery -A app.worker.celery_app.celery_app inspect ping -d celery@$HOSTNAME
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcper-admin
+  namespace: mcper
+  labels:
+    app: mcper-admin
+spec:
+  replicas: 1                # 반드시 1 (어드민 UI는 단일 인스턴스)
+  strategy:
+    type: Recreate           # RollingUpdate 아님 (어드민 UI 동시 2개 방지)
+  selector:
+    matchLabels:
+      app: mcper-admin
+  template:
+    metadata:
+      labels:
+        app: mcper-admin
+    spec:
+      containers:
+      - name: mcper-admin
+        image: your-registry/mcper:VERSION    # web과 동일 이미지, 동일 태그
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: mcper-config
+        - secretRef:
+            name: mcper-secret
+        env:
+        - name: MCPER_ADMIN_ENABLED
+          value: "true"
+        - name: MCPER_MCP_ENABLED
+          value: "false"    # 어드민 Pod에서 MCP 엔드포인트 불필요
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

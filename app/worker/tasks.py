@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db.database import SessionLocal
 from app.db.models import Spec
@@ -163,7 +164,7 @@ def index_code_batch_task(self, app_target: str, payload: dict[str, Any]) -> dic
             ).first()
             return r.id if r else None
 
-        n_edges = 0
+        edge_values = []
         for e in edges_raw:
             ss = str(e.get("source_stable_id") or "").strip()
             ts = str(e.get("target_stable_id") or "").strip()
@@ -172,15 +173,14 @@ def index_code_batch_task(self, app_target: str, payload: dict[str, Any]) -> dic
             ti = node_id_for_stable(ts)
             if si is None or ti is None:
                 continue
-            db.add(
-                CodeEdge(
-                    app_target=app_key,
-                    source_id=si,
-                    target_id=ti,
-                    relation=rel,
-                )
+            edge_values.append(
+                {"app_target": app_key, "source_id": si, "target_id": ti, "relation": rel}
             )
-            n_edges += 1
+
+        n_edges = len(edge_values)
+        if edge_values:
+            # 배치 INSERT + ON CONFLICT DO NOTHING (중복 edge 방지)
+            db.execute(pg_insert(CodeEdge).values(edge_values).on_conflict_do_nothing())
         db.commit()
         return {
             "ok": True,

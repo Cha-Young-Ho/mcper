@@ -10,12 +10,20 @@ from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.services.versioned_rules import (
     append_to_app_rule as append_app_rule_body,
+    export_rules_json,
+    export_rules_markdown,
     get_rule_version_snapshot,
     get_rules_markdown,
     normalize_read_version,
+    patch_app_rule,
+    patch_global_rule,
+    patch_repo_rule,
     publish_app,
     publish_global,
     publish_repo,
+    rollback_app_rule,
+    rollback_global_rule,
+    rollback_repo_rule,
 )
 
 # Cursor 전용 참고 경로 (다른 IDE는 각 제품 문서·CLAUDE.md·.agent/rules 등 사용)
@@ -220,5 +228,103 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 {"scope": "repo", "pattern": p, "version": v},
                 ensure_ascii=False,
             )
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def patch_global_rule_tool(patch_markdown: str) -> str:
+        """
+        global 룰 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
+        전체 본문을 교체할 때는 `publish_global_rule`을 사용하세요.
+        반환: JSON `{ "scope": "global", "version": N }`.
+        """
+        record_mcp_tool_call("patch_global_rule")
+        db = SessionLocal()
+        try:
+            scope, v = patch_global_rule(db, patch_markdown)
+            return json.dumps({"scope": scope, "version": v}, ensure_ascii=False)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def patch_app_rule_tool(app_name: str, patch_markdown: str) -> str:
+        """
+        app 룰 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
+        반환: JSON `{ "scope": "app", "app_name": "...", "version": N }`.
+        """
+        key = _normalize_app_name(app_name)
+        if not key:
+            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        record_mcp_tool_call("patch_app_rule")
+        db = SessionLocal()
+        try:
+            name, v = patch_app_rule(db, key, patch_markdown)
+            return json.dumps({"scope": "app", "app_name": name, "version": v}, ensure_ascii=False)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def patch_repo_rule_tool(pattern: str, patch_markdown: str) -> str:
+        """
+        repo 룰 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
+        반환: JSON `{ "scope": "repo", "pattern": "...", "version": N }`.
+        """
+        record_mcp_tool_call("patch_repo_rule")
+        db = SessionLocal()
+        try:
+            p, v = patch_repo_rule(db, pattern, patch_markdown)
+            return json.dumps({"scope": "repo", "pattern": p, "version": v}, ensure_ascii=False)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def rollback_global_rule_tool(target_version: int) -> str:
+        """
+        global 룰을 `target_version` 본문으로 새 버전 생성 (롤백).
+        원본 버전 히스토리는 보존됩니다.
+        반환: JSON `{ "scope": "global", "version": N }`.
+        """
+        record_mcp_tool_call("rollback_global_rule")
+        db = SessionLocal()
+        try:
+            v = rollback_global_rule(db, target_version)
+            return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
+        except ValueError as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def rollback_app_rule_tool(app_name: str, target_version: int) -> str:
+        """
+        app 룰을 `target_version` 본문으로 새 버전 생성 (롤백).
+        반환: JSON `{ "scope": "app", "app_name": "...", "version": N }`.
+        """
+        key = _normalize_app_name(app_name)
+        if not key:
+            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        record_mcp_tool_call("rollback_app_rule")
+        db = SessionLocal()
+        try:
+            name, v = rollback_app_rule(db, key, target_version)
+            return json.dumps({"scope": "app", "app_name": name, "version": v}, ensure_ascii=False)
+        except ValueError as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def export_rules(format: str = "markdown") -> str:
+        """
+        모든 룰 최신 버전을 export합니다.
+        `format`: "markdown" (기본) 또는 "json".
+        반환: 마크다운 문자열 또는 JSON 문자열.
+        """
+        record_mcp_tool_call("export_rules")
+        db = SessionLocal()
+        try:
+            if format.lower() == "json":
+                return json.dumps(export_rules_json(db), ensure_ascii=False)
+            return export_rules_markdown(db)
         finally:
             db.close()

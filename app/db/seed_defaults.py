@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 
 from sqlalchemy import delete, func, select
@@ -13,6 +15,10 @@ from app.db.rule_models import (
     McpAppPullOption,
     RepoRuleVersion,
 )
+
+logger = logging.getLogger(__name__)
+
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
 
 _PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -118,3 +124,39 @@ def seed_force(session: Session) -> None:
     session.commit()
     seed_all_rows(session)
     session.commit()
+
+
+def seed_admin_user_if_empty(session: Session) -> None:
+    """
+    MCPER_AUTH_ENABLED=true이고 mcper_users 테이블이 비어 있으면
+    ADMIN_USER / ADMIN_PASSWORD 환경변수로 초기 관리자 계정 생성.
+    """
+    if not _auth_enabled:
+        return
+    try:
+        from app.db.auth_models import User
+        from app.auth.service import hash_password
+
+        count = session.scalar(select(func.count()).select_from(User)) or 0
+        if count > 0:
+            return
+        username = os.environ.get("ADMIN_USER", "admin")
+        password = os.environ.get("ADMIN_PASSWORD", "")
+        if not password:
+            logger.warning(
+                "MCPER_AUTH_ENABLED=true but ADMIN_PASSWORD is empty. Skipping admin seed."
+            )
+            return
+        session.add(
+            User(
+                username=username,
+                hashed_password=hash_password(password),
+                is_admin=True,
+                is_active=True,
+            )
+        )
+        session.commit()
+        logger.info("Initial admin user '%s' created.", username)
+    except Exception as exc:
+        logger.exception("seed_admin_user_if_empty failed: %s", exc)
+        session.rollback()

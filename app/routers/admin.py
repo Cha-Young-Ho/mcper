@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import os
-import secrets
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import require_admin_user
 from app.config import settings
 from app.db.database import get_db
 from app.db.mcp_tool_stats import McpToolCallStat
@@ -27,40 +25,14 @@ from app.db.rule_models import (
 from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 from app.services import versioned_rules as vr
-from app.services.celery_client import enqueue_index_spec
+from app.services.celery_client import enqueue_index_spec, enqueue_or_index_sync
+from app.services.document_parser import parse_uploaded_file
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
-
-security = HTTPBasic(auto_error=False)
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _admin_creds() -> tuple[str, str]:
-    user = os.environ.get("ADMIN_USER", "admin")
-    password = os.environ.get("ADMIN_PASSWORD", "changeme")
-    return user, password
-
-
-def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)) -> str:
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    expected_user, expected_password = _admin_creds()
-    ok_user = secrets.compare_digest(credentials.username, expected_user)
-    ok_pass = secrets.compare_digest(credentials.password, expected_password)
-    if not (ok_user and ok_pass):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
 
 
 def _count(db: Session, model) -> int:
@@ -97,7 +69,7 @@ def _spec_app_cards(db: Session) -> list[dict]:
 @router.get("")
 def admin_home(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     apps = vr.list_distinct_apps(db)
@@ -127,7 +99,7 @@ def admin_home(
 @router.get("/tools")
 def admin_tools(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     counts = {
@@ -156,7 +128,7 @@ def admin_tools(
 @router.get("/global-rules")
 def global_rules_board(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     rows = db.scalars(
@@ -178,7 +150,7 @@ def global_rules_board(
 
 @router.post("/global-rules/mcp-app-default-toggle")
 def global_mcp_app_default_toggle(
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     """앱별 옵션 행이 없을 때 쓰는 전역 기본: rule pull 시 __default__ 앱 스트림 포함."""
@@ -191,7 +163,7 @@ def global_mcp_app_default_toggle(
 def global_rule_view(
     request: Request,
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     row = db.scalars(
@@ -217,7 +189,7 @@ def global_rule_view(
 @router.post("/global-rules/v/{version}/delete")
 def global_rule_delete_version(
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     n = int(db.scalar(select(func.count()).select_from(GlobalRuleVersion)) or 0)
@@ -238,7 +210,7 @@ def global_rule_delete_version(
 
 @router.post("/global-rules/publish")
 def global_rule_publish(
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -248,7 +220,7 @@ def global_rule_publish(
 
 @router.post("/global-rules/save-as-new")
 def global_rule_save_as_new(
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -274,7 +246,7 @@ def _sort_app_names(names: list[str]) -> list[str]:
 @router.get("/app-rules")
 def app_rules_cards(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
 ):
@@ -337,7 +309,7 @@ def _sort_repo_patterns(patterns: list[str]) -> list[str]:
 @router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")
 def repo_pattern_include_repo_default_toggle(
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     """패턴(카드)마다 repository default 스트림 병합 여부."""
@@ -354,7 +326,7 @@ def repo_pattern_include_repo_default_toggle(
 @router.get("/app-rules/new")
 def new_app_form(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
 ):
     return templates.TemplateResponse(
         request,
@@ -370,7 +342,7 @@ def new_app_form(
 @router.post("/app-rules/new")
 def new_app_submit(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     app_name: str = Form(...),
     body: str = Form(...),
@@ -415,7 +387,7 @@ def new_app_submit(
 def app_rule_board(
     request: Request,
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
@@ -465,7 +437,7 @@ def app_rule_board(
 @router.post("/app-rules/app/{app_name}/pull-default-toggle")
 def app_rule_pull_default_toggle(
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     return_to: str = Form(""),
 ):
@@ -495,7 +467,7 @@ def app_rule_pull_default_toggle(
 @router.post("/app-rules/app/{app_name}/delete")
 def app_rule_delete_stream(
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     """해당 app_name 의 모든 app_rule_versions 행 삭제 (`__default__` 제외)."""
@@ -517,7 +489,7 @@ def app_rule_delete_stream(
 def app_rule_delete_one_version(
     app_name: str,
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
@@ -557,7 +529,7 @@ def app_rule_delete_one_version(
 def app_rule_publish_form(
     request: Request,
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
@@ -582,7 +554,7 @@ def app_rule_publish_form(
 @router.post("/app-rules/app/{app_name}/publish")
 def app_rule_publish_submit(
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -597,7 +569,7 @@ def app_rule_publish_submit(
 @router.post("/app-rules/app/{app_name}/save-as-new")
 def app_rule_save_as_new(
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -615,7 +587,7 @@ def app_rule_version_view(
     request: Request,
     app_name: str,
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
@@ -651,7 +623,7 @@ def app_rule_version_view(
 @router.get("/repo-rules")
 def repo_rules_cards(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
 ):
@@ -710,7 +682,7 @@ def repo_rules_cards(
 @router.get("/repo-rules/new")
 def new_repo_pattern_form(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
 ):
     return templates.TemplateResponse(
         request,
@@ -726,7 +698,7 @@ def new_repo_pattern_form(
 @router.post("/repo-rules/new")
 def new_repo_pattern_submit(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     pattern: str = Form(...),
     sort_order: int = Form(100),
@@ -767,7 +739,7 @@ def new_repo_pattern_submit(
 def repo_rule_board(
     request: Request,
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = vr.repo_pattern_from_url_segment(pat_segment)
@@ -812,7 +784,7 @@ def repo_rule_board(
 @router.post("/repo-rules/pat/{pat_segment}/delete")
 def repo_rule_delete_pattern_stream(
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = vr.repo_pattern_from_url_segment(pat_segment)
@@ -832,7 +804,7 @@ def repo_rule_delete_pattern_stream(
 def repo_rule_delete_one_version(
     pat_segment: str,
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = vr.repo_pattern_from_url_segment(pat_segment)
@@ -870,7 +842,7 @@ def repo_rule_delete_one_version(
 def repo_rule_publish_form(
     request: Request,
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = vr.repo_pattern_from_url_segment(pat_segment)
@@ -898,7 +870,7 @@ def repo_rule_publish_form(
 @router.post("/repo-rules/pat/{pat_segment}/publish")
 def repo_rule_publish_submit(
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -914,7 +886,7 @@ def repo_rule_publish_submit(
 @router.post("/repo-rules/pat/{pat_segment}/save-as-new")
 def repo_rule_save_as_new(
     pat_segment: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
@@ -932,7 +904,7 @@ def repo_rule_version_view(
     request: Request,
     pat_segment: str,
     version: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = vr.repo_pattern_from_url_segment(pat_segment)
@@ -971,7 +943,7 @@ def repo_rule_version_view(
 @router.get("/plans")
 def plans_app_index(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse(
@@ -991,7 +963,7 @@ def plans_app_index(
 def plans_list_for_app(
     request: Request,
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.strip()
@@ -1019,7 +991,7 @@ def plans_list_for_app(
 def plan_detail(
     request: Request,
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     row = db.get(Spec, spec_id)
@@ -1044,7 +1016,7 @@ def plan_detail(
 def plan_edit_form(
     request: Request,
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     row = db.get(Spec, spec_id)
@@ -1068,7 +1040,7 @@ def plan_edit_form(
 @router.post("/plans/{spec_id:int}/edit")
 def plan_edit_submit(
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     title: str = Form(""),
     app_target: str = Form(...),
@@ -1096,7 +1068,7 @@ def plan_edit_submit(
 def plan_delete_confirm(
     request: Request,
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     row = db.get(Spec, spec_id)
@@ -1118,7 +1090,7 @@ def plan_delete_confirm(
 @router.post("/plans/{spec_id:int}/delete")
 def plan_delete(
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     confirm: str = Form(""),
 ):
@@ -1133,13 +1105,102 @@ def plan_delete(
     return RedirectResponse(f"/admin/plans/app/{app_enc}", status_code=303)
 
 
+# ----- 기획서 일괄 업로드 -----
+
+_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+
+
+@router.get("/plans/bulk-upload")
+def plan_bulk_upload_form(
+    request: Request,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    apps = sorted({row for (row,) in db.execute(select(Spec.app_target).distinct()).all()})
+    return templates.TemplateResponse(
+        request,
+        "admin/plan_bulk_upload.html",
+        {
+            "request": request,
+            "title": "기획서 일괄 업로드",
+            "known_apps": apps,
+        },
+    )
+
+
+@router.post("/plans/bulk-upload")
+async def plan_bulk_upload_submit(
+    request: Request,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+    app_target: str = Form(...),
+    base_branch: str = Form("main"),
+    files: list[UploadFile] = File(...),
+):
+    app_key = app_target.strip().lower()
+    if not app_key:
+        raise HTTPException(400, "app_target 필수")
+
+    results = []
+    for f in files:
+        filename = f.filename or "unnamed"
+        ext = Path(filename).suffix.lower()
+        if ext not in _ALLOWED_EXTENSIONS:
+            results.append({"file": filename, "ok": False, "error": f"지원하지 않는 형식: {ext}"})
+            continue
+        try:
+            raw = await f.read()
+            text = parse_uploaded_file(filename, raw)
+            if not text.strip():
+                results.append({"file": filename, "ok": False, "error": "파일 내용이 비어 있습니다"})
+                continue
+
+            title = Path(filename).stem
+            spec = Spec(
+                title=title,
+                content=text,
+                app_target=app_key,
+                base_branch=(base_branch or "main").strip() or "main",
+                related_files=[],
+            )
+            db.add(spec)
+            db.flush()  # spec.id 확보
+            index_result = enqueue_or_index_sync(spec.id)
+            db.commit()
+            results.append({
+                "file": filename,
+                "ok": True,
+                "spec_id": spec.id,
+                **index_result,
+            })
+        except Exception as exc:
+            db.rollback()
+            results.append({"file": filename, "ok": False, "error": str(exc)})
+
+    ok_count = sum(1 for r in results if r["ok"])
+    return templates.TemplateResponse(
+        request,
+        "admin/plan_bulk_upload.html",
+        {
+            "request": request,
+            "title": "기획서 일괄 업로드",
+            "known_apps": sorted({row for (row,) in db.execute(select(Spec.app_target).distinct()).all()}),
+            "results": results,
+            "ok_count": ok_count,
+            "total": len(results),
+            "app_target": app_key,
+        },
+        status_code=200,
+    )
+
+
 # ----- 기획서–코드 (연결 파일) -----
 
 
 @router.get("/plan-code")
 def plan_code_app_index(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse(
@@ -1159,7 +1220,7 @@ def plan_code_app_index(
 def plan_code_list_for_app(
     request: Request,
     app_name: str,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     key = app_name.strip()
@@ -1186,7 +1247,7 @@ def plan_code_list_for_app(
 def plan_code_detail(
     request: Request,
     spec_id: int,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
     row = db.get(Spec, spec_id)
@@ -1211,7 +1272,7 @@ def plan_code_detail(
 @router.get("/seed/confirm")
 def seed_confirm(
     request: Request,
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
 ):
     return templates.TemplateResponse(
         request,
@@ -1222,7 +1283,7 @@ def seed_confirm(
 
 @router.post("/seed/force")
 def seed_force_run(
-    _user: str = Depends(require_admin),
+    _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     confirm: str = Form(""),
 ):
