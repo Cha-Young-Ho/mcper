@@ -28,6 +28,21 @@
 
 ---
 
+## 대용량 파일 분석 시 기록관 활용
+
+**다음 중 하나라도 해당하면 @archivist 에게 먼저 요청:**
+
+- 파일 크기 1000줄 이상 (admin.py, versioned_rules.py, search_hybrid.py 등)
+- 동시에 5개 이상 파일 분석 필요
+- 최근 `.claude/archivist_notes/` 에 관련 메모가 있으면 활용
+
+**단, 사용자가 "빨리 해줘" / "급해" 등 시간 압박 명시 → 기록관 스킵하고 직접 진행**
+
+설계 단계에서는 현재 아키텍처 이해가 필수인데, 기록관의 요약으로 빠르게 파악 가능.
+필요하면 "이 부분 더 자세히" 요청해서 추가 분석 받음.
+
+---
+
 ## 출력 형식
 
 ```
@@ -63,3 +78,30 @@ Option B: API 키 (SHA256)
 
 → 사용자 선택: ...
 ```
+
+---
+
+## 설계 완료 후 보고서
+
+설계 문서 작성을 완료하면 `docs/dev_log.md` 에 보고서 추가:
+
+```markdown
+## [날짜]: @senior 아키텍처 설계
+
+**작업 내용:**
+- 새 파일: 3개 (search_hybrid.py, embeddings/factory.py, utils.py)
+- 수정 파일: 2개 (db/rag_models.py, routers/admin.py)
+- 의존성 변경: 없음
+- DB 변경: 1개 테이블 추가 (spec_chunks)
+
+**판단 이유:**
+- Why: RAG 기능이 불완전하므로, 벡터+FTS 하이브리드 설계 필요
+- Risk: pgvector 차원 변경 시 기존 벡터 무효화
+
+**결과:** ✅ 설계 완료, 구현 준비 완료
+
+**다음 단계:**
+- @coder + @tester: 병렬로 코드 + 테스트 작성
+```
+
+자세한 형식은 `.agents/report_template.md` 참고.
