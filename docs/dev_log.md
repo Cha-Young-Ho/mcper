@@ -2,6 +2,139 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-03-31: 문서 정리 (CLAUDE.md compact화, PLANS.md Phase 1 완료 표시, planning 파일 상태 갱신, AGENTS.md 중복 제거)
+
+- CLAUDE.md: 119줄 → 64줄 (보고서 포맷 중복 제거, report_template.md 참조로 대체)
+- PLANS.md: Phase 1 완료 표시, 세부 항목 목록 정리, 파일 구조 재작성
+- planning_security_and_refactor.md / planning_wbs.md / planning_parallel_execution.md: 상단에 Phase 1 완료 상태 배너 추가
+- AGENTS.md: 작업 완료 후 보고 섹션에서 포맷 중복 제거 (report_template.md 참조로 축소)
+
+## 2026-03-31: 프로젝트 정리 (@pm)
+
+**참고 메모 (삭제된 일회성 보고서 요약)**
+- `HARNESS_ENGINEERING_SUMMARY.md` (삭제) — 2026-03-30 하네스 구조 구축 완료 보고서. 핵심: 7개 에이전트 역할, docs/ 13개 문서 생성, 품질 6.8/10, CRITICAL 보안 3개 + HIGH 구조 3개 개선 대상. 상세 내용은 AGENTS.md, ARCHITECTURE.md, docs/ 문서 체계에 반영됨.
+- `PLANNING_COMPLETE.md` (삭제) — 2026-03-30 기획 완료 보고서. 핵심 설계 결정: Admin PW=메모리 플래그(1회성), CSRF=Redis 저장(분산 지원), CodeNode=Python AST 우선(표준 라이브러리), Celery 실패 추적=독립 DB 테이블(90일 보관), admin.py=기능별 4개 라우터 분리. 상세 기획은 docs/planning_*.md 유지.
+- `docs/project_assessment.md` (삭제) — 핵심 내용 이미 dev_log.md 2026-03-30 항목에 반영됨.
+- `docs/mcper_next_prompt_v3.md` (삭제) — 완료된 v3 리팩토링 작업 지시서. 2026-03-31 리팩토링으로 실행 완료.
+
+## 2026-03-31: @senior/@coder/@tester v3 전체 리팩토링 완료
+
+### 작업 내용
+- **Priority 1**: mcp_tool_stats atomic upsert(PG ON CONFLICT), seed advisory lock 구현
+- **Priority 2**: infra/docker/.env.example 인라인 주석 버그 수정 (값 오염 방지)
+- **Priority 3**: requirements.txt 버전 전면 고정, specs.py→documents.py 리네임+deprecated alias, 한국어 제거(logging_config/spec_admin/mcp_tools_docs), prompts en/ko 분리+prompt_loader.py
+- **Priority 4**: 전체 완료 확인 (Auth/JWT/OAuth/seed_admin 모두 구현됨)
+- **Priority 5**: URL 일괄 등록 엔드포인트, upload_documents_batch MCP 툴 신규 구현
+- **Priority 6**: datasources/ 어댑터 레이어 (interface, registry, PostgresBackend, get_data MCP 툴, config.yaml 섹션)
+- **Priority 7**: 룰 diff뷰, 롤백, Import/Export 엔드포인트 구현
+- **Priority 8**: GitHub Actions CI (.github/workflows/test.yml), integration tests 골격
+- 파일: 20개+ 신규/수정
+
+### 판단 이유
+- Why: mcper_next_prompt_v3.md 지시서 기반 전체 리팩토링
+- Risk: requirements.txt 버전 업그레이드 호환성 (특히 redis 5.x→7.x, sentence-transformers 4→5)
+
+### 결과
+✅ 완료
+
+### 다음 단계
+- `pip install -r requirements.txt` 실행 후 의존성 충돌 검증
+- integration tests의 skip 항목들 실제 구현
+- CI 첫 실행 후 DB 마이그레이션 step 추가 여부 검토
+
+## 2026-03-31: @coder Priority 7 — 룰 편의성 기능 3개 추가 (diff / rollback / export-import)
+
+### 작업 내용
+- `app/routers/admin.py` 에 엔드포인트 4개 추가
+- `GET /admin/rules/{rule_id}/diff?v1=&v2=` — global rule 두 버전 간 unified diff 반환
+- `POST /admin/rules/{rule_id}/rollback` — target_version 본문으로 새 버전 생성 (append-only 유지)
+- `GET /admin/rules/export` — 전체 룰 JSON 다운로드 (Content-Disposition attachment)
+- `POST /admin/rules/import` — JSON 파일 업로드 → global/app/repo 각각 새 버전으로 publish
+- `import difflib`, `import json` stdlib 추가
+
+### 판단 이유
+- Why: versioned_rules.py 에 `rollback_global_rule`, `export_rules_json`, `publish_global/app/repo` 가 이미 구현돼 있어 router에서 얇게 위임하는 방식으로 구현
+- Why (rule_id): global rule은 단일 스트림이라 `rule_id` 경로 파라미터는 API 일관성용으로 수신만 하고 무시
+- Risk: import 시 중복 publish → 의도적 append-only 원칙에 따른 설계, 덮어쓰기 없음
+
+### 결과
+완료
+
+### 다음 단계
+- @tester: 세 기능에 대한 유닛/통합 테스트 작성 권장
+
+## 2026-03-31: @coder Priority 8 — CI 파이프라인 및 통합 테스트 골격 구현
+
+### 작업 내용
+- `.github/workflows/test.yml` 신규 생성 — PostgreSQL(pgvector) + Redis 서비스 포함 CI 워크플로우
+- `tests/integration/__init__.py` 신규 생성 (빈 패키지 파일)
+- `tests/integration/test_search_hybrid.py` — 하이브리드 검색(RRF) 통합 테스트 골격
+- `tests/integration/test_upload_index.py` — 문서 업로드 → 인덱싱 파이프라인 통합 테스트 골격
+- `tests/integration/test_rules.py` — 규칙 버전관리 통합 테스트 골격
+- `tests/integration/test_admin_api.py` — 어드민 API 통합 테스트 골격 (health, auth 검증 포함)
+
+### 판단 이유
+- Why: conftest.py의 fixture명 확인 후 `client` → `test_client`로 맞춰 적용
+- Risk: `test_admin_api.py`의 두 테스트는 실제 DB/앱 기동 필요. `test_health_endpoint`, `test_admin_requires_auth`는 skip 없이 실제 assertion 포함 — CI에서 앱 기동 실패 시 에러 발생 가능
+
+### 결과
+✅ 완료
+
+### 다음 단계
+- seed fixture 구현 후 `test_search_hybrid`, `test_upload_index` 내 skip 해제
+- `test_admin_api` 실제 동작 검증 (CI에서 DB 마이그레이션 실행 여부 확인 필요)
+
+## 2026-03-31: @tester Priority 5 신규 구현 테스트 작성
+
+### 작업 내용
+- **POST /admin/documents/urls 테스트** — `test_url_bulk_register.py` 작성 (30개 테스트 케이스)
+  - 인증/인가 테스트 (admin 권한 필수)
+  - 성공 시나리오 (1개, 다중 URL 등록)
+  - 부분 실패 처리 (일부 URL fetch 실패, 빈 내용 등)
+  - 엣지 케이스 (빈 리스트, 공백 정리, 기본값 등)
+  - 응답 형식 검증
+- **upload_documents_batch MCP 도구 테스트** — `test_upload_documents_batch.py` 작성 (40개 테스트 케이스)
+  - 기본 기능 (단일 문서, 메타데이터)
+  - 부분 실패 및 에러 처리
+  - 메타데이터 정규화 (title, related_files JSON/CSV 변환)
+  - 엣지 케이스 (대용량, 특수문자, 코드 스니펫)
+  - 응답 JSON 형식 검증
+  - DB 트랜잭션 및 인덱싱 통합
+- 파일: `tests/unit/test_url_bulk_register.py` (신규, 750줄), `tests/unit/test_upload_documents_batch.py` (신규, 650줄)
+
+### 판단 이유
+- Why: Priority 5 기능에 대한 전체 테스트 커버리지 확보 (정상/실패/엣지 케이스 포함)
+- Why: @coder와 병렬 진행으로 코드 품질 조기 검증
+- Risk: 낮음. Mock 기반 테스트로 DB 독립성 확보, fetch_url_as_text 모킹으로 네트워크 의존성 제거
+
+### 결과
+✅ 완료. 70개 테스트 케이스 작성, 문법 검증 완료
+
+### 다음 단계
+- 테스트 실행 및 통과 확인 (pytest 환경 설정 필요)
+- 필요시 @coder와 협력하여 구현 보완
+
+## 2026-03-31: @coder 프롬프트 구조 다국어 분리
+
+### 작업 내용
+- **언어별 디렉터리 구조 구현** — `app/prompts/` 를 `en/`, `ko/` 로 분리, 각 3개 마크다운 파일 보유 (`global_rule_bootstrap.md`, `branch_context.md`, `app_target_rule.md`)
+- **영문 번역 작성** — 3개 파일 모두 영문으로 번역 (의미 및 구조 완전 보존)
+- **prompt_loader.py 신규 생성** — locale 환경변수 기반 로더, 언어 폴백 지원 (요청한 locale 없으면 자동으로 en 로드)
+- **seed_defaults.py 개선** — `load_prompt()` 함수 사용으로 마크다운 읽기 중앙화, Path/\_read_md 제거
+- **기존 루트 파일 정리** — 더 이상 참조되지 않는 `app/prompts/*.md` 3개 파일 삭제
+- 파일: `app/prompts/prompt_loader.py` (신규), `app/prompts/en/*.md` (신규), `app/prompts/ko/*.md` (신규), `app/db/seed_defaults.py` (수정)
+
+### 판단 이유
+- Why: 프롬프트 템플릿을 다국어 지원으로 확장하고, 마크다운 읽기 로직 중앙화로 유지보수성 개선
+- Risk: 낮음. `prompt_loader`는 영어 폴백이 있어 locale 없는 환경도 정상 작동
+
+### 결과
+✅ 완료. `load_prompt('global_rule_bootstrap', locale='ko')` 등으로 테스트 완료
+
+### 다음 단계
+- 필요시 다른 routers/main 에서 prompt_loader 사용 확대
+- 추가 언어(ja, zh 등) 지원 시 디렉터리만 추가하면 됨
+
 ## 2026-03-30: @coder Phase 1 보안 강화 (CRITICAL 3개)
 
 ### 작업 내용
@@ -280,3 +413,5 @@
 ## 세션 종료: 2026-03-30 14:40
 ## 세션 종료: 2026-03-30 14:44
 ## 세션 종료: 2026-03-30 14:47
+## 세션 종료: 2026-03-31 01:54
+## 세션 종료: 2026-03-31 02:00

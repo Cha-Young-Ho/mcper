@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from app.db.rule_models import (
@@ -15,16 +14,11 @@ from app.db.rule_models import (
     McpAppPullOption,
     RepoRuleVersion,
 )
+from app.prompts.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
 _auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
-
-_PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
-
-
-def _read_md(filename: str) -> str:
-    return (_PROMPTS / filename).read_text(encoding="utf-8")
 
 
 def _default_app_body() -> str:
@@ -80,7 +74,7 @@ def seed_all_rows(session: Session) -> None:
     session.add(
         GlobalRuleVersion(
             version=1,
-            body=_read_md("global_rule_bootstrap.md"),
+            body=load_prompt("global_rule_bootstrap"),
         )
     )
 
@@ -97,6 +91,7 @@ def seed_all_rows(session: Session) -> None:
 
 def seed_if_empty(session: Session) -> bool:
     """Return True if full rule seed ran (global was empty)."""
+    session.execute(text("SELECT pg_advisory_xact_lock(1234567890)"))
     n = session.scalar(select(func.count()).select_from(GlobalRuleVersion)) or 0
     if n > 0:
         return False
@@ -107,6 +102,7 @@ def seed_if_empty(session: Session) -> bool:
 
 def seed_repo_if_empty(session: Session) -> bool:
     """기존 DB에 global만 있고 repo 테이블이 비어 있을 때 repository 시드만 추가."""
+    session.execute(text("SELECT pg_advisory_xact_lock(1234567891)"))
     n = session.scalar(select(func.count()).select_from(RepoRuleVersion)) or 0
     if n > 0:
         return False

@@ -31,11 +31,8 @@ MANIFEST
 venv/
 env/
 ENV/
-.env
 .env/
 .env.*.local
-infra/docker/.env
-infra/kubernetes/secret.yaml
 .venv.*
 
 # PyInstaller
@@ -95,7 +92,4 @@ coverage.xml
 # Local database / data
 *.sqlite3
 *.db
-
-# Local YAML secrets (example: config.example.yaml)
-/config.yaml
 

@@ -1,6 +1,6 @@
 # [CRITICAL ACTION REQUIRED: APP_NAME MISSING]
 
-현재 프로젝트의 룰을 로드하려면 **`app_name`** 파라미터가 반드시 필요합니다.  
+현재 프로젝트의 룰을 로드하려면 **`app_name`** 파라미터가 반드시 필요합니다.
 **절대 app_name을 임의로 추측하거나 지어내지 마십시오.** 아래 절차를 정확히 따르세요.
 
 ---
@@ -58,8 +58,8 @@
 
 - **MCP는 마크다운만 제공**합니다. **저장 경로·파일 포맷은 Cursor / Claude / Antigravity / Gemini 등 실제 환경**에 맞춥니다.
 - `get_global_rule(app_name="확정값")` **2차 응답**을 **Git 저장소 루트** 기준으로 로컬에 씁니다. (읽기만 하고 끝내지 마십시오.)
-  - 서브폴더만 열려 있으면 `git rev-parse --show-toplevel` 로 루트를 잡습니다.  
-  - 멀티 루트면 `app_name` 이 나온 저장소 루트.  
+  - 서브폴더만 열려 있으면 `git rev-parse --show-toplevel` 로 루트를 잡습니다.
+  - 멀티 루트면 `app_name` 이 나온 저장소 루트.
   - MCP가 Docker면 **호스트 클론 경로**에 씁니다 (컨테이너 안 X).
 - **세부 절차**는 2차 응답 말미 **`[CRITICAL — 사용 중인 에이전트/IDE에 맞게 로컬에 규칙 반영]`** 절을 따르십시오.
 - **1단계(인자 없이 호출)로 받은 이 부트스트랩은 저장하지 마십시오.**
@@ -74,4 +74,5 @@
 - 추가 확인은 **`git status`** 등. 불확실하면 **사용자에게** 저장소 루트·브랜치를 질문한다.
 
 ---
+
 *다음: app_name을 확보한 뒤 `get_global_rule(app_name="your_app_name", origin_url=…)` 로 다시 호출하고, Cursor 는 **`.cursor/rules/mcp-rules.mdc`** 등 응답 말미 지시에 따라 저장하세요.*

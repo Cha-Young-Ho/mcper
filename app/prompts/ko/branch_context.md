@@ -20,4 +20,5 @@
 {matching_rules}
 
 ---
+
 *확인되었으면 "Base Branch({base_branch}) 기준으로 분석을 시작합니다"라고 답해 주세요.*

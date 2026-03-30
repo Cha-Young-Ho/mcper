@@ -4,7 +4,8 @@ from mcp.server.fastmcp import FastMCP
 
 from app.tools.global_rules import register_global_rule_tool
 from app.tools.rag_tools import register_rag_tools
-from app.tools.specs import register_spec_tools
+from app.tools.documents import register_document_tools
+from app.tools.data_tools import register_data_tools
 
 # Cursor는 URL 기반 MCP에 Streamable HTTP를 우선 사용한다.
 # FastAPI에 ``Mount("/mcp", ...)`` 할 때 내부 라우트는 ``/`` 로 두는 게 일반적이다.
@@ -29,6 +30,7 @@ mcp = FastMCP(
     stateless_http=True,
 )
 
-register_spec_tools(mcp)
+register_document_tools(mcp)
 register_rag_tools(mcp)
 register_global_rule_tool(mcp)
+register_data_tools(mcp)

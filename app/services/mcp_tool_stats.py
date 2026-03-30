@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from app.db.database import SessionLocal
 from app.db.mcp_tool_stats import McpToolCallStat
 
@@ -15,11 +17,15 @@ def record_mcp_tool_call(tool_name: str) -> None:
     try:
         db = SessionLocal()
         try:
-            row = db.get(McpToolCallStat, tool_name)
-            if row is None:
-                db.add(McpToolCallStat(tool_name=tool_name, call_count=1))
-            else:
-                row.call_count = int(row.call_count) + 1
+            stmt = (
+                pg_insert(McpToolCallStat)
+                .values(tool_name=tool_name, call_count=1)
+                .on_conflict_do_update(
+                    index_elements=["tool_name"],
+                    set_={"call_count": McpToolCallStat.call_count + 1},
+                )
+            )
+            db.execute(stmt)
             db.commit()
         finally:
             db.close()
