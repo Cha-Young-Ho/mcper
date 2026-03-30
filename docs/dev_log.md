@@ -1,6 +1,253 @@
 # 개발 로그
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
+
+## 2026-03-30: 에이전트 팀 구조 확장 및 프로젝트 평가
+
+**작업 내용:**
+1. **기록관 에이전트 추가** (@archivist)
+   - 역할: 대용량 파일(1000줄+) 읽기 전담 → 메모 작성 → 컨텍스트 절감
+   - 저장소: `.claude/archivist_notes/`
+   - 효과: 컨텍스트 30-40% 절감 (대용량 파일 재읽기 방지)
+
+2. **테스트 코드 작업자 추가** (@tester)
+   - 역할: 설계 기반 테스트 케이스 작성
+   - 협력: @coder와 병렬로 코드 + 테스트 동시 작성
+   - 타겟: 복잡 로직, DB/Celery, 보안 엣지 케이스
+
+3. **모든 에이전트 지침 업데이트**
+   - @pm, @planner, @senior, @coder, @infra: 기록관 활용 규칙 추가
+   - @coder: @tester 협력 규칙 추가
+   - 시간 압박 시: 기록관 스킵 명시
+
+4. **프로젝트 종합 평가**
+   - 평가 파일: `docs/project_assessment.md`
+   - 코드 분석: 93개 파일, ~7,300줄
+   - 각 파트별 평가 (DB ⭐⭐⭐⭐, 규칙 ⭐⭐⭐⭐⭐, 보안 ⭐⭐)
+   - 개선 우선순위: CRITICAL/HIGH/MEDIUM/LOW
+
+**파일 변경:**
+- 신규: `.agents/archivist.md`, `.agents/tester.md`, `docs/project_assessment.md`
+- 수정: `.agents/pm.md`, `.agents/planner.md`, `.agents/senior.md`, `.agents/coder.md`, `.agents/infra.md`
+- 수정: `CLAUDE.md`, `MEMORY.md`, `.claude/archivist_notes/index.md`
+
+**핵심 발견:**
+- ✅ 강점: 규칙 시스템 매우 우수 (append-only, 3단계 병합)
+- ⚠️ 약점: Admin 패스워드 "changeme" (경고만, 강제 없음) → CRITICAL
+- ⚠️ 약점: admin.py 1293줄 (단일 파일) → 모듈 분리 필요
+- ❌ 부재: CodeNode 자동 인덱싱 파서 (AST 크롤러)
+
+**결정사항:**
+1. 기록관 으로 컨텍스트 최적화 (대용량 파일 중복 읽기 제거)
+2. @tester 추가로 테스트 우선 개발 강화
+3. 보안 강화 (Admin 패스워드, 토큰 검증, CORS/CSRF)
+4. admin.py 모듈 분리 (규칙/스펙/도구별로)
+5. CodeNode 파서 개발 (RAG 완성도 향상)
+
+**다음 단계:**
+- 기록관 메모 작성 (필요시 요청)
+- 테스트 코드 작성 (보안, RAG, Celery)
+- Admin 패스워드 강제 변경 기능 (CRITICAL)
+- admin.py 모듈 분리 (1293줄 → 200줄씩)
+
+## 2026-03-30: @planner 기획서 작성 (CRITICAL/HIGH 6개 항목)
+
+**작업 내용:**
+1. **기획 문서 작성**: `docs/planning_security_and_refactor.md`
+   - CRITICAL 3개 항목 (보안): Admin 패스워드, API 토큰, CORS/CSRF
+   - HIGH 3개 항목 (구조): admin.py 분리, CodeNode 파서, Celery 모니터링
+
+2. **각 항목별 상세 기획**:
+   - 유저 스토리 + 수용 기준
+   - QA 시나리오 (정상/엣지/실패)
+   - 구현 아키텍처 + 의존성
+   - 예상 작업량 (시간 단위)
+
+3. **Phase 계획**:
+   - Phase 1 (주 1): CRITICAL 3개 (15.5시간)
+   - Phase 2 (주 2-3): HIGH 3개 (25.5시간)
+   - 병렬 작업 최적화 (전체 2주)
+
+4. **협업 모델**:
+   - @coder: 핵심 구현
+   - @tester: 테스트 케이스 (병렬)
+   - @senior: 코드 리뷰
+   - @archivist: admin.py 분석 (항목 4)
+   - @infra: 배포 검수
+
+**핵심 내용**:
+- Admin 패스워드: lifespan 강제 변경 + 설정 페이지 (4시간)
+- API 토큰: expires_at 검증 로직 추가 (4.5시간)
+- CORS/CSRF: 미들웨어 + 토큰 검증 (7시간)
+- admin.py: 4개 라우터로 분리 (10.5시간)
+- CodeNode: Python AST 파서 (9시간)
+- Celery: 실패 추적 대시보드 (6시간)
+
+**성공 지표**:
+- Phase 1: 기본 패스워드 강제 + 토큰 만료 + CSRF 보호
+- Phase 2: admin.py <300줄 + CodeNode 100+ 자동 생성 + 모니터링 UI
+
+**판단 이유**:
+- Why: PM 평가에서 CRITICAL/HIGH 6개 항목 식별, 운영 준비 단계 필수
+- Risk: Phase 1이 정해야 프로덕션 배포 가능, Phase 2는 유지보수성 향상
+
+**결과**: ✅ 기획 완료
+
+**산출물**:
+- `docs/planning_security_and_refactor.md` (상세 기획서, ~800줄)
+- `docs/planning_wbs.md` (작업 분해도, 29개 태스크)
+- `docs/planning_parallel_execution.md` (병렬 실행 계획, ~400줄)
+- `PLANNING_COMPLETE.md` (최종 보고서)
+
+**기획 내용 요약**:
+- 6개 항목 모두 상세 기획 완료 (유저 스토리, QA 시나리오, 코드 예시)
+- 작업량: Phase 1 (15.5h) + Phase 2 (25.5h) = 41시간 (2주 일정)
+- 병렬도: Phase 1 최대 3개, Phase 2 최대 2개 (@coder 1명)
+- 위험도: 낮음 (기술적 의존성 없음)
+- 성공 기준: Admin PW 강제, API 토큰 만료, CSRF 보호, admin.py <300줄, CodeNode 100+, Celery UI
+
+**다음 단계**:
+- @senior: 기술 설계서 작성 (각 항목별, 3-5일 예상)
+- @coder: 설계 검토 후 Phase 1 구현 시작 (Monday)
+- @tester: 테스트 계획 작성 및 병렬 테스트 진행
+
 ## 세션 종료: 2026-03-30 10:11
 ## 세션 종료: 2026-03-30 10:15
 ## 세션 종료: 2026-03-30 10:20
+## 세션 종료: 2026-03-30 10:53
+## 세션 종료: 2026-03-30 11:02
+## 세션 종료: 2026-03-30 11:05
+## 세션 종료: 2026-03-30 12:42
+## 세션 종료: 2026-03-30 12:44
+## 세션 종료: 2026-03-30 12:46
+## 세션 종료: 2026-03-30 12:49
+## 세션 종료: 2026-03-30 12:50
+## 세션 종료: 2026-03-30 12:50
+## 2026-03-30: @senior 기술 설계서 작성 (CRITICAL/HIGH 6개 항목)
+
+**작업 내용:**
+1. **기술 설계서 3종 작성** (총 ~3,500줄)
+   - `docs/DESIGN_CRITICAL_SECURITY.md` (~1,200줄)
+     * Admin 패스워드 강제 변경 (초기 로그인)
+     * API 토큰 만료 검증 (JWT expiry + refresh)
+     * CORS/CSRF 방어 (미들웨어 + SameSite)
+
+   - `docs/DESIGN_HIGH_REFACTOR.md` (~2,000줄)
+     * admin.py 모듈 분리 (1293줄 → 5개 라우터, 200줄씩)
+     * CodeNode 자동 파서 (Python AST + JS 정규식)
+     * Celery 모니터링 (FailedTask 테이블 + 대시보드)
+
+   - `docs/DESIGN_SUMMARY.md` (~400줄)
+     * 6개 항목 통합 요약
+     * 파일 변경 교차 의존성 분석
+     * 구현 순서, 일정, 테스트 전략
+
+2. **각 설계서별 상세 내용**:
+   - 문제 정의 (Why) + 솔루션 아키텍처 (How)
+   - 신규/수정 파일 목록 (정확한 경로)
+   - API 스펙 (요청/응답 JSON 스키마)
+   - DB 스키마 (신규 테이블/필드)
+   - 구현 체크리스트 (단계별)
+   - 테스트 시나리오 (정상/엣지/실패 케이스)
+   - 위험 및 완화 전략
+
+3. **교차 의존성 분석**:
+   - 병렬 작업 가능한 그룹 식별 (3개 그룹)
+   - 공유 변경 파일 최소화 (app/main.py, app/db/database.py)
+   - 충돌 가능성 평가 (모두 낮음)
+
+4. **구현 일정 및 순서**:
+   - Phase 1 (CRITICAL): 2-3일 (병렬)
+   - Phase 2 (HIGH): 3-4일 (병렬)
+   - 전체: 7-10일 (병렬 작업)
+
+5. **배포 체크리스트**:
+   - 데이터베이스 마이그레이션 순서
+   - 환경 변수 설정 (신규: SECURE_COOKIE, CORS_ALLOWED_ORIGINS)
+   - 보안 검증 항목
+   - 모니터링 확인 사항
+
+6. **롤백 계획**:
+   - Phase별 독립적 롤백 가능
+   - 각 항목의 롤백 전략 명시
+
+**핵심 설계 결정**:
+
+**CRITICAL 1: Admin 패스워드 강제 변경**
+- DB: User.password_changed_at 필드 추가 (NULL = 미변경)
+- UI: GET/POST /auth/change-password-forced 엔드포인트
+- 검증: require_admin_user에서 리다이렉트 로직
+- 제약: 초기 관리자만 강제 (OAuth는 고민 필요)
+
+**CRITICAL 2: API 토큰 만료 검증**
+- JWT: decode_token에 allow_expired 파라미터 추가
+- Refresh: POST /auth/token/refresh (7일 유효)
+- Access: 15분 유효 (짧은 수명)
+- API 키: expires_at 필드 검증 추가
+
+**CRITICAL 3: CORS/CSRF 방어**
+- 미들웨어: CSRFMiddleware (토큰 생성/검증)
+- 쿠키: SameSite=Lax, Secure, HttpOnly
+- 폼/API: X-CSRF-Token 헤더 또는 hidden 필드
+- MCP: CSRF 검증 제외 (Bearer 토큰 기반)
+
+**HIGH 4: admin.py 모듈 분리**
+- 신규: admin_base.py (AdminContext, 공통 헬퍼)
+- 신규: admin_dashboard.py (GET /admin, 통계)
+- 신규: admin_rules.py (규칙 관리)
+- 신규: admin_specs.py (기획서 CRUD, 검색)
+- 신규: admin_tools.py (도구 카탈로그)
+- 기존: admin.py (라우터 통합만)
+
+**HIGH 5: CodeNode 자동 파서**
+- 인터페이스: CodeParserBase (AST 파서 추상화)
+- 구현:
+  * PythonCodeParser (ast 모듈)
+  * JavaScriptCodeParser (정규식)
+- 팩토리: CodeParserFactory (언어별 선택)
+- MCP: push_code_index에 auto_parse 파라미터
+
+**HIGH 6: Celery 모니터링**
+- DB: FailedTask 테이블 (task_id, entity, error, retry_count, status)
+- 태스크: index_spec_task에 FailedTask 로깅
+- UI: /admin/monitoring (대시보드 + 재시도 버튼)
+- 헬스: GET /health/rag 확장 (Celery 상태)
+
+**파일 변경 전략**:
+- 그룹 A (보안): app/auth/*, app/asgi/csrf_middleware.py (독립적)
+- 그룹 B (리팩터): app/routers/admin_*.py (독립적)
+- 그룹 C (기능): app/services/code_parser*.py, app/db/celery_models.py (독립적)
+- 공유: app/main.py, app/db/database.py (순차 병합 가능)
+
+**테스트 전략**:
+- Unit: 각 함수별 (토큰 만료, CSRF 검증, 파서 정확도)
+- Integration: 엔드포인트별 (로그인 플로우, 규칙 관리)
+- Security: Penetration (CSRF 공격, CORS 우회)
+
+**성공 기준**:
+- Admin 기본 PW로 접근 불가 (강제 변경)
+- JWT 15분 후 만료 (refresh로 갱신)
+- CSRF 공격 시 403 Forbidden
+- admin.py <= 350줄/모듈
+- Python/JS 파일 90%+ 자동 파싱
+- 실패 스펙 UI에서 재시도 가능
+
+**산출물**:
+- `docs/DESIGN_CRITICAL_SECURITY.md` (1,200줄)
+- `docs/DESIGN_HIGH_REFACTOR.md` (2,000줄)
+- `docs/DESIGN_SUMMARY.md` (400줄)
+
+**파일 변경 없음** (설계서만 작성, 코드 미수정)
+
+**예상 영향**:
+- @coder: 설계 검토 후 Phase 1 구현 (2-3일)
+- @tester: 테스트 계획 작성 (설계 기반)
+- @infra: 배포 체크리스트 검토
+- @pm: 일정/리스크 최종 확인
+
+**다음 단계**:
+- @coder: 설계 문서 검토 + 질문
+- @coder: Phase 1 (CRITICAL) 구현 시작
+- @tester: 테스트 계획 작성 (설계 기반)
+
+## 세션 종료: 2026-03-30 12:54

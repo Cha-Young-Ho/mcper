@@ -1,10 +1,29 @@
 # MEMORY.md
 
-**메모리 인덱스.** 각 파일은 `.claude/projects/-Users-wemadeplay-workspace-personal-mcper/memory/` 에서 유지됨.
+**메모리 인덱스 및 기록관 메모.**
+- 사용자·피드백·프로젝트 메모: `.claude/projects/-Users-wemadeplay-workspace-personal-mcper/memory/`
+- 기록관 메모: `.claude/archivist_notes/` (대용량 파일 분석 결과)
+- 프로젝트 평가: `docs/project_assessment.md` (2026-03-30 종합 평가 기록)
 
 ---
 
-(현재 메모리 없음)
+## 기록관 메모 인덱스
+
+기록관(@archivist)이 작성한 분석 메모들. 대용량 파일 재읽기를 줄이기 위해 먼저 확인:
+
+- (메모 없음 - 첫 기록관 요청 시 생성 예정)
+
+---
+
+## 프로젝트 평가 (2026-03-30)
+
+종합 평가 및 개선 계획: `docs/project_assessment.md` 참고
+
+**핵심:**
+- ✅ 규칙 시스템 우수 (⭐⭐⭐⭐⭐)
+- ⚠️ 보안 미흡 (⭐⭐) → Admin 패스워드 강제 필수
+- ⚠️ 관리자 UI 너무 큼 (1293줄) → 모듈 분리 필요
+- ❌ CodeNode 파서 부재 → AST 크롤러 필요
 
 ---
 

@@ -28,6 +28,28 @@
 
 ---
 
+## 대용량 파일 분석 시 기록관 활용
+
+**다음 중 하나라도 해당하면 @archivist 에게 먼저 요청:**
+
+- 파일 크기 1000줄 이상 (admin.py, versioned_rules.py 등)
+- 동시에 5개 이상 파일 분석 필요
+- 최근 `.claude/archivist_notes/` 에 관련 메모가 있으면 활용
+
+**단, 사용자가 "빨리 해줘" / "급해" 등 시간 압박 명시 → 기록관 스킵하고 직접 진행**
+
+```python
+# 예시
+if context.time_critical:
+    # 기록관 거치지 않음 → 바로 분석
+    analyze_directly()
+else:
+    # 대용량 파일 → 기록관 요청
+    @archivist.analyze_files(files=[...])
+```
+
+---
+
 ## 출력 형식
 
 ```
@@ -42,3 +64,29 @@
 ## 권장 흐름
 @planner (기획) → @senior (설계) → @coder (구현) → @infra (검수)
 ```
+
+---
+
+## 작업 완료 후 보고서
+
+타당성 검토 + 범위 결정을 완료하면 `docs/dev_log.md` 에 보고서 추가:
+
+```markdown
+## [날짜]: @pm 타당성 검토 및 범위 결정
+
+**작업 내용:**
+- 타당성: 프로젝트 목표에 부합
+- 범위: X 포함, Y 제외
+- 절차: @planner → @senior → @coder → @infra
+
+**판단 이유:**
+- Why: 사용자 요청이 인증 기능 추가인데, 현재 MCPER_AUTH_ENABLED=false
+- Risk: 기존 사용자 영향도 없음 (선택적 기능)
+
+**결과:** ✅ 진행 가능
+
+**다음 단계:**
+- @planner: 기획서 작성
+```
+
+자세한 형식은 `.agents/report_template.md` 참고.
