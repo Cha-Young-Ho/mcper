@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 from urllib.parse import quote
@@ -942,6 +943,170 @@ def publish_repo(
     session.commit()
     ensure_mcp_repo_pattern_pull_option(session, key)
     return key, nv
+
+
+def patch_global_rule(session: Session, patch_markdown: str) -> tuple[str, int]:
+    """
+    현재 global 룰 최신 버전에 patch_markdown을 적용해 새 버전 생성.
+    patch_markdown이 전체 본문이면 전체 교체, 부분이면 기존에 덧붙임.
+    완전 교체 시: publish_global() 직접 사용 권장.
+    """
+    latest = _global_latest(session)
+    base = latest.body if latest else ""
+    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    return "global", publish_global(session, new_body)
+
+
+def patch_app_rule(session: Session, app_name: str, patch_markdown: str) -> tuple[str, int]:
+    """app 룰 최신 버전에 patch_markdown 병합 후 새 버전 생성."""
+    key = (app_name or "").strip().lower()
+    if not key:
+        raise ValueError("app_name is required")
+    latest = _app_latest(session, key)
+    base = latest.body if latest else ""
+    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    name, v = publish_app(session, key, new_body)
+    return name, v
+
+
+def patch_repo_rule(session: Session, pattern: str, patch_markdown: str) -> tuple[str, int]:
+    """repo 룰 최신 버전에 patch_markdown 병합 후 새 버전 생성."""
+    key = (pattern or "").strip()
+    latest_v = (
+        session.scalar(
+            select(func.max(RepoRuleVersion.version)).where(RepoRuleVersion.pattern == key)
+        )
+        or 0
+    )
+    if latest_v:
+        prev = session.scalars(
+            select(RepoRuleVersion).where(
+                RepoRuleVersion.pattern == key, RepoRuleVersion.version == latest_v
+            )
+        ).first()
+        base = prev.body if prev else ""
+    else:
+        base = ""
+    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    return publish_repo(session, key, new_body)
+
+
+def rollback_global_rule(session: Session, target_version: int) -> int:
+    """
+    global 룰을 target_version 본문으로 새 버전 생성 (롤백).
+    원본 버전 행은 삭제하지 않고 히스토리 보존.
+    반환: 새로 생성된 버전 번호.
+    """
+    row = session.scalar(
+        select(GlobalRuleVersion).where(GlobalRuleVersion.version == target_version)
+    )
+    if row is None:
+        raise ValueError(f"global rule version {target_version} not found")
+    return publish_global(session, row.body)
+
+
+def rollback_app_rule(session: Session, app_name: str, target_version: int) -> tuple[str, int]:
+    """app 룰 특정 버전으로 롤백."""
+    key = (app_name or "").strip().lower()
+    row = session.scalar(
+        select(AppRuleVersion).where(
+            AppRuleVersion.app_name == key, AppRuleVersion.version == target_version
+        )
+    )
+    if row is None:
+        raise ValueError(f"app rule '{key}' version {target_version} not found")
+    return publish_app(session, key, row.body)
+
+
+def rollback_repo_rule(session: Session, pattern: str, target_version: int) -> tuple[str, int]:
+    """repo 룰 특정 버전으로 롤백."""
+    key = (pattern or "").strip()
+    row = session.scalar(
+        select(RepoRuleVersion).where(
+            RepoRuleVersion.pattern == key, RepoRuleVersion.version == target_version
+        )
+    )
+    if row is None:
+        raise ValueError(f"repo rule pattern '{key}' version {target_version} not found")
+    return publish_repo(session, key, row.body)
+
+
+def export_rules_markdown(session: Session) -> str:
+    """모든 룰 (global 최신 + app 최신 + repo 최신)을 단일 마크다운 문자열로 export."""
+    lines: list[str] = ["# MCPER Rules Export\n"]
+
+    latest_global = _global_latest(session)
+    if latest_global:
+        lines.append(f"## Global Rule (v{latest_global.version})\n")
+        lines.append(latest_global.body)
+        lines.append("\n")
+
+    apps = list_distinct_apps(session)
+    if apps:
+        lines.append("## App Rules\n")
+        for app in apps:
+            latest = _app_latest(session, app)
+            if latest:
+                lines.append(f"### {app} (v{latest.version})\n")
+                lines.append(latest.body)
+                lines.append("\n")
+
+    patterns = list_distinct_repo_patterns(session)
+    if patterns:
+        lines.append("## Repository Rules\n")
+        for p in patterns:
+            max_v = session.scalar(
+                select(func.max(RepoRuleVersion.version)).where(RepoRuleVersion.pattern == p)
+            )
+            if max_v:
+                row = session.scalar(
+                    select(RepoRuleVersion).where(
+                        RepoRuleVersion.pattern == p, RepoRuleVersion.version == max_v
+                    )
+                )
+                if row:
+                    label = p if p else "(default)"
+                    lines.append(f"### {label} (v{row.version})\n")
+                    lines.append(row.body)
+                    lines.append("\n")
+
+    return "\n".join(lines)
+
+
+def export_rules_json(session: Session) -> dict:
+    """모든 룰 최신 버전을 JSON 직렬화 가능한 dict로 export."""
+    latest_global = _global_latest(session)
+    apps = list_distinct_apps(session)
+    patterns = list_distinct_repo_patterns(session)
+
+    app_rules = {}
+    for app in apps:
+        latest = _app_latest(session, app)
+        if latest:
+            app_rules[app] = {"version": latest.version, "body": latest.body}
+
+    repo_rules = {}
+    for p in patterns:
+        max_v = session.scalar(
+            select(func.max(RepoRuleVersion.version)).where(RepoRuleVersion.pattern == p)
+        )
+        if max_v:
+            row = session.scalar(
+                select(RepoRuleVersion).where(
+                    RepoRuleVersion.pattern == p, RepoRuleVersion.version == max_v
+                )
+            )
+            if row:
+                repo_rules[p or "__default__"] = {"version": row.version, "body": row.body}
+
+    return {
+        "global": {
+            "version": latest_global.version if latest_global else 0,
+            "body": latest_global.body if latest_global else "",
+        },
+        "apps": app_rules,
+        "repos": repo_rules,
+    }
 
 
 def list_distinct_apps(session: Session) -> list[str]:

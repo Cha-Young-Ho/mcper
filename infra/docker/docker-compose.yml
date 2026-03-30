@@ -1,0 +1,97 @@
+# infra/docker/docker-compose.yml
+# 프로덕션/스테이징용 (볼륨 마운트·핫리로드 없음)
+# 사용법: docker compose -f infra/docker/docker-compose.yml up -d
+# 개발 환경: docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.override.yml up
+#
+# 사내(Private Network) 운영 시 주의사항:
+#   - ADMIN_PASSWORD / AUTH_SECRET_KEY 반드시 강력한 값으로 변경
+#   - DB/Redis 포트는 호스트 바인딩을 127.0.0.1 또는 사내 IP 대역으로 제한 권장
+#   - MCP_BYPASS_TRANSPORT_GATE=false 유지 (프로덕션)
+#   - MCPER_AUTH_ENABLED=true 권장 (사내 접근제어)
+name: mcper
+
+services:
+  web:
+    image: mcper:local
+    build:
+      context: ../..          # 저장소 루트
+      dockerfile: Dockerfile
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:${MCPER_WEB_PORT:-8001}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env                  # infra/docker/.env (gitignore)
+    environment:
+      - MCPER_ADMIN_ENABLED=${MCPER_ADMIN_ENABLED:-true}
+      - MCPER_MCP_ENABLED=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    image: mcper:local
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  db:
+    image: pgvector/pgvector:pg17    # PostgreSQL 17 + pgvector
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-mcpdb}
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-mcpdb}"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  redis:
+    image: redis:7.4.2-alpine        # latest 금지
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --save 60 1 --loglevel warning
+    restart: unless-stopped
+
+  # Optional: 로컬 임베딩 실험용 (--profile local-embed)
+  ollama:
+    profiles:
+      - local-embed
+    image: ollama/ollama:0.6.5       # latest 금지
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  pgdata:
+  redisdata:
+  ollama_data:

@@ -1,0 +1,170 @@
+{% extends "admin/base.html" %}
+{% block head %}
+<style>
+.upload-zone {
+  border: 2px dashed var(--border, #d1d5db);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.upload-zone.dragover,
+.upload-zone:focus-within {
+  border-color: var(--primary, #2563eb);
+  background: rgba(37,99,235,0.04);
+}
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-zone__label { pointer-events: none; }
+.upload-zone__hint { font-size: 0.82rem; color: var(--muted, #6b7280); margin-top: 0.4rem; }
+.file-list { margin-top: 0.75rem; text-align: left; }
+.file-list__item { font-size: 0.85rem; padding: 0.2rem 0; }
+
+.result-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; }
+.result-table th, .result-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border, #e5e7eb); }
+.result-table th { background: var(--surface-alt, #f9fafb); font-weight: 600; }
+.badge-ok   { color: #15803d; font-weight: 600; }
+.badge-fail { color: #b91c1c; font-weight: 600; }
+.summary-bar { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; font-weight: 600; }
+.summary-bar--ok   { background: #dcfce7; color: #166534; }
+.summary-bar--warn { background: #fef9c3; color: #854d0e; }
+.summary-bar--fail { background: #fee2e2; color: #991b1b; }
+</style>
+{% endblock %}
+{% block body %}
+<p class="muted" style="margin-top:0"><a href="/admin/plans">← 기획서 목록</a></p>
+
+{% if results is defined %}
+  {% if ok_count == total %}
+    <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 처리 완료 ({{ ok_count }}개 성공)</div>
+  {% elif ok_count > 0 %}
+    <div class="summary-bar summary-bar--warn">{{ total }}개 중 {{ ok_count }}개 성공, {{ total - ok_count }}개 실패</div>
+  {% else %}
+    <div class="summary-bar summary-bar--fail">전체 실패 ({{ total }}개)</div>
+  {% endif %}
+
+  <table class="result-table">
+    <thead>
+      <tr>
+        <th>파일명</th>
+        <th>결과</th>
+        <th>상세</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.file }}</td>
+        <td>
+          {% if r.ok %}<span class="badge-ok">성공</span>{% else %}<span class="badge-fail">실패</span>{% endif %}
+        </td>
+        <td>
+          {% if r.ok %}
+            <a href="/admin/plans/{{ r.spec_id }}">#{{ r.spec_id }}</a>
+            {% if r.get('queued') %} · Celery 큐에 추가됨{% endif %}
+            {% if r.get('indexed') %} · 즉시 인덱싱 완료 ({{ r.get('chunks', 0) }}청크){% endif %}
+          {% else %}
+            {{ r.error }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:1.5rem">
+    <a href="/admin/plans/app/{{ app_target }}" class="btn btn-primary">앱 목록으로</a>
+    <a href="/admin/plans/bulk-upload" class="btn btn-secondary" style="margin-left:0.5rem">다시 업로드</a>
+  </div>
+
+{% else %}
+
+<form class="form-stack" method="post" action="/admin/plans/bulk-upload" enctype="multipart/form-data" id="bulk-form">
+  <div class="field">
+    <label class="field-label" for="app_target">app_target <span style="color:#b91c1c">*</span></label>
+    {% if known_apps %}
+    <input class="input" list="known-apps-list" id="app_target" name="app_target" required placeholder="앱 이름 (예: my-app)" autocomplete="off" />
+    <datalist id="known-apps-list">
+      {% for a in known_apps %}<option value="{{ a }}">{% endfor %}
+    </datalist>
+    {% else %}
+    <input class="input" id="app_target" name="app_target" required placeholder="앱 이름 (예: my-app)" autocomplete="off" />
+    {% endif %}
+    <p class="field-hint">기획서를 묶을 앱 식별자. 기존 앱과 동일하게 입력하면 해당 앱에 추가됩니다.</p>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="base_branch">base_branch</label>
+    <input class="input" id="base_branch" name="base_branch" value="main" autocomplete="off" />
+  </div>
+
+  <div class="field">
+    <label class="field-label">파일 선택 (복수 선택 가능)</label>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" name="files" multiple accept=".txt,.md,.pdf,.docx" id="file-input" />
+      <div class="upload-zone__label">
+        <strong>파일을 드래그하거나 클릭해서 선택</strong>
+        <div class="upload-zone__hint">.txt · .md · .pdf · .docx 지원 · 복수 파일 동시 업로드</div>
+      </div>
+    </div>
+    <ul class="file-list" id="file-list"></ul>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary" id="submit-btn">업로드 및 청킹 시작</button>
+    <a href="/admin/plans" class="btn btn-secondary">취소</a>
+  </div>
+</form>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+  const input = document.getElementById('file-input');
+  const zone  = document.getElementById('upload-zone');
+  const list  = document.getElementById('file-list');
+  const btn   = document.getElementById('submit-btn');
+  if (!input) return;
+
+  function renderList(files) {
+    list.innerHTML = '';
+    [...files].forEach(f => {
+      const li = document.createElement('li');
+      li.className = 'file-list__item';
+      li.textContent = `${f.name}  (${(f.size / 1024).toFixed(1)} KB)`;
+      list.appendChild(li);
+    });
+  }
+
+  input.addEventListener('change', () => renderList(input.files));
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const dt = e.dataTransfer;
+    if (dt && dt.files.length) {
+      // DataTransfer → FileList는 직접 교체 불가, 폼에 hidden input으로 추가
+      // 대신 input.files를 직접 교체하는 우회 방식 사용
+      try {
+        const container = new DataTransfer();
+        [...dt.files].forEach(f => container.items.add(f));
+        input.files = container.files;
+        renderList(input.files);
+      } catch (_) {}
+    }
+  });
+
+  document.getElementById('bulk-form')?.addEventListener('submit', () => {
+    if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+  });
+})();
+</script>
+{% endblock %}

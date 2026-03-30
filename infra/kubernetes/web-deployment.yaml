@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcper-web
+  namespace: mcper
+  labels:
+    app: mcper-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcper-web
+  template:
+    metadata:
+      labels:
+        app: mcper-web
+    spec:
+      containers:
+      - name: mcper-web
+        image: your-registry/mcper:VERSION    # latest 금지, 태그 명시
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: mcper-config
+        - secretRef:
+            name: mcper-secret
+        env:
+        - name: MCPER_ADMIN_ENABLED
+          value: "false"          # Web Pod: 어드민 OFF (admin pod 별도)
+        - name: MCPER_MCP_ENABLED
+          value: "true"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/rag
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      terminationGracePeriodSeconds: 30

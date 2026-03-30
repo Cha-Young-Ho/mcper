@@ -25,6 +25,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EmbeddingProvider = Literal["local", "openai", "localhost", "bedrock"]
 
+
+class AuthSettings(BaseModel):
+    """JWT 기반 세션 인증 설정. MCPER_AUTH_ENABLED=true 시 활성화."""
+
+    enabled: bool = False
+    secret_key: str = ""
+    token_expire_minutes: int = 1440
+    # OAuth (optional — 클라이언트 ID 설정 시 자동 활성화)
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    github_client_id: str | None = None
+    github_client_secret: str | None = None
+
 _ENV_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
@@ -85,6 +98,7 @@ class AppSettings(BaseModel):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     celery: CelerySettings = Field(default_factory=CelerySettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
     @computed_field
     def celery_enabled(self) -> bool:
@@ -163,6 +177,28 @@ class EnvBootstrapSettings(BaseSettings):
     )
     localhost_embedding_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("LOCALHOST_EMBEDDING_API_KEY")
+    )
+    # Auth bootstrap
+    mcper_auth_enabled: str | None = Field(
+        default=None, validation_alias=AliasChoices("MCPER_AUTH_ENABLED")
+    )
+    auth_secret_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_SECRET_KEY")
+    )
+    auth_token_expire_minutes: int | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_TOKEN_EXPIRE_MINUTES")
+    )
+    auth_google_client_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_GOOGLE_CLIENT_ID")
+    )
+    auth_google_client_secret: str | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_GOOGLE_CLIENT_SECRET")
+    )
+    auth_github_client_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_GITHUB_CLIENT_ID")
+    )
+    auth_github_client_secret: str | None = Field(
+        default=None, validation_alias=AliasChoices("AUTH_GITHUB_CLIENT_SECRET")
     )
 
 
@@ -305,6 +341,23 @@ def load_settings() -> AppSettings:
         cfg.embedding.localhost_model = env.localhost_embedding_model.strip()
     if env.localhost_embedding_api_key:
         cfg.embedding.localhost_api_key = env.localhost_embedding_api_key.strip()
+
+    # Auth settings override
+    if env.mcper_auth_enabled is not None:
+        v = env.mcper_auth_enabled.strip().lower()
+        cfg.auth.enabled = v in ("1", "true", "yes")
+    if env.auth_secret_key:
+        cfg.auth.secret_key = env.auth_secret_key
+    if env.auth_token_expire_minutes is not None:
+        cfg.auth.token_expire_minutes = env.auth_token_expire_minutes
+    if env.auth_google_client_id:
+        cfg.auth.google_client_id = env.auth_google_client_id
+    if env.auth_google_client_secret:
+        cfg.auth.google_client_secret = env.auth_google_client_secret
+    if env.auth_github_client_id:
+        cfg.auth.github_client_id = env.auth_github_client_id
+    if env.auth_github_client_secret:
+        cfg.auth.github_client_secret = env.auth_github_client_secret
 
     return cfg
 

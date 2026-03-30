@@ -1,0 +1,36 @@
+# 사내망: 모든 서비스는 ClusterIP (외부 노출 없음)
+# 외부 접근은 Ingress + 사내 Ingress Controller 통해서만
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcper-web-svc
+  namespace: mcper
+  labels:
+    app: mcper-web
+spec:
+  type: ClusterIP          # 사내망: LoadBalancer 사용 안함
+  selector:
+    app: mcper-web
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcper-admin-svc
+  namespace: mcper
+  labels:
+    app: mcper-admin
+spec:
+  type: ClusterIP
+  selector:
+    app: mcper-admin
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http

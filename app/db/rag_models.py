@@ -57,6 +57,12 @@ class CodeEdge(Base):
     """Directed relationship between code nodes (CALLS, IMPORTS, etc.)."""
 
     __tablename__ = "code_edges"
+    __table_args__ = (
+        UniqueConstraint(
+            "app_target", "source_id", "target_id", "relation",
+            name="uq_code_edges_app_src_tgt_rel",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     app_target: Mapped[str] = mapped_column(String(255), nullable=False, index=True)

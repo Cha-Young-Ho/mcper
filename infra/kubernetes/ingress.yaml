@@ -1,0 +1,88 @@
+# 사내망(Private Network) Ingress 설정
+# NGINX Ingress Controller 기준 (사내 클러스터 설치 필요)
+# ingressClassName을 사내 클러스터 설정에 맞게 변경
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcper-ingress
+  namespace: mcper
+  annotations:
+    # 사내 NGINX Ingress (external: 사내 네트워크에서 접근 가능한 ingress class)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"         # SSE 스트리밍용
+    # 사내망 IP 제한 예시 (10.x.x.x, 192.168.x.x)
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16"
+spec:
+  ingressClassName: nginx   # 사내 클러스터 ingress class명으로 변경
+  rules:
+  - host: mcper.corp.internal    # 사내 DNS 주소로 변경
+    http:
+      paths:
+      # MCP 엔드포인트 (Web Pod)
+      - path: /mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-web-svc
+            port:
+              number: 80
+      # Health 엔드포인트 (Web Pod)
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-web-svc
+            port:
+              number: 80
+      # Admin UI (Admin Pod — 사내 IP만 접근)
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-admin-svc
+            port:
+              number: 80
+      # Auth 엔드포인트 (Admin Pod)
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-admin-svc
+            port:
+              number: 80
+      # Static 파일 (Admin Pod)
+      - path: /static
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-admin-svc
+            port:
+              number: 80
+
+---
+# Admin 전용 Ingress (사내 IP만 접근, 별도 제한 적용)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcper-admin-ingress
+  namespace: mcper
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # 사내망 IP 화이트리스트 (아래 CIDR을 사내 네트워크에 맞게 수정)
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: mcper-admin.corp.internal    # 어드민 전용 사내 DNS
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcper-admin-svc
+            port:
+              number: 80

@@ -1,8 +1,14 @@
-"""MCP 마운트 앞단: 매 요청 DB에서 허용 Host 조회 후 통과/421/403."""
+"""MCP 마운트 앞단: 매 요청 DB에서 허용 Host 조회 후 통과/421/403.
+
+인증 검사 순서 (MCPER_AUTH_ENABLED=true 시):
+  1. Authorization: Bearer <JWT or API 키> 헤더 검증
+  2. 실패 시 401 반환
+"""
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from collections.abc import Callable
@@ -21,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 ASGIApp = Callable[[dict[str, Any], Callable, Callable], Any]
 
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+
 
 def _mcp_transport_gate_bypassed() -> bool:
     """Host/Origin 앱 레벨 검사 생략 — 네트워크는 SG·ALB 등에서 제어할 때 ``MCP_BYPASS_TRANSPORT_GATE=1``."""
@@ -35,14 +43,56 @@ def _header(scope: dict[str, Any], name: bytes) -> str | None:
     return None
 
 
+def _check_bearer_auth(auth_header: str | None) -> tuple[bool, int, bytes]:
+    """MCPER_AUTH_ENABLED=true 시 Bearer 토큰(JWT or API 키) 검증."""
+    if not _auth_enabled:
+        return True, 0, b""
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return False, 401, b"Authorization required"
+
+    token_or_key = auth_header[7:]
+
+    # JWT 검증 시도
+    try:
+        from app.auth.service import decode_token
+        decode_token(token_or_key)
+        return True, 0, b""
+    except Exception:
+        pass
+
+    # API 키 검증 시도
+    try:
+        from sqlalchemy import select
+        from app.db.auth_models import ApiKey
+
+        key_hash = hashlib.sha256(token_or_key.encode()).hexdigest()
+        db = SessionLocal()
+        try:
+            row = db.scalar(select(ApiKey).where(ApiKey.key_hash == key_hash))
+            if row is not None:
+                return True, 0, b""
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.exception("MCP auth check failed: %s", exc)
+
+    return False, 401, b"Invalid token"
+
+
 def _sync_validate(
     app_settings: AppSettings,
     host: str | None,
     origin: str | None,
     method: str,
     content_type: str | None,
+    auth_header: str | None = None,
 ) -> tuple[bool, int, bytes]:
     """(통과 여부, 실패 시 status, body)."""
+    # Auth 검사 (MCPER_AUTH_ENABLED=true 시)
+    ok, status, body = _check_bearer_auth(auth_header)
+    if not ok:
+        return ok, status, body
+
     if _mcp_transport_gate_bypassed():
         if method.upper() == "POST" and not content_type_ok_for_mcp_post(content_type):
             return False, 400, b"Invalid Content-Type header"
@@ -84,6 +134,7 @@ class McpHostGateASGI:
         origin = _header(scope, b"origin")
         method = scope.get("method") or "GET"
         ct = _header(scope, b"content-type")
+        auth_header = _header(scope, b"authorization")
 
         ok, status, body = await asyncio.to_thread(
             _sync_validate,
@@ -92,6 +143,7 @@ class McpHostGateASGI:
             origin,
             method,
             ct,
+            auth_header,
         )
         if not ok:
             await send(

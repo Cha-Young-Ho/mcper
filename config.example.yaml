@@ -60,3 +60,19 @@ embedding:
   # dim: 1024
   # bedrock_region: "ap-northeast-2"
   # bedrock_model_id: "amazon.titan-embed-text-v2:0"
+
+# ── 인증 설정 (MCPER_AUTH_ENABLED=true 시 활성화) ─────────────────────────────
+# 사내 배포 시 MCPER_AUTH_ENABLED=true 권장
+# env 로 덮어쓰기: MCPER_AUTH_ENABLED, AUTH_SECRET_KEY, AUTH_TOKEN_EXPIRE_MINUTES,
+#   AUTH_GOOGLE_CLIENT_ID, AUTH_GOOGLE_CLIENT_SECRET,
+#   AUTH_GITHUB_CLIENT_ID, AUTH_GITHUB_CLIENT_SECRET
+auth:
+  enabled: false                    # true로 변경 시 JWT 인증 활성화
+  secret_key: "${AUTH_SECRET_KEY}"  # 반드시 강력한 랜덤 값 설정 (32바이트 이상)
+  token_expire_minutes: 1440        # 기본 24시간
+  # Google OAuth (선택 — 설정 시 자동 활성화)
+  # google_client_id: "${AUTH_GOOGLE_CLIENT_ID}"
+  # google_client_secret: "${AUTH_GOOGLE_CLIENT_SECRET}"
+  # GitHub OAuth (선택 — 설정 시 자동 활성화)
+  # github_client_id: "${AUTH_GITHUB_CLIENT_ID}"
+  # github_client_secret: "${AUTH_GITHUB_CLIENT_SECRET}"
