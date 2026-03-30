@@ -1,0 +1,178 @@
+{% extends "admin/base.html" %}
+
+{% block body %}
+<!-- Summary Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem">
+  <div class="stat-card" style="padding:1rem;border:1px solid var(--border,#e0e0e0);border-radius:8px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#e67e22" id="stat-pending">{{ pending_count }}</div>
+    <div style="font-size:.85rem;color:#666">Pending</div>
+  </div>
+  <div class="stat-card" style="padding:1rem;border:1px solid var(--border,#e0e0e0);border-radius:8px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#3498db" id="stat-retrying">{{ retrying_count }}</div>
+    <div style="font-size:.85rem;color:#666">Retrying</div>
+  </div>
+  <div class="stat-card" style="padding:1rem;border:1px solid var(--border,#e0e0e0);border-radius:8px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#e74c3c" id="stat-failed">{{ failed_count }}</div>
+    <div style="font-size:.85rem;color:#666">Failed</div>
+  </div>
+  <div class="stat-card" style="padding:1rem;border:1px solid var(--border,#e0e0e0);border-radius:8px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#27ae60" id="stat-resolved">{{ resolved_count }}</div>
+    <div style="font-size:.85rem;color:#666">Resolved</div>
+  </div>
+</div>
+
+<!-- Task Stats Table -->
+{% if task_stats %}
+<h3 style="margin-bottom:.75rem">Task Statistics</h3>
+<div style="overflow-x:auto;margin-bottom:1.5rem">
+  <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+        <th style="padding:.5rem">Task Name</th>
+        <th style="padding:.5rem;text-align:right">Success</th>
+        <th style="padding:.5rem;text-align:right">Failure</th>
+        <th style="padding:.5rem;text-align:right">Total Duration</th>
+        <th style="padding:.5rem">Last Success</th>
+        <th style="padding:.5rem">Last Failure</th>
+      </tr>
+    </thead>
+    <tbody id="stats-tbody">
+      {% for s in task_stats %}
+      <tr style="border-bottom:1px solid var(--border,#e0e0e0)">
+        <td style="padding:.5rem"><code>{{ s.task_name }}</code></td>
+        <td style="padding:.5rem;text-align:right;color:#27ae60">{{ s.success_count }}</td>
+        <td style="padding:.5rem;text-align:right;color:#e74c3c">{{ s.failure_count }}</td>
+        <td style="padding:.5rem;text-align:right">{{ s.total_duration_seconds }}s</td>
+        <td style="padding:.5rem;font-size:.8rem">{{ s.last_success_at.strftime('%m-%d %H:%M') if s.last_success_at else '-' }}</td>
+        <td style="padding:.5rem;font-size:.8rem">{{ s.last_failure_at.strftime('%m-%d %H:%M') if s.last_failure_at else '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+  <h3 style="margin:0">Failed Tasks</h3>
+  <form method="get" action="/admin/celery" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+    <select name="status" style="padding:.35rem .5rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:.85rem">
+      <option value="">All status</option>
+      {% for v in ['pending','retrying','failed','resolved'] %}
+      <option value="{{ v }}" {% if filter_status == v %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+    </select>
+    <select name="entity_type" style="padding:.35rem .5rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:.85rem">
+      <option value="">All types</option>
+      {% for v in ['spec','code_index'] %}
+      <option value="{{ v }}" {% if filter_entity_type == v %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" style="padding:.35rem .75rem;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85rem">Filter</button>
+  </form>
+  <span style="font-size:.8rem;color:#888">{{ total_count }} total</span>
+</div>
+
+<!-- Failed Tasks Table -->
+{% if failed_tasks %}
+<div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+        <th style="padding:.5rem">ID</th>
+        <th style="padding:.5rem">Task ID</th>
+        <th style="padding:.5rem">Type</th>
+        <th style="padding:.5rem">Entity</th>
+        <th style="padding:.5rem">Status</th>
+        <th style="padding:.5rem">Retries</th>
+        <th style="padding:.5rem">Error</th>
+        <th style="padding:.5rem">Created</th>
+        <th style="padding:.5rem">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in failed_tasks %}
+      <tr style="border-bottom:1px solid var(--border,#e0e0e0)" id="row-{{ t.id }}">
+        <td style="padding:.5rem">{{ t.id }}</td>
+        <td style="padding:.5rem"><code style="font-size:.75rem">{{ t.task_id[:12] }}...</code></td>
+        <td style="padding:.5rem">{{ t.entity_type }}</td>
+        <td style="padding:.5rem">{{ t.entity_id }}</td>
+        <td style="padding:.5rem">
+          {% if t.status == 'pending' %}
+          <span style="color:#e67e22;font-weight:600">pending</span>
+          {% elif t.status == 'retrying' %}
+          <span style="color:#3498db;font-weight:600">retrying</span>
+          {% elif t.status == 'failed' %}
+          <span style="color:#e74c3c;font-weight:600">failed</span>
+          {% elif t.status == 'resolved' %}
+          <span style="color:#27ae60;font-weight:600">resolved</span>
+          {% else %}
+          {{ t.status }}
+          {% endif %}
+        </td>
+        <td style="padding:.5rem">{{ t.retry_count }}/{{ t.max_retries }}</td>
+        <td style="padding:.5rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ t.error_message }}">{{ t.error_message[:80] }}</td>
+        <td style="padding:.5rem;font-size:.8rem">{{ t.created_at.strftime('%m-%d %H:%M') if t.created_at else '-' }}</td>
+        <td style="padding:.5rem;white-space:nowrap">
+          {% if t.status in ('pending', 'retrying') %}
+          <button onclick="retryTask({{ t.id }})" style="padding:.25rem .5rem;background:#3498db;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:.8rem">Retry</button>
+          {% endif %}
+          {% if t.status != 'resolved' %}
+          <button onclick="resolveTask({{ t.id }})" style="padding:.25rem .5rem;background:#27ae60;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:.8rem">Resolve</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem">
+  {% for p in range(1, total_pages + 1) %}
+  <a href="/admin/celery?page={{ p }}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if filter_entity_type %}&entity_type={{ filter_entity_type }}{% endif %}"
+     style="padding:.35rem .6rem;border:1px solid var(--border,#ccc);border-radius:4px;text-decoration:none;font-size:.85rem;{% if p == current_page %}background:#3498db;color:#fff;{% endif %}">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<p style="color:#888;text-align:center;padding:2rem 0">No failed tasks found.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function retryTask(id) {
+  if (!confirm('Retry this task?')) return;
+  try {
+    const r = await fetch('/admin/celery/retry/' + id, {method:'POST'});
+    if (r.ok) location.reload();
+    else { const d = await r.json(); alert(d.detail || 'Retry failed'); }
+  } catch(e) { alert('Request failed'); }
+}
+
+async function resolveTask(id) {
+  if (!confirm('Mark as resolved?')) return;
+  try {
+    const r = await fetch('/admin/celery/resolve/' + id, {method:'POST'});
+    if (r.ok) location.reload();
+    else { const d = await r.json(); alert(d.detail || 'Failed'); }
+  } catch(e) { alert('Request failed'); }
+}
+
+// Auto-refresh stats every 30 seconds
+setInterval(async () => {
+  try {
+    const r = await fetch('/admin/celery/stats');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('stat-pending').textContent = d.pending;
+    document.getElementById('stat-retrying').textContent = d.retrying;
+    document.getElementById('stat-failed').textContent = d.failed;
+    document.getElementById('stat-resolved').textContent = d.resolved;
+  } catch(e) {}
+}, 30000);
+</script>
+{% endblock %}

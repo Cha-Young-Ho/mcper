@@ -18,6 +18,7 @@ import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
 import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
 import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
 import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
+import app.db.celery_models  # noqa: F401 — failed_tasks, celery_task_stats
 
 
 def _resolve_database_url() -> str:
@@ -54,6 +55,12 @@ def _apply_lightweight_migrations(connection) -> None:
     connection.execute(
         text(
             "ALTER TABLE specs ADD COLUMN IF NOT EXISTS title VARCHAR(512)"
+        )
+    )
+    # User 테이블에 password_changed_at 컬럼 추가 (없을 경우)
+    connection.execute(
+        text(
+            "ALTER TABLE mcper_users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP WITH TIME ZONE NULL"
         )
     )
     connection.execute(

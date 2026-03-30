@@ -56,6 +56,7 @@ class SecuritySettings(BaseModel):
     """MCP ``allowed_origins`` YAML 기본값. Host 는 ``MCP_ALLOWED_HOSTS`` 등 env + 기동 시 DB 동기화."""
 
     allowed_origins: list[str] = Field(default_factory=list)
+    secure_cookie: bool = True  # HTTPS only 쿠키 (로컬 개발: false)
 
 
 class DatabaseSettings(BaseModel):

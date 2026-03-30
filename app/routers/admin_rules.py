@@ -1,135 +1,26 @@
-"""Admin UI: versioned global rules + per-app rules."""
+"""Admin 규칙 관리 (글로벌, 앱, 레포)."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
-from app.config import settings
 from app.db.database import get_db
-from app.db.mcp_tool_stats import McpToolCallStat
-from app.db.models import Spec
 from app.db.rule_models import (
     AppRuleVersion,
     GlobalRuleVersion,
     McpAppPullOption,
     RepoRuleVersion,
 )
-from app.db.seed_defaults import seed_force
-from app.mcp_tools_docs import tools_with_counts
+from app.routers.admin_base import _count, templates
 from app.services import versioned_rules as vr
-from app.services.celery_client import enqueue_index_spec, enqueue_or_index_sync
-from app.services.document_parser import parse_uploaded_file
-from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
-
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _count(db: Session, model) -> int:
-    return int(db.scalar(select(func.count()).select_from(model)) or 0)
-
-
-def _related_files_from_textarea(raw: str) -> list[str]:
-    return [ln.strip() for ln in (raw or "").splitlines() if ln.strip()]
-
-
-def _spec_app_cards(db: Session) -> list[dict]:
-    apps = db.scalars(select(Spec.app_target).distinct()).all()
-    cards: list[dict] = []
-    for a in sorted({x for x in apps if x}):
-        cnt = (
-            db.scalar(
-                select(func.count()).select_from(Spec).where(Spec.app_target == a)
-            )
-            or 0
-        )
-        cards.append(
-            {
-                "app": a,
-                "count": int(cnt),
-                "enc": quote(a, safe=""),
-            }
-        )
-    return cards
-
-
-# ----- Home -----
-
-
-@router.get("")
-def admin_home(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    apps = vr.list_distinct_apps(db)
-    counts = {
-        r.tool_name: int(r.call_count)
-        for r in db.scalars(select(McpToolCallStat)).all()
-    }
-    tool_stats, _ = tools_with_counts(counts)
-    mcp_calls_total = int(
-        db.scalar(select(func.coalesce(func.sum(McpToolCallStat.call_count), 0))) or 0
-    )
-    return templates.TemplateResponse(
-        request,
-        "admin/index.html",
-        {
-            "request": request,
-            "title": "대시보드",
-            "global_versions_n": _count(db, GlobalRuleVersion),
-            "repo_patterns_n": len(vr.list_distinct_repo_patterns(db)),
-            "apps_n": len(apps),
-            "tool_stats": tool_stats,
-            "mcp_calls_total": mcp_calls_total,
-        },
-    )
-
-
-@router.get("/csrf-token")
-def csrf_token_endpoint(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-):
-    """CSRF 토큰 반환. JS에서 POST/PUT/DELETE 전 호출."""
-    token = request.cookies.get("csrf_token", "")
-    return JSONResponse({"csrf_token": token})
-
-
-@router.get("/tools")
-def admin_tools(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    counts = {
-        r.tool_name: int(r.call_count)
-        for r in db.scalars(select(McpToolCallStat)).all()
-    }
-    tool_stats, _ = tools_with_counts(counts)
-    mcp_calls_total = int(
-        db.scalar(select(func.coalesce(func.sum(McpToolCallStat.call_count), 0))) or 0
-    )
-    return templates.TemplateResponse(
-        request,
-        "admin/tools.html",
-        {
-            "request": request,
-            "title": "Tools",
-            "tool_stats": tool_stats,
-            "mcp_calls_total": mcp_calls_total,
-        },
-    )
 
 
 # ----- Global rules (version board) -----
@@ -141,6 +32,7 @@ def global_rules_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """글로벌 규칙 버전 보드."""
     rows = db.scalars(
         select(GlobalRuleVersion).order_by(GlobalRuleVersion.version.desc())
     ).all()
@@ -176,6 +68,7 @@ def global_rule_view(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """특정 글로벌 규칙 버전 조회."""
     row = db.scalars(
         select(GlobalRuleVersion).where(GlobalRuleVersion.version == version)
     ).first()
@@ -202,6 +95,7 @@ def global_rule_delete_version(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """글로벌 규칙 버전 삭제."""
     n = int(db.scalar(select(func.count()).select_from(GlobalRuleVersion)) or 0)
     if n <= 1:
         raise HTTPException(
@@ -224,6 +118,7 @@ def global_rule_publish(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
+    """새로운 글로벌 규칙 버전 publish."""
     nv = vr.publish_global(db, body)
     return RedirectResponse(f"/admin/global-rules/v/{nv}", status_code=303)
 
@@ -260,6 +155,7 @@ def app_rules_cards(
     db: Session = Depends(get_db),
     q: str = "",
 ):
+    """앱 규칙 카드 목록."""
     names = _sort_app_names(vr.list_distinct_apps(db))
     qn = q.strip().lower()
     if qn:
@@ -305,39 +201,12 @@ def app_rules_cards(
     )
 
 
-def _sort_repo_patterns(patterns: list[str]) -> list[str]:
-    """빈 패턴(default) 카드가 먼저 오도록 정렬."""
-
-    def key(p: str) -> tuple[int, str]:
-        if not (p or "").strip():
-            return (0, "")
-        return (1, (p or "").lower())
-
-    return sorted(patterns, key=key)
-
-
-@router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")
-def repo_pattern_include_repo_default_toggle(
-    pat_segment: str,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    """패턴(카드)마다 repository default 스트림 병합 여부."""
-    key = vr.repo_pattern_from_url_segment(pat_segment)
-    if not db.scalars(
-        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
-    ).first():
-        raise HTTPException(404, "Unknown repository pattern")
-    cur = vr.get_mcp_include_repo_default_for_pattern(db, key)
-    vr.set_mcp_include_repo_default_for_pattern(db, key, not cur)
-    return RedirectResponse("/admin/repo-rules", status_code=303)
-
-
 @router.get("/app-rules/new")
 def new_app_form(
     request: Request,
     _user: str = Depends(require_admin_user),
 ):
+    """새 앱 규칙 생성 폼."""
     return templates.TemplateResponse(
         request,
         "admin/app_rule_new_app.html",
@@ -357,6 +226,7 @@ def new_app_submit(
     app_name: str = Form(...),
     body: str = Form(...),
 ):
+    """새 앱 규칙 생성 처리."""
     key = app_name.strip().lower()
     if not key:
         return templates.TemplateResponse(
@@ -390,9 +260,6 @@ def new_app_submit(
     )
 
 
-# ----- Per-app version board -----
-
-
 @router.get("/app-rules/app/{app_name}")
 def app_rule_board(
     request: Request,
@@ -400,6 +267,7 @@ def app_rule_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """앱 규칙 버전 보드."""
     key = app_name.lower().strip()
     rows = db.scalars(
         select(AppRuleVersion)
@@ -451,9 +319,7 @@ def app_rule_pull_default_toggle(
     db: Session = Depends(get_db),
     return_to: str = Form(""),
 ):
-    """
-    이 앱으로 `get_global_rule` 호출 시 `__default__` 앱 스트림을 함께 내려줄지 (앱별).
-    """
+    """이 앱으로 `get_global_rule` 호출 시 `__default__` 앱 스트림을 함께 내려줄지 (앱별)."""
     key = app_name.lower().strip()
     if key == "__default__":
         raise HTTPException(
@@ -502,6 +368,7 @@ def app_rule_delete_one_version(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """앱 규칙 특정 버전 삭제."""
     key = app_name.lower().strip()
     n = int(
         db.scalar(select(func.count()).where(AppRuleVersion.app_name == key)) or 0
@@ -542,6 +409,7 @@ def app_rule_publish_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """앱 규칙 새 버전 publish 폼."""
     key = app_name.lower().strip()
     if not db.scalars(
         select(AppRuleVersion).where(AppRuleVersion.app_name == key).limit(1)
@@ -568,6 +436,7 @@ def app_rule_publish_submit(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
+    """앱 규칙 새 버전 publish."""
     key = app_name.lower().strip()
     _, nv = vr.publish_app(db, key, body)
     return RedirectResponse(
@@ -600,6 +469,7 @@ def app_rule_version_view(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """앱 규칙 특정 버전 조회."""
     key = app_name.lower().strip()
     row = db.scalars(
         select(AppRuleVersion).where(
@@ -630,6 +500,34 @@ def app_rule_version_view(
 # ----- Repository rules (URL 패턴별) -----
 
 
+def _sort_repo_patterns(patterns: list[str]) -> list[str]:
+    """빈 패턴(default) 카드가 먼저 오도록 정렬."""
+
+    def key(p: str) -> tuple[int, str]:
+        if not (p or "").strip():
+            return (0, "")
+        return (1, (p or "").lower())
+
+    return sorted(patterns, key=key)
+
+
+@router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")
+def repo_pattern_include_repo_default_toggle(
+    pat_segment: str,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """패턴(카드)마다 repository default 스트림 병합 여부."""
+    key = vr.repo_pattern_from_url_segment(pat_segment)
+    if not db.scalars(
+        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
+    ).first():
+        raise HTTPException(404, "Unknown repository pattern")
+    cur = vr.get_mcp_include_repo_default_for_pattern(db, key)
+    vr.set_mcp_include_repo_default_for_pattern(db, key, not cur)
+    return RedirectResponse("/admin/repo-rules", status_code=303)
+
+
 @router.get("/repo-rules")
 def repo_rules_cards(
     request: Request,
@@ -637,6 +535,7 @@ def repo_rules_cards(
     db: Session = Depends(get_db),
     q: str = "",
 ):
+    """레포 규칙 카드 목록."""
     patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db))
     qn = q.strip().lower()
     if qn:
@@ -694,6 +593,7 @@ def new_repo_pattern_form(
     request: Request,
     _user: str = Depends(require_admin_user),
 ):
+    """새 레포 패턴 규칙 생성 폼."""
     return templates.TemplateResponse(
         request,
         "admin/repo_rule_new_pattern.html",
@@ -714,6 +614,7 @@ def new_repo_pattern_submit(
     sort_order: int = Form(100),
     body: str = Form(...),
 ):
+    """새 레포 패턴 규칙 생성 처리."""
     key = pattern.strip()
     if key == vr.REPO_PATTERN_URL_DEFAULT:
         return templates.TemplateResponse(
@@ -752,6 +653,7 @@ def repo_rule_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """레포 규칙 버전 보드."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     rows = db.scalars(
         select(RepoRuleVersion)
@@ -797,6 +699,7 @@ def repo_rule_delete_pattern_stream(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """레포 규칙 패턴 전체 삭제."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not (key or "").strip():
         raise HTTPException(
@@ -817,6 +720,7 @@ def repo_rule_delete_one_version(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """레포 규칙 특정 버전 삭제."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     n = int(
         db.scalar(select(func.count()).where(RepoRuleVersion.pattern == key)) or 0
@@ -855,6 +759,7 @@ def repo_rule_publish_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """레포 규칙 새 버전 publish 폼."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not db.scalars(
         select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
@@ -884,13 +789,11 @@ def repo_rule_publish_submit(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
+    """레포 규칙 새 버전 publish."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     _, nv = vr.publish_repo(db, key, body)
     pat_url = vr.repo_pat_href_segment(key)
-    return RedirectResponse(
-        f"/admin/repo-rules/pat/{pat_url}/v/{nv}",
-        status_code=303,
-    )
+    return RedirectResponse(f"/admin/repo-rules/pat/{pat_url}/v/{nv}", status_code=303)
 
 
 @router.post("/repo-rules/pat/{pat_segment}/save-as-new")
@@ -900,13 +803,11 @@ def repo_rule_save_as_new(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ):
+    """버전 상세에서 수정한 내용을 해당 패턴의 새 버전으로 저장."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     _, nv = vr.publish_repo(db, key, body)
     pat_url = vr.repo_pat_href_segment(key)
-    return RedirectResponse(
-        f"/admin/repo-rules/pat/{pat_url}/v/{nv}",
-        status_code=303,
-    )
+    return RedirectResponse(f"/admin/repo-rules/pat/{pat_url}/v/{nv}", status_code=303)
 
 
 @router.get("/repo-rules/pat/{pat_segment}/v/{version}")
@@ -917,6 +818,7 @@ def repo_rule_version_view(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
+    """레포 규칙 특정 버전 조회."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     row = db.scalars(
         select(RepoRuleVersion).where(
@@ -926,12 +828,12 @@ def repo_rule_version_view(
     ).first()
     if row is None:
         raise HTTPException(404, "Not found")
-    pat_url = vr.repo_pat_href_segment(key)
-    display = vr.repo_pattern_card_display(key)
     n = int(
         db.scalar(select(func.count()).where(RepoRuleVersion.pattern == key)) or 0
     )
     can_delete_version = n >= 1 and ((key or "").strip() != "" or n > 1)
+    pat_url = vr.repo_pat_href_segment(key)
+    display = vr.repo_pattern_card_display(key)
     return templates.TemplateResponse(
         request,
         "admin/repo_rule_version_view.html",
@@ -945,359 +847,3 @@ def repo_rule_version_view(
             "can_delete_version": can_delete_version,
         },
     )
-
-
-# ----- 기획서 (본문) -----
-
-
-@router.get("/plans")
-def plans_app_index(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    return templates.TemplateResponse(
-        request,
-        "admin/spec_apps_cards.html",
-        {
-            "request": request,
-            "title": "기획서",
-            "page_heading": "앱별 기획서",
-            "nav_base": "plans",
-            "cards": _spec_app_cards(db),
-        },
-    )
-
-
-@router.get("/plans/app/{app_name}")
-def plans_list_for_app(
-    request: Request,
-    app_name: str,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    key = app_name.strip()
-    rows = db.scalars(
-        select(Spec)
-        .where(Spec.app_target == key)
-        .order_by(Spec.id.desc())
-    ).all()
-    return templates.TemplateResponse(
-        request,
-        "admin/specs_list_by_app.html",
-        {
-            "request": request,
-            "title": f"기획서 — {key}",
-            "app_name": key,
-            "app_enc": quote(key, safe=""),
-            "nav_base": "plans",
-            "rows": rows,
-            "spec_display_title": spec_display_title,
-        },
-    )
-
-
-@router.get("/plans/{spec_id:int}")
-def plan_detail(
-    request: Request,
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    hide_body = content_looks_like_vector_or_blob(row.content)
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_detail.html",
-        {
-            "request": request,
-            "title": spec_display_title(row),
-            "row": row,
-            "hide_body": hide_body,
-            "spec_display_title": spec_display_title,
-            "app_enc": quote(row.app_target, safe=""),
-        },
-    )
-
-
-@router.get("/plans/{spec_id:int}/edit")
-def plan_edit_form(
-    request: Request,
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    related_lines = "\n".join(row.related_files or [])
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_edit.html",
-        {
-            "request": request,
-            "title": f"수정 — {spec_display_title(row)}",
-            "row": row,
-            "related_lines": related_lines,
-            "spec_display_title": spec_display_title,
-            "app_enc": quote(row.app_target, safe=""),
-        },
-    )
-
-
-@router.post("/plans/{spec_id:int}/edit")
-def plan_edit_submit(
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-    title: str = Form(""),
-    app_target: str = Form(...),
-    base_branch: str = Form(...),
-    content: str = Form(...),
-    related_files_text: str = Form(""),
-):
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    app_key = app_target.strip()
-    if not app_key:
-        raise HTTPException(400, "app_target 필수")
-    row.title = (title or "").strip() or None
-    row.app_target = app_key
-    row.base_branch = (base_branch or "").strip() or "main"
-    row.content = content or ""
-    row.related_files = _related_files_from_textarea(related_files_text)
-    db.commit()
-    enqueue_index_spec(spec_id)
-    return RedirectResponse(f"/admin/plans/{spec_id}", status_code=303)
-
-
-@router.get("/plans/{spec_id:int}/delete/confirm")
-def plan_delete_confirm(
-    request: Request,
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_delete_confirm.html",
-        {
-            "request": request,
-            "title": f"삭제 확인 — {spec_display_title(row)}",
-            "row": row,
-            "spec_display_title": spec_display_title,
-            "app_enc": quote(row.app_target, safe=""),
-        },
-    )
-
-
-@router.post("/plans/{spec_id:int}/delete")
-def plan_delete(
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-    confirm: str = Form(""),
-):
-    if confirm.strip().upper() != "DELETE":
-        raise HTTPException(400, '확인 입력란에 대문자 DELETE 를 입력하세요.')
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    app_enc = quote(row.app_target, safe="")
-    db.delete(row)
-    db.commit()
-    return RedirectResponse(f"/admin/plans/app/{app_enc}", status_code=303)
-
-
-# ----- 기획서 일괄 업로드 -----
-
-_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
-
-
-@router.get("/plans/bulk-upload")
-def plan_bulk_upload_form(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    apps = sorted({row for (row,) in db.execute(select(Spec.app_target).distinct()).all()})
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_bulk_upload.html",
-        {
-            "request": request,
-            "title": "기획서 일괄 업로드",
-            "known_apps": apps,
-        },
-    )
-
-
-@router.post("/plans/bulk-upload")
-async def plan_bulk_upload_submit(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-    app_target: str = Form(...),
-    base_branch: str = Form("main"),
-    files: list[UploadFile] = File(...),
-):
-    app_key = app_target.strip().lower()
-    if not app_key:
-        raise HTTPException(400, "app_target 필수")
-
-    results = []
-    for f in files:
-        filename = f.filename or "unnamed"
-        ext = Path(filename).suffix.lower()
-        if ext not in _ALLOWED_EXTENSIONS:
-            results.append({"file": filename, "ok": False, "error": f"지원하지 않는 형식: {ext}"})
-            continue
-        try:
-            raw = await f.read()
-            text = parse_uploaded_file(filename, raw)
-            if not text.strip():
-                results.append({"file": filename, "ok": False, "error": "파일 내용이 비어 있습니다"})
-                continue
-
-            title = Path(filename).stem
-            spec = Spec(
-                title=title,
-                content=text,
-                app_target=app_key,
-                base_branch=(base_branch or "main").strip() or "main",
-                related_files=[],
-            )
-            db.add(spec)
-            db.flush()  # spec.id 확보
-            index_result = enqueue_or_index_sync(spec.id)
-            db.commit()
-            results.append({
-                "file": filename,
-                "ok": True,
-                "spec_id": spec.id,
-                **index_result,
-            })
-        except Exception as exc:
-            db.rollback()
-            results.append({"file": filename, "ok": False, "error": str(exc)})
-
-    ok_count = sum(1 for r in results if r["ok"])
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_bulk_upload.html",
-        {
-            "request": request,
-            "title": "기획서 일괄 업로드",
-            "known_apps": sorted({row for (row,) in db.execute(select(Spec.app_target).distinct()).all()}),
-            "results": results,
-            "ok_count": ok_count,
-            "total": len(results),
-            "app_target": app_key,
-        },
-        status_code=200,
-    )
-
-
-# ----- 기획서–코드 (연결 파일) -----
-
-
-@router.get("/plan-code")
-def plan_code_app_index(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    return templates.TemplateResponse(
-        request,
-        "admin/spec_apps_cards.html",
-        {
-            "request": request,
-            "title": "기획서–코드",
-            "page_heading": "앱별 기획서 → 연결 코드",
-            "nav_base": "plan-code",
-            "cards": _spec_app_cards(db),
-        },
-    )
-
-
-@router.get("/plan-code/app/{app_name}")
-def plan_code_list_for_app(
-    request: Request,
-    app_name: str,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    key = app_name.strip()
-    rows = db.scalars(
-        select(Spec)
-        .where(Spec.app_target == key)
-        .order_by(Spec.id.desc())
-    ).all()
-    return templates.TemplateResponse(
-        request,
-        "admin/spec_code_list_by_app.html",
-        {
-            "request": request,
-            "title": f"기획서–코드 — {key}",
-            "app_name": key,
-            "app_enc": quote(key, safe=""),
-            "rows": rows,
-            "spec_display_title": spec_display_title,
-        },
-    )
-
-
-@router.get("/plan-code/{spec_id:int}")
-def plan_code_detail(
-    request: Request,
-    spec_id: int,
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-):
-    row = db.get(Spec, spec_id)
-    if row is None:
-        raise HTTPException(404, "Not found")
-    return templates.TemplateResponse(
-        request,
-        "admin/plan_code_detail.html",
-        {
-            "request": request,
-            "title": f"연결 코드 — {spec_display_title(row)}",
-            "row": row,
-            "spec_display_title": spec_display_title,
-            "app_enc": quote(row.app_target, safe=""),
-        },
-    )
-
-
-# ----- Destructive re-seed -----
-
-
-@router.get("/seed/confirm")
-def seed_confirm(
-    request: Request,
-    _user: str = Depends(require_admin_user),
-):
-    return templates.TemplateResponse(
-        request,
-        "admin/seed_confirm.html",
-        {"request": request, "title": "Re-seed from defaults"},
-    )
-
-
-@router.post("/seed/force")
-def seed_force_run(
-    _user: str = Depends(require_admin_user),
-    db: Session = Depends(get_db),
-    confirm: str = Form(""),
-):
-    if confirm != "yes":
-        raise HTTPException(400, 'Type "yes" in confirm field')
-    seed_force(db)
-    return RedirectResponse("/admin", status_code=303)

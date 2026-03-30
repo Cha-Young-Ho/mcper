@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -36,6 +37,52 @@ def create_access_token(
     return jwt.encode(to_encode, settings.auth.secret_key, algorithm="HS256")
 
 
-def decode_token(token: str) -> dict:
-    """JWTError를 그대로 raise — 호출자가 처리."""
-    return jwt.decode(token, settings.auth.secret_key, algorithms=["HS256"])
+def decode_token(token: str, allow_expired: bool = False) -> dict:
+    """
+    JWT 검증. 만료 시 기본적으로 JWTError 발생.
+    allow_expired=True → 만료된 토큰도 payload 반환 (refresh 토큰 갱신용).
+    """
+    try:
+        return jwt.decode(
+            token,
+            settings.auth.secret_key,
+            algorithms=["HS256"],
+            options={"verify_exp": not allow_expired}
+        )
+    except Exception as e:
+        if allow_expired and "expired" in str(e).lower():
+            # 만료된 토큰의 payload 반환 (refresh 토큰에서 유저ID 추출용)
+            return jwt.decode(
+                token,
+                settings.auth.secret_key,
+                algorithms=["HS256"],
+                options={"verify_exp": False}
+            )
+        raise JWTError("Token validation failed") from e
+
+
+def verify_token_not_expired(token: str) -> bool:
+    """토큰 만료 여부만 확인. True = 유효."""
+    try:
+        jwt.decode(
+            token,
+            settings.auth.secret_key,
+            algorithms=["HS256"],
+        )
+        return True
+    except Exception:
+        return False
+
+
+def validate_password(password: str) -> str | None:
+    """
+    패스워드 정책 검증.
+    - 12자 이상
+    - 특수문자 1개 이상 포함
+    Returns: 오류 메시지 (None이면 통과).
+    """
+    if len(password) < 12:
+        return "Password must be at least 12 characters"
+    if not re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>/?`~]', password):
+        return "Password must contain at least one special character"
+    return None

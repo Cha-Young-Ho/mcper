@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -13,6 +14,7 @@ from app.db.models import Spec
 from app.db.rag_models import CodeEdge, CodeNode, SpecChunk
 from app.services.chunking import chunk_spec_text
 from app.services.embeddings import embed_texts
+from app.services.celery_monitoring import CeleryMonitoring
 from app.worker.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -67,7 +69,25 @@ def index_spec_task(self, spec_id: int) -> dict[str, Any]:
         return {"ok": True, "spec_id": spec_id, "chunks": len(pairs)}
     except Exception as exc:
         db.rollback()
+
+        # Log failure for monitoring
+        CeleryMonitoring.log_task_failure(
+            db,
+            task_id=self.request.id,
+            entity_type="spec",
+            entity_id=spec_id,
+            error_message=str(exc),
+            traceback=traceback.format_exc(),
+            max_retries=self.max_retries,
+        )
+
         logger.exception("index_spec_task failed spec_id=%s", spec_id)
+
+        # Retry with exponential backoff
+        if self.request.retries < self.max_retries:
+            countdown = 10 * (self.request.retries + 1)
+            raise self.retry(exc=exc, countdown=countdown) from exc
+
         return {"ok": False, "error": str(exc), "spec_id": spec_id}
     finally:
         db.close()
@@ -190,7 +210,25 @@ def index_code_batch_task(self, app_target: str, payload: dict[str, Any]) -> dic
         }
     except Exception as exc:
         db.rollback()
+
+        # Log failure for monitoring
+        CeleryMonitoring.log_task_failure(
+            db,
+            task_id=self.request.id,
+            entity_type="code_index",
+            entity_id=0,  # app_target is string, use 0 as placeholder
+            error_message=str(exc),
+            traceback=traceback.format_exc(),
+            max_retries=self.max_retries,
+        )
+
         logger.exception("index_code_batch_task failed app=%s", app_target)
+
+        # Retry with exponential backoff
+        if self.request.retries < self.max_retries:
+            countdown = 10 * (self.request.retries + 1)
+            raise self.retry(exc=exc, countdown=countdown) from exc
+
         return {"ok": False, "error": str(exc), "app_target": app_target}
     finally:
         db.close()

@@ -2,6 +2,25 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-03-30: @coder Phase 1 보안 강화 (CRITICAL 3개)
+
+### 작업 내용
+- **항목 1: Admin 패스워드 강제 변경** — `validate_password()` 추가 (12자 + 특수문자), 기존 8자 정책 강화, HTML 템플릿 요구사항 업데이트
+- **항목 2: API 토큰 만료 검증** — `ExpiredSignatureError` 분리 catch로 만료 토큰 명시적 401 응답, `require_admin_user`에서 만료 vs 미인증 구분
+- **항목 3: CORS/CSRF 강화** — CORS 와일드카드 차단, localhost+Cursor만 기본 허용, CSRF 미들웨어에 Bearer/health 제외 로직, `/admin/csrf-token` 엔드포인트 추가
+- 파일: `app/auth/service.py`, `app/auth/dependencies.py`, `app/auth/router.py`, `app/main.py`, `app/asgi/csrf_middleware.py`, `app/routers/admin.py`, `app/templates/auth/change_password_forced.html`, `tests/test_auth_password_change.py`, `tests/test_auth_token_expiry.py`, `tests/test_csrf.py`
+
+### 판단 이유
+- Why: CRITICAL 보안 취약점 3개 해결 (Phase 1 목표)
+- Risk: `ExpiredSignatureError`가 jose 패키지 내부 예외이므로 버전 호환성 확인 필요
+
+### 결과
+✅ 완료
+
+### 다음 단계
+- @tester: 테스트 실행 및 검증
+- @infra: 배포 전 검수
+
 ## 2026-03-30: 에이전트 팀 구조 확장 및 프로젝트 평가
 
 **작업 내용:**
@@ -251,3 +270,13 @@
 - @tester: 테스트 계획 작성 (설계 기반)
 
 ## 세션 종료: 2026-03-30 12:54
+## 세션 종료: 2026-03-30 12:58
+## 세션 종료: 2026-03-30 13:00
+## 세션 종료: 2026-03-30 14:25
+## 세션 종료: 2026-03-30 14:27
+## 세션 종료: 2026-03-30 14:28
+## 세션 종료: 2026-03-30 14:30
+## 세션 종료: 2026-03-30 14:34
+## 세션 종료: 2026-03-30 14:40
+## 세션 종료: 2026-03-30 14:44
+## 세션 종료: 2026-03-30 14:47

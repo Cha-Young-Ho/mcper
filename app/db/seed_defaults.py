@@ -130,6 +130,7 @@ def seed_admin_user_if_empty(session: Session) -> None:
     """
     MCPER_AUTH_ENABLED=true이고 mcper_users 테이블이 비어 있으면
     ADMIN_USER / ADMIN_PASSWORD 환경변수로 초기 관리자 계정 생성.
+    password_changed_at=NULL로 설정하여 초기 로그인 시 강제 변경 유도.
     """
     if not _auth_enabled:
         return
@@ -153,10 +154,11 @@ def seed_admin_user_if_empty(session: Session) -> None:
                 hashed_password=hash_password(password),
                 is_admin=True,
                 is_active=True,
+                password_changed_at=None,  # 초기 상태: 패스워드 미변경
             )
         )
         session.commit()
-        logger.info("Initial admin user '%s' created.", username)
+        logger.info("Initial admin user '%s' created (password change required on first login).", username)
     except Exception as exc:
         logger.exception("seed_admin_user_if_empty failed: %s", exc)
         session.rollback()

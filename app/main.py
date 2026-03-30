@@ -8,9 +8,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.asgi.csrf_middleware import CSRFMiddleware
 from app.config import settings
 from app.db.database import SessionLocal, check_db_connection, init_db
 from app.db.seed_defaults import seed_if_empty, seed_repo_if_empty, seed_admin_user_if_empty
@@ -46,11 +48,51 @@ def _validate_startup_config() -> None:
             "ADMIN_PASSWORD is set to default 'changeme'. "
             "Change this before exposing to any network."
         )
+        if _AUTH_ENABLED:
+            logger.error(
+                "CRITICAL: MCPER_AUTH_ENABLED=true with default ADMIN_PASSWORD. "
+                "Set new ADMIN_PASSWORD in environment or change via /auth/change-password-forced"
+            )
     if _AUTH_ENABLED and not os.environ.get("AUTH_SECRET_KEY", ""):
         logger.error(
             "MCPER_AUTH_ENABLED=true but AUTH_SECRET_KEY is not set. "
             "JWT signing will fail. Please set AUTH_SECRET_KEY."
         )
+
+
+def _get_allowed_origins() -> list[str]:
+    """
+    CORS 허용 Origin 목록 생성 (제한적).
+    1. config.security.allowed_origins (YAML)
+    2. CORS_ALLOWED_ORIGINS 환경 변수 (쉼표 구분)
+    3. 기본값: localhost 포트 (개발용) + Cursor IDE
+    와일드카드("*")는 허용하지 않음.
+    """
+    origins: list[str] = []
+
+    # config.yaml 에서
+    if settings.security.allowed_origins:
+        origins.extend(settings.security.allowed_origins)
+
+    # 환경 변수에서
+    env_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+    if env_origins:
+        origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
+
+    # 기본값: localhost + Cursor IDE
+    if not origins:
+        origins = [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "vscode-webview://",
+        ]
+
+    # 와일드카드 제거 (보안 강화)
+    origins = [o for o in origins if o != "*"]
+
+    return list(set(origins))  # 중복 제거
 
 
 @asynccontextmanager
@@ -79,6 +121,27 @@ app = FastAPI(
     description="MCP + Postgres (specs, rules) — admin at /admin",
     lifespan=lifespan,
 )
+
+# ── CORS 미들웨어 등록 (CSRF 이전) ───────────────────────────────────
+allowed_origins = _get_allowed_origins()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-CSRF-Token",
+        "X-Requested-With",
+    ],
+    expose_headers=["Content-Type"],
+    max_age=86400,
+)
+
+# ── CSRF 미들웨어 등록 ────────────────────────────────────────────────
+if _AUTH_ENABLED or _ADMIN_ENABLED:
+    app.add_middleware(CSRFMiddleware, secret_key=settings.auth.secret_key or "default-csrf-key")
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
