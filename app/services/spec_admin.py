@@ -1,4 +1,4 @@
-"""Helpers for admin 기획서(spec) views."""
+"""Helpers for admin specification (spec) views."""
 
 from __future__ import annotations
 
@@ -12,12 +12,13 @@ def spec_display_title(row: Spec) -> str:
     t = (row.title or "").strip()
     if t:
         return t
-    return f"기획서 #{row.id}"
+    return f"Specification #{row.id}"
 
 
 def content_looks_like_vector_or_blob(content: str) -> bool:
     """
-    벡터 임베딩·바이너리에 가까운 본문이면 True → UI에서는 제목만 강조하고 본문은 숨김.
+    Returns True if content appears to be vector embedding or binary-like.
+    In UI, only title is highlighted and content body is hidden.
     """
     if not content or not content.strip():
         return False
