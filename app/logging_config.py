@@ -1,4 +1,4 @@
-"""로그 포맷 설정: LOG_FORMAT=json (K8s/CloudWatch) 또는 text (개발 기본값)."""
+"""Log format configuration: LOG_FORMAT=json (K8s/CloudWatch) or text (development default)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 
 class JsonFormatter(logging.Formatter):
-    """K8s / CloudWatch / Datadog 친화적 JSON 로그."""
+    """JSON logs for K8s / CloudWatch / Datadog compatibility."""
 
     def format(self, record: logging.LogRecord) -> str:
         log_data: dict = {
@@ -27,8 +27,8 @@ class JsonFormatter(logging.Formatter):
 
 def configure_logging() -> None:
     """
-    LOG_FORMAT=json  → JSON 구조화 로그 (K8s, 사내 로그 수집 권장)
-    LOG_FORMAT=text  → 사람이 읽기 좋은 텍스트 로그 (개발 기본값)
+    LOG_FORMAT=json  → Structured JSON logs (K8s, corporate log aggregation recommended)
+    LOG_FORMAT=text  → Human-readable text logs (development default)
     LOG_LEVEL=DEBUG|INFO|WARNING|ERROR
     """
     log_format = os.environ.get("LOG_FORMAT", "text").lower()
