@@ -32,9 +32,16 @@ venv/
 env/
 ENV/
 .env/
-.env.*.local
-infra/docker/.env.local
 .venv.*
+
+# Env 파일 규칙:
+#   .env.example  → 커밋 O (기본값 템플릿)
+#   .env.local    → 커밋 O (로컬/서버 오버라이드, 민감 정보 주의)
+#   .env.prod     → 커밋 X (프로덕션 시크릿)
+#   .env.staging  → 커밋 X (스테이징 시크릿)
+.env.prod
+.env.staging
+.env.*.secret
 
 # PyInstaller
 *.manifest
