@@ -1,34 +1,40 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin/repo-rules">← 목록</a></p>
-<div class="page-actions page-actions--spread">
-  <a href="/admin/repo-rules/pat/{{ pat_url }}/publish" class="btn btn-primary">+ 새 버전</a>
+<p class="muted" style="margin-top:0"><a href="/admin/repo-rules">← Repository rules</a></p>
+
+<div class="page-actions page-actions--spread" style="margin-bottom:1.5rem">
+  <a href="/admin/repo-rules/pat/{{ pat_url }}/s/new" class="btn btn-primary">+ 새로 추가하기</a>
   {% if can_delete_stream %}
-  <form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/delete" onsubmit="return confirm('패턴 «{{ pattern_display }}» 스트림 전체를 삭제할까요?');">
-    <button type="submit" class="btn btn-danger">스트림 삭제</button>
+  <form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/delete" onsubmit="return confirm('패턴 «{{ pattern_display }}» 전체(모든 카테고리)를 삭제할까요?');">
+    <button type="submit" class="btn btn-danger">패턴 삭제</button>
   </form>
   {% endif %}
 </div>
 
-<div class="board-list">
-  {% for r in rows %}
-  <article class="board-item">
-    <div class="board-item__meta">
-      <span class="ver-badge">{{ r.version }}</span>
-      <time class="muted board-item__time">{{ r.created_at }}</time>
-    </div>
-    <div class="board-item__excerpt">
-      <pre class="preview-text">{{ r.body[:280] }}{% if r.body|length > 280 %}…{% endif %}</pre>
-    </div>
-    <div class="board-item__actions">
-      <a class="btn btn-ghost btn-sm" href="/admin/repo-rules/pat/{{ pat_url }}/v/{{ r.version }}">보기</a>
-      {% if can_delete_repo_version(r.version) %}
-      <form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/v/{{ r.version }}/delete" class="board-item__del-form" onsubmit="return confirm('버전 {{ r.version }} 행을 삭제할까요?');">
-        <button type="submit" class="btn btn-danger btn-sm">삭제</button>
-      </form>
-      {% endif %}
-    </div>
-  </article>
-  {% endfor %}
+<div data-card-container data-per-page="20">
+  <div class="card-filter-bar">
+    <input type="search" class="input card-filter-bar__input" placeholder="카테고리 검색…" autocomplete="off" data-card-search />
+    <span class="card-filter-bar__count" data-card-count></span>
+  </div>
+  <div class="board-list board-list--grid" data-card-grid>
+    {% for s in sections %}
+    <article class="board-item board-item--clickable"
+             data-card-label="{{ s.section_name }}"
+             onclick="location.href='{{ s.url }}'">
+      <div class="board-item__meta">
+        <span class="category-badge">{% if s.section_name == 'main' %}기본{% else %}{{ s.section_name }}{% endif %}</span>
+        <span class="muted" style="font-size:0.8rem">v{{ s.version }}</span>
+        <time class="muted board-item__time" style="margin-left:auto">{{ s.created_at | datefmt }}</time>
+      </div>
+      <div class="board-item__actions">
+        <a class="btn btn-ghost btn-sm" href="{{ s.url }}">내용 보기</a>
+        <a class="btn btn-primary btn-sm" href="{{ s.url }}/publish">+ 새 버전</a>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty-state" style="grid-column:1/-1">카테고리 없음 — 위 버튼으로 추가하세요</div>
+    {% endfor %}
+  </div>
+  <div class="pg-bar" data-card-pagination></div>
 </div>
 {% endblock %}

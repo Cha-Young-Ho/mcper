@@ -174,15 +174,7 @@ kbd {
 }
 
 .admin-nav-group__summary::before {
-  content: "▸";
-  display: inline-block;
-  width: 1em;
-  transition: transform 0.15s;
-  opacity: 0.75;
-}
-
-.admin-nav-group[open] > .admin-nav-group__summary::before {
-  transform: rotate(90deg);
+  content: none;
 }
 
 .admin-nav-group__summary:hover {
@@ -537,6 +529,92 @@ kbd {
   color: var(--text-muted);
 }
 
+/* ----- card filter bar ----- */
+
+.card-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.card-filter-bar__input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+.card-filter-bar__count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ----- pagination ----- */
+
+.pg-bar {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.pg-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.pg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.pg-btn:hover:not([disabled]) {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+
+.pg-btn.is-active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+
+.pg-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pg-ellipsis {
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 2rem;
+}
+
+/* board-item__time 넘침 방지 */
+.board-item__time {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+}
+
 /* ----- forms ----- */
 
 .form-stack {
@@ -699,6 +777,18 @@ textarea.input {
   padding: 0.15rem 0.45rem;
 }
 
+.category-badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 6px;
+  background: #e5e7eb;
+  color: #374151;
+  font-family: var(--mono);
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -729,9 +819,13 @@ textarea.input {
 
 .app-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1rem;
 }
+@media (max-width: 1400px) { .app-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .app-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 750px)  { .app-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px)  { .app-card-grid { grid-template-columns: 1fr; } }
 
 .app-card-grid__empty {
   grid-column: 1 / -1;
@@ -801,6 +895,16 @@ textarea.input {
   gap: 1rem;
 }
 
+.board-list--grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 1400px) { .board-list--grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .board-list--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 750px)  { .board-list--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px)  { .board-list--grid { grid-template-columns: 1fr; } }
+
 .board-item {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -808,11 +912,38 @@ textarea.input {
   background: #fafbfc;
 }
 
+.board-item--clickable {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.board-item--clickable:hover {
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
+  background: #f5f5ff;
+}
+
+/* pre, span 등 자식 요소에서 text 커서로 되돌아가지 않도록 */
+.board-item--clickable * {
+  cursor: pointer;
+}
+
+/* 액션 버튼은 자체 동작이 있으므로 이벤트 분리 */
+.board-item--clickable .board-item__actions {
+  position: relative;
+  z-index: 1;
+}
+
 .board-item__meta {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.65rem;
+}
+
+/* preview 없는 카드: meta 바로 아래 actions가 올 때 간격 축소 */
+.board-item__meta + .board-item__actions {
+  margin-top: 0;
 }
 
 .board-item__time {

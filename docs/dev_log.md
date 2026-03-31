@@ -2,6 +2,49 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-03-31: 룰 섹션(Section) 분리 저장 기능 추가
+
+### 변경 개요
+각 글로벌/레포지토리/앱 룰을 **복수의 섹션(section_name)**으로 나눠 독립 버전 관리할 수 있도록 전면 확장.
+
+### 주요 변경 파일
+- `app/db/rule_models.py`: `section_name VARCHAR(128) DEFAULT 'main'` 컬럼 추가 (3개 테이블), 기존 unique constraint → section 포함 복합 unique로 교체
+- `app/db/database.py`: `_apply_lightweight_migrations`에 section_name 컬럼 + constraint 마이그레이션 SQL 추가 (기존 DB backward-compatible)
+- `app/services/versioned_rules.py`:
+  - `DEFAULT_SECTION = "main"` 상수 도입
+  - `list_sections_for_app/global/repo()` 신규
+  - `_app_all_sections_latest()`, `_global_all_sections_latest()`, `_repo_all_sections_latest_for_pattern()` 신규
+  - 모든 `publish_*`, `next_*_version`, `patch_*`, `rollback_*` 함수에 `section_name` 파라미터 추가 (기본값 "main")
+  - `publish_app` 반환값: `(app_name, section_name, version)` 3-tuple로 변경
+  - `get_rules_markdown` / `build_markdown_response`: 멀티섹션 응답 지원
+  - `_AGENT_LOCAL_RULE_SAVE_BLOCK`: 섹션별 분리 파일 저장 지침 업데이트
+- `app/routers/admin_rules.py`:
+  - `GET /admin/app-rules/app/{name}` → 섹션 오버뷰 카드 화면으로 변경
+  - 신규: `GET/POST /admin/app-rules/app/{name}/s/new` (섹션 생성)
+  - 신규: `GET /admin/app-rules/app/{name}/s/{section}` (섹션 버전 보드)
+  - 신규: `GET/POST /admin/app-rules/app/{name}/s/{section}/publish` (섹션별 발행)
+  - 신규: `GET /admin/app-rules/app/{name}/s/{section}/v/{version}` (버전 조회)
+  - 신규: `POST /admin/app-rules/app/{name}/s/{section}/v/{version}/delete`
+  - 기존 legacy 라우트 → 301 리다이렉트 (backward compat)
+  - import_rules: 섹션별 import 지원
+- 템플릿 변경:
+  - `admin/app_rule_board.html`: 섹션 카드 오버뷰로 전면 개편
+  - `admin/app_rule_section_board.html` (신규): 섹션별 버전 이력 목록
+  - `admin/rule_section_new.html` (신규): 새 섹션 생성 폼
+  - `admin/app_rule_version_view.html`: 섹션 breadcrumb + 섹션별 URL 지원
+  - `admin/app_rule_publish.html`: 섹션별 publish 폼 지원
+- `app/tools/global_rules.py`:
+  - `publish_app_rule`, `append_to_app_rule`, `publish_repo_rule`: `section_name` 파라미터 추가
+  - `patch_app_rule_tool`, `rollback_app_rule_tool`, `patch_repo_rule_tool`: section 인식
+  - `list_rule_sections` 신규 툴: 앱/레포/글로벌 섹션 목록 + 최신 버전 조회
+  - `publish_section_rule` 신규 툴: 섹션 명시 전용 발행 툴
+- `app/mcp_tools_docs.py`: 신규 툴 한국어 독스 추가, 기존 툴 section_name 파라미터 설명 업데이트
+
+### 아키텍처 결정
+- **Backward compatible**: `section_name` 기본값 "main" → 기존 데이터 전부 section="main"으로 유지
+- **독립 버전 스트림**: 버전은 `(entity, section_name)` 단위로 독립 증가 (e.g., app_a/main=v3, app_a/admin_rules=v1)
+- **MCP 멀티섹션 응답**: `get_global_rule` 호출 시 모든 섹션이 별도 heading으로 응답, 에이전트가 섹션별 별도 파일로 저장 가능
+
 ## 2026-03-31: 문서 정리 (CLAUDE.md compact화, PLANS.md Phase 1 완료 표시, planning 파일 상태 갱신, AGENTS.md 중복 제거)
 
 - CLAUDE.md: 119줄 → 64줄 (보고서 포맷 중복 제거, report_template.md 참조로 대체)
@@ -452,3 +495,27 @@
 ## 세션 종료: 2026-03-31 11:53
 ## 세션 종료: 2026-03-31 12:01
 ## 세션 종료: 2026-03-31 12:19
+## 세션 종료: 2026-03-31 12:24
+## 세션 종료: 2026-03-31 12:29
+## 세션 종료: 2026-03-31 12:36
+## 세션 종료: 2026-03-31 12:41
+## 세션 종료: 2026-03-31 12:43
+## 세션 종료: 2026-03-31 12:47
+## 세션 종료: 2026-03-31 12:48
+## 세션 종료: 2026-03-31 12:52
+## 세션 종료: 2026-03-31 13:09
+## 세션 종료: 2026-03-31 13:30
+## 세션 종료: 2026-03-31 13:55
+## 세션 종료: 2026-03-31 13:58
+## 세션 종료: 2026-03-31 14:00
+## 세션 종료: 2026-03-31 14:03
+## 세션 종료: 2026-03-31 15:19
+## 세션 종료: 2026-03-31 15:45
+## 세션 종료: 2026-03-31 15:51
+## 세션 종료: 2026-03-31 16:28
+## 세션 종료: 2026-03-31 16:30
+## 세션 종료: 2026-03-31 16:40
+## 세션 종료: 2026-03-31 16:46
+## 세션 종료: 2026-03-31 16:53
+## 세션 종료: 2026-03-31 16:54
+## 세션 종료: 2026-03-31 16:55
