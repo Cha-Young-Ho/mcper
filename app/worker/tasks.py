@@ -13,6 +13,7 @@ from app.db.database import SessionLocal
 from app.db.models import Spec
 from app.db.rag_models import CodeEdge, CodeNode, SpecChunk
 from app.services.chunking import chunk_spec_text
+from app.services.document_parser import parse_uploaded_file
 from app.services.embeddings import embed_texts
 from app.services.celery_monitoring import CeleryMonitoring
 from app.worker.celery_app import celery_app
@@ -89,6 +90,120 @@ def index_spec_task(self, spec_id: int) -> dict[str, Any]:
             raise self.retry(exc=exc, countdown=countdown) from exc
 
         return {"ok": False, "error": str(exc), "spec_id": spec_id}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="parse_and_index_upload", bind=True, max_retries=3)
+def parse_and_index_upload_task(
+    self,
+    filename: str,
+    redis_key: str,
+    app_target: str,
+    base_branch: str,
+) -> dict[str, Any]:
+    """
+    파일 파싱 + DB 저장 + 임베딩을 Celery worker에서 처리.
+
+    파일 바이너리는 Redis에 TTL로 보관. Celery 메시지엔 Redis key만 전달.
+    - base64 직렬화 오버헤드 없음
+    - 대용량 파일도 메시지 큐 부담 없음
+    - 재시도 시 Redis에서 재조회 (TTL 내에서만)
+    """
+    import redis as redis_lib
+
+    from app.config import settings
+
+    db = SessionLocal()
+    raw: bytes | None = None
+    try:
+        rdb = redis_lib.from_url(settings.celery.broker_url)
+        raw = rdb.get(redis_key)
+        if raw is None:
+            return {
+                "ok": False,
+                "filename": filename,
+                "error": "파일 키 만료 (Redis TTL 초과 또는 이미 처리됨)",
+            }
+
+        from pathlib import Path
+
+        text = parse_uploaded_file(filename, raw)
+        if not text.strip():
+            rdb.delete(redis_key)
+            return {"ok": False, "filename": filename, "error": "파일 내용이 비어 있습니다"}
+
+        title = Path(filename).stem
+        app_key = (app_target or "").strip().lower()
+        branch = (base_branch or "main").strip() or "main"
+
+        spec = Spec(
+            title=title,
+            content=text,
+            app_target=app_key,
+            base_branch=branch,
+            related_files=[],
+        )
+        db.add(spec)
+        db.flush()
+        spec_id = spec.id
+
+        pairs = [
+            (t, m)
+            for t, m in chunk_spec_text(
+                text,
+                base_metadata={
+                    "app_target": app_key,
+                    "base_branch": branch,
+                    "spec_title": title,
+                    "spec_id": spec_id,
+                },
+            )
+            if (t or "").strip()
+        ]
+
+        if pairs:
+            texts = [p[0] for p in pairs]
+            try:
+                vectors = embed_texts(texts)
+            except Exception as exc:
+                logger.exception("embed failed filename=%s", filename)
+                db.rollback()
+                raise self.retry(exc=exc, countdown=10) from exc
+
+            for i, ((chunk_text, meta), vec) in enumerate(zip(pairs, vectors, strict=True)):
+                meta = dict(meta)
+                meta["chunk_index"] = i
+                db.add(
+                    SpecChunk(
+                        spec_id=spec_id,
+                        chunk_index=i,
+                        content=chunk_text,
+                        embedding=list(vec),
+                        chunk_metadata=meta,
+                    )
+                )
+
+        db.commit()
+        rdb.delete(redis_key)  # 성공 시 정리
+        return {"ok": True, "filename": filename, "spec_id": spec_id, "chunks": len(pairs)}
+
+    except Exception as exc:
+        db.rollback()
+        CeleryMonitoring.log_task_failure(
+            db,
+            task_id=self.request.id,
+            entity_type="upload",
+            entity_id=0,
+            error_message=str(exc),
+            traceback=traceback.format_exc(),
+            max_retries=self.max_retries,
+        )
+        logger.exception("parse_and_index_upload_task failed filename=%s", filename)
+        if self.request.retries < self.max_retries:
+            countdown = 10 * (self.request.retries + 1)
+            raise self.retry(exc=exc, countdown=countdown) from exc
+        return {"ok": False, "filename": filename, "error": str(exc)}
     finally:
         db.close()
 

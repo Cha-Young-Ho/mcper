@@ -201,6 +201,9 @@ class EnvBootstrapSettings(BaseSettings):
     auth_github_client_secret: str | None = Field(
         default=None, validation_alias=AliasChoices("AUTH_GITHUB_CLIENT_SECRET")
     )
+    csrf_cookie_secure: str | None = Field(
+        default=None, validation_alias=AliasChoices("CSRF_COOKIE_SECURE")
+    )
 
 
 def _expand_env_in_str(s: str) -> str:
@@ -359,6 +362,9 @@ def load_settings() -> AppSettings:
         cfg.auth.github_client_id = env.auth_github_client_id
     if env.auth_github_client_secret:
         cfg.auth.github_client_secret = env.auth_github_client_secret
+    if env.csrf_cookie_secure is not None:
+        v = env.csrf_cookie_secure.strip().lower()
+        cfg.security.secure_cookie = v in ("1", "true", "yes")
 
     return cfg
 

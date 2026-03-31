@@ -1,0 +1,63 @@
+# infra/docker/docker-compose.test.yml
+# 테스트 전용 — 격리된 DB/Redis + pytest 자동 실행
+# tmpfs 기반 DB라서 빠르고 테스트 후 데이터는 자동 소멸
+#
+# 사용법 (직접):
+#   docker compose -f infra/docker/docker-compose.test.yml up \
+#     --build --abort-on-container-exit --exit-code-from test
+#
+# 사용법 (Makefile):
+#   make test
+
+name: mcper-test
+
+services:
+  test:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/app
+    depends_on:
+      db_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://user:testpassword@db_test:5432/mcpdb_test
+      - CELERY_BROKER_URL=redis://redis_test:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis_test:6379/0
+      - TESTING=true
+      - LOG_FORMAT=text
+      - LOG_LEVEL=WARNING
+      - MCPER_ADMIN_ENABLED=true
+      - MCP_BYPASS_TRANSPORT_GATE=true
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=testpassword
+      - AUTH_SECRET_KEY=test-secret-key-32-chars-long-here!
+      - EMBEDDING_PROVIDER=local
+      - EMBEDDING_DIM=384
+      - LOCAL_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+    command: pytest tests/ -v --tb=short
+    restart: "no"
+
+  db_test:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: mcpdb_test
+    tmpfs:
+      - /var/lib/postgresql/data   # 메모리 내 DB — 빠르고 테스트 후 자동 소멸
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mcpdb_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  redis_test:
+    image: redis:7.4.2-alpine
+    command: redis-server --loglevel warning
+    tmpfs:
+      - /data

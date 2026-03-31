@@ -90,6 +90,43 @@ def admin_celery_resolve(
     return JSONResponse({"ok": True})
 
 
+@router.get("/celery/active")
+def admin_celery_active_api(
+    _user: str = Depends(require_admin_user),
+):
+    """
+    Celery worker 실행 중/대기 중 태스크 조회 (Inspect API).
+    timeout=1.5s 로 worker 응답 대기 — worker 없으면 빈 결과 반환.
+    """
+    try:
+        from app.worker.celery_app import celery_app
+
+        inspector = celery_app.control.inspect(timeout=1.5)
+        active_raw   = inspector.active()   or {}
+        reserved_raw = inspector.reserved() or {}
+
+        def _flatten(raw: dict) -> list[dict]:
+            out = []
+            for worker, tasks in raw.items():
+                for t in (tasks or []):
+                    out.append({
+                        "worker": worker,
+                        "task_id": t.get("id", ""),
+                        "name": t.get("name", ""),
+                        "args": str(t.get("args", []))[:120],
+                        "time_start": t.get("time_start"),
+                    })
+            return out
+
+        return JSONResponse({
+            "active":   _flatten(active_raw),
+            "reserved": _flatten(reserved_raw),
+        })
+    except Exception as exc:
+        logger.warning("Celery Inspect 실패: %s", exc)
+        return JSONResponse({"active": [], "reserved": [], "error": str(exc)})
+
+
 @router.get("/celery/stats")
 def admin_celery_stats_api(
     _user: str = Depends(require_admin_user),

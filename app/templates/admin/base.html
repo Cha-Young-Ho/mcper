@@ -56,6 +56,52 @@
     </div>
   </div>
   <script src="/static/admin/admin.js?v=3" defer></script>
+  <script>
+  // 모든 폼 제출을 fetch()로 가로채 X-CSRF-Token 헤더 전송
+  // — body를 서버 미들웨어에서 소비하지 않아도 되며, multipart 업로드도 안전하게 처리
+  (function () {
+    function getCsrfToken() {
+      return document.cookie.split('; ').reduce(function (acc, part) {
+        var kv = part.split('=');
+        return kv[0].trim() === 'csrf_token' ? decodeURIComponent(kv[1]) : acc;
+      }, '');
+    }
+
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      var token = getCsrfToken();
+      if (!token) return;
+
+      e.preventDefault();
+
+      var url = form.action || window.location.href;
+      var method = (form.getAttribute('method') || 'POST').toUpperCase();
+
+      fetch(url, {
+        method: method,
+        headers: { 'x-csrf-token': token },
+        body: new FormData(form),
+        credentials: 'include',
+      }).then(function (res) {
+        if (res.redirected) {
+          window.location.href = res.url;
+          return;
+        }
+        return res.text().then(function (html) {
+          document.open();
+          document.write(html);
+          document.close();
+          if (res.url && res.url !== window.location.href) {
+            window.history.pushState({}, '', res.url);
+          }
+        });
+      }).catch(function (err) {
+        console.error('[CSRF] fetch 제출 실패:', err);
+      });
+    }, true);
+  })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

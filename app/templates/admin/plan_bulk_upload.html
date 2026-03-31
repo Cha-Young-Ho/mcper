@@ -38,10 +38,15 @@
 <p class="muted" style="margin-top:0"><a href="/admin/plans">← 기획서 목록</a></p>
 
 {% if results is defined %}
-  {% if ok_count == total %}
-    <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 처리 완료 ({{ ok_count }}개 성공)</div>
-  {% elif ok_count > 0 %}
-    <div class="summary-bar summary-bar--warn">{{ total }}개 중 {{ ok_count }}개 성공, {{ total - ok_count }}개 실패</div>
+  {% set fail_count = total - queued_count - ok_count %}
+  {% if fail_count == 0 %}
+    {% if queued_count > 0 %}
+      <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 Celery 큐에 등록됨 — <a href="/admin/celery" style="color:inherit">Celery 모니터</a>에서 진행 상황 확인</div>
+    {% else %}
+      <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 처리 완료 (즉시 인덱싱)</div>
+    {% endif %}
+  {% elif queued_count + ok_count > 0 %}
+    <div class="summary-bar summary-bar--warn">{{ total }}개 중 {{ queued_count + ok_count }}개 접수, {{ fail_count }}개 실패</div>
   {% else %}
     <div class="summary-bar summary-bar--fail">전체 실패 ({{ total }}개)</div>
   {% endif %}
@@ -59,13 +64,19 @@
       <tr>
         <td>{{ r.file }}</td>
         <td>
-          {% if r.ok %}<span class="badge-ok">성공</span>{% else %}<span class="badge-fail">실패</span>{% endif %}
+          {% if r.get('queued') %}
+            <span class="badge-ok">큐 등록</span>
+          {% elif r.get('ok') %}
+            <span class="badge-ok">완료</span>
+          {% else %}
+            <span class="badge-fail">실패</span>
+          {% endif %}
         </td>
         <td>
-          {% if r.ok %}
-            <a href="/admin/plans/{{ r.spec_id }}">#{{ r.spec_id }}</a>
-            {% if r.get('queued') %} · Celery 큐에 추가됨{% endif %}
-            {% if r.get('indexed') %} · 즉시 인덱싱 완료 ({{ r.get('chunks', 0) }}청크){% endif %}
+          {% if r.get('queued') %}
+            Celery worker 처리 중 — <a href="/admin/celery">Celery 모니터</a>에서 확인
+          {% elif r.get('ok') %}
+            <a href="/admin/plans/{{ r.spec_id }}">#{{ r.spec_id }}</a> · 즉시 인덱싱 완료 ({{ r.get('chunks', 0) }}청크)
           {% else %}
             {{ r.error }}
           {% endif %}
@@ -107,10 +118,11 @@
       <input type="file" name="files" multiple accept=".txt,.md,.pdf,.docx" id="file-input" />
       <div class="upload-zone__label">
         <strong>파일을 드래그하거나 클릭해서 선택</strong>
-        <div class="upload-zone__hint">.txt · .md · .pdf · .docx 지원 · 복수 파일 동시 업로드</div>
+        <div class="upload-zone__hint">.txt · .md · .pdf · .docx · 파일당 최대 50 MB · 총 200 MB</div>
       </div>
     </div>
     <ul class="file-list" id="file-list"></ul>
+    <p id="size-error" style="color:#b91c1c;font-size:.85rem;margin-top:.4rem;display:none"></p>
   </div>
 
   <div class="form-actions">
@@ -126,23 +138,60 @@
 {{ super() }}
 <script>
 (function () {
-  const input = document.getElementById('file-input');
-  const zone  = document.getElementById('upload-zone');
-  const list  = document.getElementById('file-list');
-  const btn   = document.getElementById('submit-btn');
+  const MAX_FILE_MB    = 50;
+  const MAX_TOTAL_MB   = 200;
+  const MAX_FILE_BYTES = MAX_FILE_MB  * 1024 * 1024;
+  const MAX_TOTAL_BYTES= MAX_TOTAL_MB * 1024 * 1024;
+
+  const input    = document.getElementById('file-input');
+  const zone     = document.getElementById('upload-zone');
+  const list     = document.getElementById('file-list');
+  const btn      = document.getElementById('submit-btn');
+  const errEl    = document.getElementById('size-error');
   if (!input) return;
 
-  function renderList(files) {
-    list.innerHTML = '';
-    [...files].forEach(f => {
-      const li = document.createElement('li');
-      li.className = 'file-list__item';
-      li.textContent = `${f.name}  (${(f.size / 1024).toFixed(1)} KB)`;
-      list.appendChild(li);
-    });
+  function fmtSize(bytes) {
+    return bytes >= 1024 * 1024
+      ? (bytes / 1024 / 1024).toFixed(1) + ' MB'
+      : (bytes / 1024).toFixed(1) + ' KB';
   }
 
-  input.addEventListener('change', () => renderList(input.files));
+  function validateAndRender(files) {
+    list.innerHTML = '';
+    errEl.style.display = 'none';
+    errEl.textContent   = '';
+
+    let totalBytes = 0;
+    let errorMsg   = '';
+
+    [...files].forEach(f => {
+      totalBytes += f.size;
+      const li = document.createElement('li');
+      li.className = 'file-list__item';
+      const oversize = f.size > MAX_FILE_BYTES;
+      li.textContent = `${f.name}  (${fmtSize(f.size)})`;
+      if (oversize) {
+        li.style.color = '#b91c1c';
+        li.textContent += `  ← ${MAX_FILE_MB}MB 초과`;
+        if (!errorMsg) errorMsg = `"${f.name}"이 ${MAX_FILE_MB}MB를 초과합니다 (${fmtSize(f.size)})`;
+      }
+      list.appendChild(li);
+    });
+
+    if (!errorMsg && totalBytes > MAX_TOTAL_BYTES) {
+      errorMsg = `전체 파일 크기가 ${MAX_TOTAL_MB}MB를 초과합니다 (${fmtSize(totalBytes)})`;
+    }
+
+    if (errorMsg) {
+      errEl.textContent   = '⚠ ' + errorMsg;
+      errEl.style.display = 'block';
+      if (btn) btn.disabled = true;
+    } else {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  input.addEventListener('change', () => validateAndRender(input.files));
 
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
@@ -151,19 +200,23 @@
     zone.classList.remove('dragover');
     const dt = e.dataTransfer;
     if (dt && dt.files.length) {
-      // DataTransfer → FileList는 직접 교체 불가, 폼에 hidden input으로 추가
-      // 대신 input.files를 직접 교체하는 우회 방식 사용
       try {
         const container = new DataTransfer();
         [...dt.files].forEach(f => container.items.add(f));
         input.files = container.files;
-        renderList(input.files);
+        validateAndRender(input.files);
       } catch (_) {}
     }
   });
 
-  document.getElementById('bulk-form')?.addEventListener('submit', () => {
-    if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+  document.getElementById('bulk-form')?.addEventListener('submit', function (e) {
+    // 크기 오류가 있으면 제출 차단 (fetch 기반 CSRF 인터셉터 실행 전에도 체크)
+    if (errEl && errEl.style.display !== 'none') {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '업로드 중…'; }
   });
 })();
 </script>
