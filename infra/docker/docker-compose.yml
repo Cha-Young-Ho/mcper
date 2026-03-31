@@ -9,9 +9,10 @@
 # │              │   --exit-code-from test                                                            │
 # └──────────────┴────────────────────────────────────────────────────────────────────────────────────┘
 #
-# env 파일 목록:
-#   .env.local   — 로컬 개발 기본값 (기본값, gitignore)
-#   .env.example — 프로덕션용 템플릿 (cp .env.example .env.prod 후 사용)
+# env 파일 우선순위 (낮음 → 높음, 뒤쪽이 앞쪽을 덮어씀):
+#   1. .env.example — 커밋된 기본값 (항상 존재, 클론 직후 바로 실행 가능)
+#   2. .env.local   — 로컬/서버 오버라이드 (커밋 가능, 민감 정보만 별도 관리)
+#   3. COMPOSE_ENV_FILE — 환경 지정 시 전체 교체 (예: COMPOSE_ENV_FILE=.env.prod)
 name: spec-mcp
 
 services:
@@ -28,8 +29,10 @@ services:
       redis:
         condition: service_started
     env_file:
-      - path: ${COMPOSE_ENV_FILE:-.env.local}
+      - path: .env.example
         required: true
+      - path: ${COMPOSE_ENV_FILE:-.env.local}
+        required: false
     volumes:
       - ../..:/app
     command: >
@@ -58,8 +61,10 @@ services:
       redis:
         condition: service_started
     env_file:
-      - path: ${COMPOSE_ENV_FILE:-.env.local}
+      - path: .env.example
         required: true
+      - path: ${COMPOSE_ENV_FILE:-.env.local}
+        required: false
     volumes:
       - ../..:/app
     restart: unless-stopped
