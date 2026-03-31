@@ -23,7 +23,7 @@ from app.services.embeddings import configure_embedding_backend
 from app.services.mcp_auto_hosts import sync_mcp_allowed_hosts
 from app.services.rag_health import rag_health_payload
 from app.mcp_dynamic_mount import mcp_dynamic_asgi
-from app.routers import admin as admin_routes
+from app.routers import admin_base, admin_celery, admin_dashboard, admin_specs, admin_rules, admin_tools
 
 logger = logging.getLogger("mcper.startup")
 
@@ -148,7 +148,12 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 # ── 조건부 라우터 등록 ──────────────────────────────────────────────
 if _ADMIN_ENABLED:
-    app.include_router(admin_routes.router)
+    app.include_router(admin_base.router)
+    app.include_router(admin_dashboard.router)
+    app.include_router(admin_specs.router)
+    app.include_router(admin_rules.router)
+    app.include_router(admin_tools.router)
+    app.include_router(admin_celery.router)
     logger.info("Admin UI enabled at /admin")
 
 if _AUTH_ENABLED:

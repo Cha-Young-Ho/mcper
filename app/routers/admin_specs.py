@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,7 @@ from app.routers.admin_base import (
     templates,
 )
 from app.services.celery_client import enqueue_index_spec, enqueue_or_index_sync
-from app.services.document_parser import parse_uploaded_file
+from app.services.document_parser import fetch_url_as_text, parse_uploaded_file
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -358,3 +358,46 @@ def plan_code_detail(
             "app_enc": quote(row.app_target, safe=""),
         },
     )
+
+
+# ----- URL 일괄 등록 -----
+
+
+@router.post("/documents/urls")
+async def bulk_register_urls(
+    urls: list[str] = Body(...),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """Bulk register URLs as documents. Fetches text for each URL, saves as Spec, and enqueues indexing."""
+    app_key = ""
+    base_branch = "main"
+    results = []
+    for url in urls:
+        url = url.strip()
+        if not url:
+            continue
+        try:
+            text = await fetch_url_as_text(url)
+            if not text.strip():
+                results.append({"url": url, "ok": False, "error": "URL 내용이 비어 있습니다"})
+                continue
+            spec = Spec(
+                title=url,
+                content=text,
+                app_target=app_key,
+                base_branch=(base_branch or "main").strip() or "main",
+                related_files=[],
+            )
+            db.add(spec)
+            db.flush()
+            index_result = enqueue_or_index_sync(spec.id)
+            db.commit()
+            results.append({"url": url, "ok": True, "spec_id": spec.id, **index_result})
+        except Exception as exc:
+            db.rollback()
+            results.append({"url": url, "ok": False, "error": str(exc)})
+
+    ok_count = sum(1 for r in results if r["ok"])
+    fail_count = len(results) - ok_count
+    return JSONResponse({"ok_count": ok_count, "fail_count": fail_count, "results": results})

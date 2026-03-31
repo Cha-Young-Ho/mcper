@@ -1,11 +1,13 @@
-"""Admin 규칙 관리 (글로벌, 앱, 레포)."""
+"""Admin 규칙 관리 (글로벌, 앱, 레포, diff, rollback, export/import)."""
 
 from __future__ import annotations
 
+import difflib
+import json
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
@@ -847,3 +849,129 @@ def repo_rule_version_view(
             "can_delete_version": can_delete_version,
         },
     )
+
+
+# ----- Rule 편의성 기능 (diff / rollback / export-import) -----
+
+
+@router.get("/rules/{rule_id}/diff")
+def rule_diff(
+    rule_id: int,
+    v1: int,
+    v2: int,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Return unified diff between two versions of a global rule.
+    rule_id is accepted for API consistency but global rules use a single stream.
+    Returns JSON: {"v1": int, "v2": int, "diff": str}
+    """
+    row1 = db.scalars(
+        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v1)
+    ).first()
+    row2 = db.scalars(
+        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v2)
+    ).first()
+
+    if row1 is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v1} not found")
+    if row2 is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v2} not found")
+
+    lines1 = row1.body.splitlines(keepends=True)
+    lines2 = row2.body.splitlines(keepends=True)
+    diff_lines = list(
+        difflib.unified_diff(
+            lines1,
+            lines2,
+            fromfile=f"v{v1}",
+            tofile=f"v{v2}",
+        )
+    )
+    return JSONResponse({"v1": v1, "v2": v2, "diff": "".join(diff_lines)})
+
+
+@router.post("/rules/{rule_id}/rollback")
+def rule_rollback(
+    rule_id: int,
+    target_version: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Roll back a global rule to a specific version by creating a new version
+    with the content of the target version (append-only principle).
+    """
+    try:
+        new_version = vr.rollback_global_rule(db, target_version)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return JSONResponse(
+        {"ok": True, "rolled_back_to": target_version, "new_version": new_version}
+    )
+
+
+@router.get("/rules/export")
+def export_rules(
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """Export all rules (global + app + repo latest versions) as JSON."""
+    data = vr.export_rules_json(db)
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": "attachment; filename=rules_export.json"},
+    )
+
+
+@router.post("/rules/import")
+async def import_rules(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin_user),
+):
+    """
+    Import rules from a JSON export file.
+    Expects the same structure produced by GET /admin/rules/export.
+    Each rule type is published as a new version (append-only).
+    """
+    raw = await file.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid JSON: {exc}") from exc
+
+    results: dict[str, object] = {}
+
+    # global
+    global_section = data.get("global", {})
+    global_body = (global_section.get("body") or "").strip() if isinstance(global_section, dict) else ""
+    if global_body:
+        new_gv = vr.publish_global(db, global_body)
+        results["global"] = {"new_version": new_gv}
+
+    # apps
+    apps_imported: dict[str, int] = {}
+    for app_name, info in (data.get("apps") or {}).items():
+        body = (info.get("body") or "").strip() if isinstance(info, dict) else ""
+        if not body:
+            continue
+        _, new_v = vr.publish_app(db, app_name, body)
+        apps_imported[app_name] = new_v
+    if apps_imported:
+        results["apps"] = apps_imported
+
+    # repos
+    repos_imported: dict[str, int] = {}
+    for pat_key, info in (data.get("repos") or {}).items():
+        body = (info.get("body") or "").strip() if isinstance(info, dict) else ""
+        if not body:
+            continue
+        pattern = "" if pat_key == "__default__" else pat_key
+        _, new_v = vr.publish_repo(db, pattern, body)
+        repos_imported[pat_key] = new_v
+    if repos_imported:
+        results["repos"] = repos_imported
+
+    return JSONResponse({"ok": True, "imported": results})
