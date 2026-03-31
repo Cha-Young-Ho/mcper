@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.db.models import Base
 
 import app.db.rule_models  # noqa: F401 — register rule_* tables on Base.metadata
+import app.db.skill_models  # noqa: F401 — register skill_* tables on Base.metadata
 import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
 import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
 import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
@@ -157,6 +158,112 @@ def _apply_lightweight_migrations(connection) -> None:
                 END IF;
               END IF;
             END $$;
+            """
+        )
+    )
+    # ── section_name 컬럼 + 고유 제약 마이그레이션 ────────────────────
+    # 기존 행이 있는 DB에서 section_name='main' 기본값으로 컬럼 추가.
+    # 구 unique constraint를 삭제하고 section_name 포함 복합 unique를 추가.
+    connection.execute(
+        text(
+            """
+            ALTER TABLE global_rule_versions
+                ADD COLUMN IF NOT EXISTS section_name VARCHAR(128) NOT NULL DEFAULT 'main';
+            ALTER TABLE app_rule_versions
+                ADD COLUMN IF NOT EXISTS section_name VARCHAR(128) NOT NULL DEFAULT 'main';
+            ALTER TABLE repo_rule_versions
+                ADD COLUMN IF NOT EXISTS section_name VARCHAR(128) NOT NULL DEFAULT 'main';
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              -- global_rule_versions: 구 unique(version) → unique(section_name, version)
+              IF EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'global_rule_versions_version_key'
+              ) THEN
+                ALTER TABLE global_rule_versions DROP CONSTRAINT global_rule_versions_version_key;
+              END IF;
+              IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'uq_global_rule_versions_section_version'
+              ) THEN
+                ALTER TABLE global_rule_versions
+                  ADD CONSTRAINT uq_global_rule_versions_section_version
+                  UNIQUE (section_name, version);
+              END IF;
+
+              -- app_rule_versions: 구 unique(app_name, version) → unique(app_name, section_name, version)
+              IF EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'uq_app_rule_versions_app_version'
+              ) THEN
+                ALTER TABLE app_rule_versions DROP CONSTRAINT uq_app_rule_versions_app_version;
+              END IF;
+              IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'uq_app_rule_versions_app_section_version'
+              ) THEN
+                ALTER TABLE app_rule_versions
+                  ADD CONSTRAINT uq_app_rule_versions_app_section_version
+                  UNIQUE (app_name, section_name, version);
+              END IF;
+
+              -- repo_rule_versions: 구 unique(pattern, version) → unique(pattern, section_name, version)
+              IF EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'uq_repo_rule_versions_pattern_version'
+              ) THEN
+                ALTER TABLE repo_rule_versions DROP CONSTRAINT uq_repo_rule_versions_pattern_version;
+              END IF;
+              IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'uq_repo_rule_versions_pattern_section_version'
+              ) THEN
+                ALTER TABLE repo_rule_versions
+                  ADD CONSTRAINT uq_repo_rule_versions_pattern_section_version
+                  UNIQUE (pattern, section_name, version);
+              END IF;
+            END $$;
+            """
+        )
+    )
+
+
+    # ── Skills 테이블 생성 (Rules와 완전 별개) ─────────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS global_skill_versions (
+                id SERIAL PRIMARY KEY,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_global_skill_versions_section_version UNIQUE (section_name, version)
+            );
+            CREATE TABLE IF NOT EXISTS app_skill_versions (
+                id SERIAL PRIMARY KEY,
+                app_name VARCHAR(128) NOT NULL,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_app_skill_versions_app_section_version UNIQUE (app_name, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_app_skill_versions_app_name ON app_skill_versions (app_name);
+            CREATE INDEX IF NOT EXISTS ix_app_skill_versions_section_name ON app_skill_versions (section_name);
+            CREATE TABLE IF NOT EXISTS repo_skill_versions (
+                id SERIAL PRIMARY KEY,
+                pattern VARCHAR(256) NOT NULL DEFAULT '',
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                sort_order INTEGER NOT NULL DEFAULT 100,
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_repo_skill_versions_pattern_section_version UNIQUE (pattern, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_repo_skill_versions_pattern ON repo_skill_versions (pattern);
+            CREATE INDEX IF NOT EXISTS ix_repo_skill_versions_section_name ON repo_skill_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_global_skill_versions_section_name ON global_skill_versions (section_name);
             """
         )
     )

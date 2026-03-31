@@ -1,4 +1,10 @@
-"""ORM models: versioned global + repository + per-app rules (immutable versions)."""
+"""ORM models: versioned global + repository + per-app rules (immutable versions).
+
+섹션(section_name) 설계:
+- 각 룰 타입(global/app/repo)은 여러 섹션을 가질 수 있음 (예: main, admin_rules, code_rules)
+- 기본 섹션 이름은 "main" (기존 데이터 backward-compatible)
+- 버전은 (entity, section_name) 단위로 독립 증가
+"""
 
 from __future__ import annotations
 
@@ -9,28 +15,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models import Base
 
+_DEFAULT_SECTION = "main"
+
 
 class GlobalRuleVersion(Base):
-    """Single stream of global defaults; monotonically increasing version."""
+    """글로벌 룰; section_name 별로 독립 버전 스트림."""
 
     __tablename__ = "global_rule_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
+    section_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
     )
-
-
-class AppRuleVersion(Base):
-    """Per-app rule stream; each app has its own version sequence (1, 2, 3…)."""
-
-    __tablename__ = "app_rule_versions"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    app_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -39,17 +35,45 @@ class AppRuleVersion(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("app_name", "version", name="uq_app_rule_versions_app_version"),
+        UniqueConstraint("section_name", "version", name="uq_global_rule_versions_section_version"),
+    )
+
+
+class AppRuleVersion(Base):
+    """앱별 룰; (app_name, section_name) 단위로 독립 버전 스트림."""
+
+    __tablename__ = "app_rule_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    app_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    section_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "app_name", "section_name", "version",
+            name="uq_app_rule_versions_app_section_version",
+        ),
     )
 
 
 class RepoRuleVersion(Base):
-    """Git remote URL 부분문자열 매칭 + 빈 pattern 폴백. pattern 별로 버전 스트림."""
+    """Git remote URL 부분문자열 매칭 + 빈 pattern 폴백; (pattern, section_name) 단위 버전 스트림."""
 
     __tablename__ = "repo_rule_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pattern: Mapped[str] = mapped_column(String(256), nullable=False, default="", index=True)
+    section_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
+    )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
@@ -59,7 +83,10 @@ class RepoRuleVersion(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("pattern", "version", name="uq_repo_rule_versions_pattern_version"),
+        UniqueConstraint(
+            "pattern", "section_name", "version",
+            name="uq_repo_rule_versions_pattern_section_version",
+        ),
     )
 
 

@@ -1,0 +1,92 @@
+{% extends "admin/base.html" %}
+{% block head %}
+<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
+{% endblock %}
+{% block body %}
+<p class="muted" style="margin-top:0">
+  <a href="/admin/global-rules">← Global rules</a>
+  &nbsp;/&nbsp;
+  <span>새 카테고리</span>
+</p>
+
+{% if error %}
+<div class="alert alert-error" style="margin-bottom:1rem">{{ error }}</div>
+{% endif %}
+
+<div class="publish-box">
+  <h2 class="publish-box__title">새 카테고리 추가</h2>
+  {% if existing_sections %}
+  <p class="muted" style="margin-bottom:1rem">
+    현재 카테고리: {% for s in existing_sections %}<code>{% if s == 'main' %}기본{% else %}{{ s }}{% endif %}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+
+  <form method="post" action="/admin/global-rules/s/new" class="form-stack" id="gcategory-new-form">
+    <div class="form-field">
+      <label for="section_name" class="form-label">카테고리 이름 <span class="required">*</span></label>
+      <input
+        type="text"
+        id="section_name"
+        name="section_name"
+        class="form-input"
+        placeholder="예: admin_rules, code_rules, security"
+        pattern="[a-z0-9_\-]+"
+        title="소문자 영문, 숫자, 언더스코어, 하이픈만 사용 가능"
+        required
+        style="max-width:24rem"
+      />
+      <p class="muted" style="font-size:0.82rem;margin-top:0.25rem">소문자 영문, 숫자, _ - 만 사용</p>
+    </div>
+
+    {% set md_label = "초기 카테고리 본문 (Markdown)" %}
+    {% set md_name = "body" %}
+    {% set md_id = "gcatbody" %}
+    {% set md_value = "" %}
+    {% set md_required = true %}
+    {% set md_rows = 12 %}
+    {% include "admin/partials/markdown_split_field.html" %}
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" id="gcategory-save-btn">저장</button>
+      <a href="/admin/global-rules" class="btn btn-ghost">취소</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  document.getElementById('gcategory-save-btn').addEventListener('click', async function() {
+    const form = document.getElementById('gcategory-new-form');
+    const sn = form.section_name.value.trim();
+    if (!sn) { alert('카테고리 이름을 입력해주세요.'); return; }
+    const body = form.body.value.trim();
+    if (!body) { alert('카테고리 본문을 입력해주세요.'); return; }
+
+    const csrfCookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrf_token='));
+    const csrfToken = csrfCookie ? decodeURIComponent(csrfCookie.split('=')[1]) : '';
+
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'x-csrf-token': csrfToken },
+      body: fd,
+      redirect: 'manual',
+    });
+
+    if (resp.type === 'opaqueredirect' || resp.status === 303 || resp.status === 200) {
+      const location = resp.headers.get('Location') || resp.url;
+      window.location.href = location || '/admin/global-rules';
+    } else if (resp.status === 409) {
+      const data = await resp.json();
+      alert(data.message || '이미 존재하는 카테고리입니다.');
+    } else {
+      alert('저장 중 오류가 발생했습니다. (status: ' + resp.status + ')');
+    }
+  });
+})();
+</script>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+{% include "admin/partials/markdown_editor_assets.html" %}
+{% endblock %}

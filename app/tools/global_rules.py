@@ -1,4 +1,4 @@
-"""MCP tools: get_global_rule + publish_* for versioned global/repo/app rules."""
+"""MCP tools: get_global_rule + publish_* + section tools for versioned rules."""
 
 from __future__ import annotations
 
@@ -9,11 +9,15 @@ from mcp.server.fastmcp import FastMCP
 from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.services.versioned_rules import (
+    DEFAULT_SECTION,
     append_to_app_rule as append_app_rule_body,
     export_rules_json,
     export_rules_markdown,
     get_rule_version_snapshot,
     get_rules_markdown,
+    list_sections_for_app,
+    list_sections_for_global,
+    list_sections_for_repo,
     normalize_read_version,
     patch_app_rule,
     patch_global_rule,
@@ -154,56 +158,57 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             db.close()
 
     @mcp.tool()
-    def publish_app_rule(app_name: str, body: str) -> str:
+    def publish_app_rule(
+        app_name: str,
+        body: str,
+        section_name: str | None = None,
+    ) -> str:
         """
-        **새 app 룰 버전을 1개 추가**합니다. 버전 번호는 **서버가 해당 앱 기준으로 자동 부여**합니다.
-        `version` 인자는 없습니다.
-        반환: JSON `{ "scope": "app", "app_name": "...", "version": N }`.
+        **새 app 룰 버전을 1개 추가**합니다. 버전 번호는 서버가 (app_name, section_name) 기준으로 자동 부여합니다.
+
+        - `section_name` (선택): 기본값 "main". 예: "admin_rules", "code_rules".
+          처음 쓰는 섹션이면 자동으로 첫 버전(v1) 생성됩니다.
+        - `version` 인자는 없습니다 (서버가 자동 증가).
+
+        반환: JSON `{ "scope": "app", "app_name": "...", "section_name": "...", "version": N }`.
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps(
-                {"error": "app_name is required"},
-                ensure_ascii=False,
-            )
+            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("publish_app_rule")
         db = SessionLocal()
         try:
-            name, v = publish_app(db, key, body)
+            name, sn_out, v = publish_app(db, key, body, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "version": v},
+                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
                 ensure_ascii=False,
             )
         finally:
             db.close()
 
     @mcp.tool()
-    def append_to_app_rule(app_name: str, append_markdown: str) -> str:
+    def append_to_app_rule(
+        app_name: str,
+        append_markdown: str,
+        section_name: str | None = None,
+    ) -> str:
         """
-        해당 앱 룰 **최신 본문 뒤에** `append_markdown` 을 덧붙여 **새 버전**을 저장합니다.
-        - **해당 앱이 DB에 없으면** → 넘긴 내용만으로 **버전 1** 행 생성.
-        - **이미 있으면** → 최신 본문 + append_markdown 을 **다음 정수 버전**(2, 3, …)으로 저장.
-        사용자가 「룰 이거 추가해줘」「your_app_name 앱 룰에 ~~ 추가해줘」처럼 말할 때 사용합니다.
-        (전체 본문을 갈아엎을 때는 `publish_app_rule` 에 전체 `body` 를 넘기세요.)
-        반환: JSON `{ "scope": "app", "app_name": "...", "version": N, "appended": true }`.
+        해당 앱 룰 섹션의 **최신 본문 뒤에** `append_markdown` 을 덧붙여 **새 버전**을 저장합니다.
+        - **해당 섹션이 DB에 없으면** → 넘긴 내용만으로 **버전 1** 행 생성.
+        - `section_name` 생략 시 "main" 섹션 대상.
+        반환: JSON `{ "scope": "app", "app_name": "...", "section_name": "...", "version": N, "appended": true }`.
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps(
-                {"error": "app_name is required"},
-                ensure_ascii=False,
-            )
+            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("append_to_app_rule")
         db = SessionLocal()
         try:
-            name, v = append_app_rule_body(db, key, append_markdown)
+            name, sn_out, v = append_app_rule_body(db, key, append_markdown, sn)
             return json.dumps(
-                {
-                    "scope": "app",
-                    "app_name": name,
-                    "version": v,
-                    "appended": True,
-                },
+                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v, "appended": True},
                 ensure_ascii=False,
             )
         except ValueError as e:
@@ -212,20 +217,117 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             db.close()
 
     @mcp.tool()
-    def publish_repo_rule(pattern: str, body: str) -> str:
+    def publish_repo_rule(
+        pattern: str,
+        body: str,
+        section_name: str | None = None,
+    ) -> str:
         """
-        **새 repository 룰 버전을 1개 추가**합니다. `pattern` 은 `git remote` origin URL에 포함되면
-        매칭되는 **부분문자열**(소문자 비교). 빈 패턴은 URL에 다른 패턴이 안 맞을 때 **폴백**으로 쓰입니다.
-        버전은 **패턴별**로 서버가 자동 증가합니다.
-        반환: JSON `{ "scope": "repo", "pattern": "...", "version": N }`.
+        **새 repository 룰 버전을 1개 추가**합니다.
+        - `pattern`: git remote origin URL에 포함되면 매칭되는 부분문자열. 빈 패턴은 폴백.
+        - `section_name` (선택): 기본값 "main".
+        반환: JSON `{ "scope": "repo", "pattern": "...", "section_name": "...", "version": N }`.
         """
         record_mcp_tool_call("publish_repo_rule")
         key = (pattern or "").strip()
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         db = SessionLocal()
         try:
-            p, v = publish_repo(db, key, body)
+            p, sn_out, v = publish_repo(db, key, body, section_name=sn)
             return json.dumps(
-                {"scope": "repo", "pattern": p, "version": v},
+                {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
+                ensure_ascii=False,
+            )
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def list_rule_sections(
+        app_name: str | None = None,
+        repo_pattern: str | None = None,
+    ) -> str:
+        """
+        룰 섹션 목록을 조회합니다.
+
+        - `app_name` 만 지정: 해당 앱의 섹션 목록 반환.
+        - `repo_pattern` 만 지정: 해당 레포지토리 패턴의 섹션 목록 반환.
+        - 둘 다 없으면: 글로벌 룰의 섹션 목록 반환.
+
+        반환 예:
+        ```json
+        {
+          "scope": "app",
+          "app_name": "your_app",
+          "sections": [
+            {"section_name": "main", "latest_version": 3},
+            {"section_name": "admin_rules", "latest_version": 1}
+          ]
+        }
+        ```
+        """
+        record_mcp_tool_call("list_rule_sections")
+        db = SessionLocal()
+        try:
+            from app.services.versioned_rules import (
+                _app_all_sections_latest,
+                _global_all_sections_latest,
+                _repo_all_sections_latest_for_pattern,
+            )
+            if app_name:
+                key = _normalize_app_name(app_name)
+                rows = _app_all_sections_latest(db, key)
+                sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+                return json.dumps(
+                    {"scope": "app", "app_name": key, "sections": sections},
+                    ensure_ascii=False,
+                )
+            if repo_pattern is not None:
+                pat = (repo_pattern or "").strip()
+                rows = _repo_all_sections_latest_for_pattern(db, pat)
+                sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+                return json.dumps(
+                    {"scope": "repo", "pattern": pat, "sections": sections},
+                    ensure_ascii=False,
+                )
+            rows = _global_all_sections_latest(db)
+            sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+            return json.dumps(
+                {"scope": "global", "sections": sections},
+                ensure_ascii=False,
+            )
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def publish_section_rule(
+        app_name: str,
+        section_name: str,
+        body: str,
+    ) -> str:
+        """
+        앱 룰 **특정 섹션에 새 버전 추가** (명시적 섹션 지정 전용 툴).
+        `publish_app_rule` 의 `section_name` 파라미터와 동일하지만,
+        섹션을 반드시 명시해야 할 때 더 명확한 이름으로 사용합니다.
+
+        - `app_name`: 앱 식별자 (INI 기준).
+        - `section_name`: 섹션 이름 (예: "admin_rules", "code_rules", "main").
+          해당 섹션이 없으면 자동으로 첫 버전(v1) 생성.
+        - `body`: 섹션 전체 본문 (기존 내용을 대체).
+
+        반환: JSON `{ "scope": "app", "app_name": "...", "section_name": "...", "version": N }`.
+        """
+        key = _normalize_app_name(app_name)
+        if not key:
+            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        sn = (section_name or "").strip()
+        if not sn:
+            return json.dumps({"error": "section_name is required"}, ensure_ascii=False)
+        record_mcp_tool_call("publish_section_rule")
+        db = SessionLocal()
+        try:
+            name, sn_out, v = publish_app(db, key, body, sn)
+            return json.dumps(
+                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
                 ensure_ascii=False,
             )
         finally:
@@ -247,33 +349,51 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             db.close()
 
     @mcp.tool()
-    def patch_app_rule_tool(app_name: str, patch_markdown: str) -> str:
+    def patch_app_rule_tool(
+        app_name: str,
+        patch_markdown: str,
+        section_name: str | None = None,
+    ) -> str:
         """
-        app 룰 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
-        반환: JSON `{ "scope": "app", "app_name": "...", "version": N }`.
+        app 룰 섹션 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
+        `section_name` 생략 시 "main" 섹션 대상.
+        반환: JSON `{ "scope": "app", "app_name": "...", "section_name": "...", "version": N }`.
         """
         key = _normalize_app_name(app_name)
         if not key:
             return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("patch_app_rule")
         db = SessionLocal()
         try:
-            name, v = patch_app_rule(db, key, patch_markdown)
-            return json.dumps({"scope": "app", "app_name": name, "version": v}, ensure_ascii=False)
+            name, sn_out, v = patch_app_rule(db, key, patch_markdown, sn)
+            return json.dumps(
+                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                ensure_ascii=False,
+            )
         finally:
             db.close()
 
     @mcp.tool()
-    def patch_repo_rule_tool(pattern: str, patch_markdown: str) -> str:
+    def patch_repo_rule_tool(
+        pattern: str,
+        patch_markdown: str,
+        section_name: str | None = None,
+    ) -> str:
         """
-        repo 룰 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
-        반환: JSON `{ "scope": "repo", "pattern": "...", "version": N }`.
+        repo 룰 섹션 최신 버전 뒤에 `patch_markdown`을 덧붙여 새 버전을 생성합니다.
+        `section_name` 생략 시 "main" 섹션 대상.
+        반환: JSON `{ "scope": "repo", "pattern": "...", "section_name": "...", "version": N }`.
         """
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("patch_repo_rule")
         db = SessionLocal()
         try:
-            p, v = patch_repo_rule(db, pattern, patch_markdown)
-            return json.dumps({"scope": "repo", "pattern": p, "version": v}, ensure_ascii=False)
+            p, sn_out, v = patch_repo_rule(db, pattern, patch_markdown, sn)
+            return json.dumps(
+                {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
+                ensure_ascii=False,
+            )
         finally:
             db.close()
 
@@ -295,19 +415,28 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             db.close()
 
     @mcp.tool()
-    def rollback_app_rule_tool(app_name: str, target_version: int) -> str:
+    def rollback_app_rule_tool(
+        app_name: str,
+        target_version: int,
+        section_name: str | None = None,
+    ) -> str:
         """
-        app 룰을 `target_version` 본문으로 새 버전 생성 (롤백).
-        반환: JSON `{ "scope": "app", "app_name": "...", "version": N }`.
+        app 룰 섹션을 `target_version` 본문으로 새 버전 생성 (롤백).
+        `section_name` 생략 시 "main" 섹션 대상.
+        반환: JSON `{ "scope": "app", "app_name": "...", "section_name": "...", "version": N }`.
         """
         key = _normalize_app_name(app_name)
         if not key:
             return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+        sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("rollback_app_rule")
         db = SessionLocal()
         try:
-            name, v = rollback_app_rule(db, key, target_version)
-            return json.dumps({"scope": "app", "app_name": name, "version": v}, ensure_ascii=False)
+            name, sn_out, v = rollback_app_rule(db, key, target_version, sn)
+            return json.dumps(
+                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                ensure_ascii=False,
+            )
         except ValueError as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
         finally:

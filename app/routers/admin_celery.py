@@ -48,7 +48,7 @@ def admin_celery_dashboard(
         "admin/celery.html",
         {
             "request": request,
-            "title": "Celery Monitor",
+            "title": "Vector Monitoring",
             "failed_tasks": failed_tasks,
             "task_stats": task_stats if isinstance(task_stats, list) else [],
             "total_count": total_count,

@@ -1,18 +1,14 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin">← 대시보드</a></p>
-
-<div class="toolbar toolbar--with-flag" style="margin-bottom:1rem">
-  <form method="post" action="/admin/global-rules/mcp-app-default-toggle" class="toolbar-flag">
-    <span class="toolbar-flag__label">default 포함 (전역 기본)</span>
-    <span class="toolbar-flag__state {% if include_app_default_global %}is-on{% endif %}">{% if include_app_default_global %}ON{% else %}OFF{% endif %}</span>
-    <button type="submit" class="btn btn-secondary btn-sm" title="앱별 옵션 행이 없을 때, get_global_rule 에서 __default__ 앱 스트림을 함께 내려줄지">전환</button>
-  </form>
-</div>
-<p class="muted" style="font-size:0.875rem;margin-top:-0.5rem;margin-bottom:1rem">앱 카드에서 따로 켠 값이 있으면 그게 우선이고, 없을 때만 이 전역 값을 씁니다.</p>
+<p class="muted" style="margin-top:0"><a href="/admin/repo-skills">← Repository 배경 지식</a></p>
 
 <div class="page-actions page-actions--spread" style="margin-bottom:1.5rem">
-  <a href="/admin/global-rules/s/new" class="btn btn-primary">+ 새로 추가하기</a>
+  <a href="/admin/repo-skills/pat/{{ pat_url }}/s/new" class="btn btn-primary">+ 새로 추가하기</a>
+  {% if can_delete_stream %}
+  <form method="post" action="/admin/repo-skills/pat/{{ pat_url }}/delete" onsubmit="return confirm('패턴 «{{ pattern_display }}» 전체를 삭제할까요?');">
+    <button type="submit" class="btn btn-danger">패턴 삭제</button>
+  </form>
+  {% endif %}
 </div>
 
 <div data-card-container data-per-page="20">

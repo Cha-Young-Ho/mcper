@@ -2,10 +2,24 @@
 {% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
 <p class="muted" style="margin-top:0">
-  <a href="/admin/repo-rules/pat/{{ pat_url }}">← 목록</a>
+  <a href="/admin/repo-rules/pat/{{ pat_url }}">← {{ pattern_display }}</a>
+  {% if section_name is defined and section_name %}
+  &nbsp;/&nbsp;
+  <a href="/admin/repo-rules/pat/{{ pat_url }}/s/{{ section_url_encoded }}">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</a>
+  {% endif %}
 </p>
-<p><span class="ver-badge">버전 {{ row.version }}</span> <span class="muted">{{ row.created_at }}</span></p>
+<p>
+  {% if section_name is defined and section_name %}
+  <span class="category-badge" style="margin-right:0.4rem">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</span>
+  {% endif %}
+  <span class="ver-badge">버전 {{ row.version }}</span>
+  <span class="muted">{{ row.created_at }}</span>
+</p>
+{% if section_name is defined and section_name %}
+<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/s/{{ section_url_encoded }}/save-as-new" class="form-stack">
+{% else %}
 <form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/save-as-new" class="form-stack">
+{% endif %}
   {% set md_label = "본문 (Markdown)" %}
   {% set md_name = "body" %}
   {% set md_id = "body" %}
@@ -18,7 +32,13 @@
   </div>
 </form>
 {% if can_delete_version %}
-<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/v/{{ row.version }}/delete" class="form-stack" style="margin-top:1rem" onsubmit="return confirm('이 버전 행을 삭제할까요?');">
+{% if section_name is defined and section_name %}
+<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/s/{{ section_url_encoded }}/v/{{ row.version }}/delete"
+      class="form-stack" style="margin-top:1rem" onsubmit="return confirm('이 버전 행을 삭제할까요?');">
+{% else %}
+<form method="post" action="/admin/repo-rules/pat/{{ pat_url }}/v/{{ row.version }}/delete"
+      class="form-stack" style="margin-top:1rem" onsubmit="return confirm('이 버전 행을 삭제할까요?');">
+{% endif %}
   <button type="submit" class="btn btn-danger">이 버전 삭제</button>
 </form>
 {% endif %}

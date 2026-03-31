@@ -1,7 +1,5 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0">HTTP Basic — <code>ADMIN_USER</code> / <code>ADMIN_PASSWORD</code></p>
-
 <div class="stats-grid">
   <div class="stat-card stat-card--highlight">
     <div class="stat-card__value">{{ mcp_calls_total }}</div>
@@ -11,45 +9,37 @@
   <div class="stat-card">
     <div class="stat-card__value">{{ global_versions_n }}</div>
     <div class="stat-card__label">Global 버전 수</div>
-    <a href="/admin/global-rules">목록 · 발행 →</a>
+    <a href="/admin/global-rules">내용 보기 →</a>
   </div>
   <div class="stat-card">
     <div class="stat-card__value">{{ repo_patterns_n }}</div>
     <div class="stat-card__label">Repository 패턴 수</div>
-    <a href="/admin/repo-rules">카드 목록 →</a>
+    <a href="/admin/repo-rules">내용 보기 →</a>
   </div>
   <div class="stat-card">
     <div class="stat-card__value">{{ apps_n }}</div>
     <div class="stat-card__label">앱 종류 수</div>
-    <a href="/admin/app-rules">카드 목록 →</a>
+    <a href="/admin/app-rules">내용 보기 →</a>
   </div>
 </div>
 
-<div class="table-wrap" style="margin-bottom:1.25rem">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>툴 이름</th>
-        <th style="width:8rem">호출 수</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_stats %}
-      <tr>
-        <td><code>{{ t.name }}</code> — {{ t.title }}</td>
-        <td><strong>{{ t.call_count }}</strong></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<div class="alert alert--info" style="margin-bottom:0">
-  <strong>MCPER:</strong> <code>specs</code> 기획서 · <code>global_rule_versions</code> / <code>repo_rule_versions</code> / <code>app_rule_versions</code> 룰.
-  MCP 툴 호출 수는 DB에 누적 · <a href="/admin/plans">기획서</a> / <a href="/admin/plan-code">기획서–코드</a> 탭에서 확인.
+<h3 style="margin:1.5rem 0 0.75rem;font-size:0.95rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em">배경 지식 (Skills)</h3>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-card__label">Global Skills</div>
+    <a href="/admin/global-skills">내용 보기 →</a>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__label">Repository Skills</div>
+    <a href="/admin/repo-skills">내용 보기 →</a>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__label">App Skills</div>
+    <a href="/admin/app-skills">내용 보기 →</a>
+  </div>
 </div>
 
 <div class="page-actions" style="margin-top:1.25rem;margin-bottom:0">
-  <a href="/admin/seed/confirm" class="btn btn-danger btn-sm">기본값으로 전체 재시드</a>
+  <a href="/admin/apps/new" class="btn btn-primary">+ 앱 추가</a>
 </div>
 {% endblock %}

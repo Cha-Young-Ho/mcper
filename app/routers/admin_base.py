@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+import jinja2
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -19,7 +20,26 @@ from app.db.seed_defaults import seed_force
 from app.mcp_tools_docs import tools_with_counts
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
+
+def _datefmt(value: object) -> str:
+    """datetime → 'YYYY-MM-DD HH:MM' 로 축약."""
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M")  # type: ignore[union-attr]
+    s = str(value)
+    return s[:16] if len(s) >= 16 else s
+
+
+def _make_jinja_env() -> jinja2.Environment:
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(_TEMPLATES_DIR)),
+        autoescape=jinja2.select_autoescape(["html", "xml"]),
+    )
+    env.filters["datefmt"] = _datefmt
+    return env
+
+
+templates = Jinja2Templates(env=_make_jinja_env())
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

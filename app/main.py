@@ -23,7 +23,7 @@ from app.services.embeddings import configure_embedding_backend
 from app.services.mcp_auto_hosts import sync_mcp_allowed_hosts
 from app.services.rag_health import rag_health_payload
 from app.mcp_dynamic_mount import mcp_dynamic_asgi
-from app.routers import admin_base, admin_celery, admin_dashboard, admin_specs, admin_rules, admin_tools
+from app.routers import admin_base, admin_celery, admin_dashboard, admin_specs, admin_rules, admin_skills, admin_tools
 
 logger = logging.getLogger("mcper.startup")
 
@@ -156,6 +156,7 @@ if _ADMIN_ENABLED:
     app.include_router(admin_dashboard.router)
     app.include_router(admin_specs.router)
     app.include_router(admin_rules.router)
+    app.include_router(admin_skills.router)
     app.include_router(admin_tools.router)
     app.include_router(admin_celery.router)
     logger.info("Admin UI enabled at /admin")

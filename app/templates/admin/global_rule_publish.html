@@ -2,10 +2,10 @@
 {% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
 <p class="muted" style="margin-top:0">
-  <a href="/admin/repo-rules/pat/{{ pat_url }}">← {{ pattern_display }}</a>
+  <a href="/admin/global-rules">← Global rules</a>
   {% if section_name is defined and section_name %}
   &nbsp;/&nbsp;
-  <a href="/admin/repo-rules/pat/{{ pat_url }}/s/{{ section_url_encoded }}">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</a>
+  <a href="/admin/global-rules/s/{{ section_url_encoded }}">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</a>
   {% endif %}
 </p>
 <p>
@@ -15,9 +15,9 @@
   다음으로 저장될 버전: <span class="ver-badge">{{ next_version }}</span>
 </p>
 {% if section_name is defined and section_name %}
-<form class="form-stack" method="post" action="/admin/repo-rules/pat/{{ pat_url }}/s/{{ section_url_encoded }}/publish">
+<form class="form-stack" method="post" action="/admin/global-rules/s/{{ section_url_encoded }}/publish">
 {% else %}
-<form class="form-stack" method="post" action="/admin/repo-rules/pat/{{ pat_url }}/publish">
+<form class="form-stack" method="post" action="/admin/global-rules/publish">
 {% endif %}
   {% set md_label = "본문 (Markdown)" %}
   {% set md_name = "body" %}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/admin/admin.css?v=3" />
+  <link rel="stylesheet" href="/static/admin/admin.css?v=6" />
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -19,21 +19,33 @@
         <small>기획서 · 룰 · Tools</small>
       </div>
       <nav class="admin-nav">
-        <a href="/admin" class="nav-link" data-nav="home"><span class="admin-nav__icon" aria-hidden="true">⌂</span> 대시보드</a>
-        <a href="/admin/plans" class="nav-link" data-nav="plans"><span class="admin-nav__icon" aria-hidden="true">📄</span> 기획서</a>
-        <a href="/admin/plans/bulk-upload" class="nav-link" data-nav="bulk-upload"><span class="admin-nav__icon" aria-hidden="true">↑</span> 일괄 업로드</a>
-        <a href="/admin/plan-code" class="nav-link" data-nav="plan-code"><span class="admin-nav__icon" aria-hidden="true">🔗</span> 기획서–코드</a>
-        <details class="admin-nav-group" data-nav-rules-group>
-          <summary class="admin-nav-group__summary"><span class="admin-nav__icon" aria-hidden="true">◇</span> Rules</summary>
+        <a href="/admin" class="nav-link" data-nav="home"> 대시보드</a>
+        <details class="admin-nav-group" data-nav-plans-group>
+          <summary class="admin-nav-group__summary"> 기획서</summary>
           <div class="admin-nav-group__sub">
-            <a href="/admin/global-rules" class="nav-link nav-link--sub" data-nav="global-rules">Global rules</a>
-            <a href="/admin/repo-rules" class="nav-link nav-link--sub" data-nav="repo-rules">Repository rules</a>
-            <a href="/admin/app-rules" class="nav-link nav-link--sub" data-nav="app-rules">Apps rules</a>
+            <a href="/admin/plans" class="nav-link nav-link--sub" data-nav="plans">목록</a>
+            <a href="/admin/plans/bulk-upload" class="nav-link nav-link--sub" data-nav="bulk-upload">일괄 업로드</a>
+            <a href="/admin/plan-code" class="nav-link nav-link--sub" data-nav="plan-code">기획서–코드</a>
           </div>
         </details>
-        <a href="/admin/tools" class="nav-link" data-nav="tools"><span class="admin-nav__icon" aria-hidden="true">⚙</span> Tools</a>
-        <a href="/admin/celery" class="nav-link" data-nav="celery"><span class="admin-nav__icon" aria-hidden="true">⏱</span> Celery</a>
-        <a href="/admin/seed/confirm" class="nav-link" data-nav="seed"><span class="admin-nav__icon" aria-hidden="true">↻</span> 재시드</a>
+        <details class="admin-nav-group" data-nav-rules-group>
+          <summary class="admin-nav-group__summary"> 행동 지침 (Rules)</summary>
+          <div class="admin-nav-group__sub">
+            <a href="/admin/global-rules" class="nav-link nav-link--sub" data-nav="global-rules">Global</a>
+            <a href="/admin/repo-rules" class="nav-link nav-link--sub" data-nav="repo-rules">Repository</a>
+            <a href="/admin/app-rules" class="nav-link nav-link--sub" data-nav="app-rules">App</a>
+          </div>
+        </details>
+        <details class="admin-nav-group" data-nav-skills-group>
+          <summary class="admin-nav-group__summary"> 배경 지식 (Skills)</summary>
+          <div class="admin-nav-group__sub">
+            <a href="/admin/global-skills" class="nav-link nav-link--sub" data-nav="global-skills">Global</a>
+            <a href="/admin/repo-skills" class="nav-link nav-link--sub" data-nav="repo-skills">Repository</a>
+            <a href="/admin/app-skills" class="nav-link nav-link--sub" data-nav="app-skills">App</a>
+          </div>
+        </details>
+        <a href="/admin/tools" class="nav-link" data-nav="tools"> Tools</a>
+        <a href="/admin/celery" class="nav-link" data-nav="celery"> Vector Monitoring</a>
       </nav>
       <div class="admin-sidebar__foot">
         <a href="/health" target="_blank" rel="noopener">/health ↗</a>
@@ -55,7 +67,7 @@
       </div>
     </div>
   </div>
-  <script src="/static/admin/admin.js?v=3" defer></script>
+  <script src="/static/admin/admin.js?v=4" defer></script>
   <script>
   // 모든 폼 제출을 fetch()로 가로채 X-CSRF-Token 헤더 전송
   // — body를 서버 미들웨어에서 소비하지 않아도 되며, multipart 업로드도 안전하게 처리

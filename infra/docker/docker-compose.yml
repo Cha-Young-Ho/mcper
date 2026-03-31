@@ -50,7 +50,8 @@ services:
 
   worker:
     image: spec-mcp:local
-    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+    # -E: task events 활성화 → Celery Inspect(active/reserved) 정상 작동
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2 -E
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +63,14 @@ services:
     volumes:
       - ../..:/app
     restart: unless-stopped
+    # sentence-transformers + torch 로드 시 ~500MB 이상 사용 가능
+    # 프로덕션에서 OOM 방지를 위해 상한 설정
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 30s
@@ -93,7 +102,14 @@ services:
       - "${MCPER_HOST_BIND:-127.0.0.1}:${REDIS_PORT:-6380}:6379"
     volumes:
       - redisdata:/data
-    command: redis-server --save 60 1 --loglevel warning
+    # RDB(60s) + AOF(everysec): 재시작 시 파일 스테이징 데이터 복구 가능
+    # everysec = 최대 1초 유실, always 대비 I/O 부담 낮음
+    command: >
+      redis-server
+      --save 60 1
+      --appendonly yes
+      --appendfsync everysec
+      --loglevel warning
     restart: unless-stopped
 
   # Optional: 로컬 임베딩 실험용 (--profile local-embed)
