@@ -223,9 +223,16 @@ def register_rag_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def push_spec_chunks_with_embeddings(spec_id: int, chunks_json: Any) -> str:
         """
-        서버 임베딩 대신 로컬에서 계산한 벡터로 spec_chunks 를 교체한다.
+        서버 Celery 워커 대신 로컬에서 직접 임베딩한 벡터를 spec_chunks에 저장한다 (폴백 전용).
+
+        언제 쓰는가:
+        - Celery 워커가 중단됐거나 큐가 지연돼서 임베딩이 안 될 때
+        - 서버 임베딩 모델 대신 다른 모델로 로컬 임베딩한 결과를 직접 넣고 싶을 때
+
+        주의: 벡터 차원이 서버의 EMBEDDING_DIM과 반드시 일치해야 한다.
+        일반적인 상황에서는 upload_document를 쓰면 서버가 자동으로 임베딩한다.
+
         chunks_json: [{ "content": "...", "embedding": [float,...], "metadata": {...} }, ...]
-        EMBEDDING_DIM 과 모델 출력 차원이 일치해야 한다.
         """
         return push_spec_chunks_with_embeddings_impl(spec_id, chunks_json)
 
@@ -237,17 +244,55 @@ def register_rag_tools(mcp: FastMCP) -> None:
         edges: list[dict[str, Any]] | str,
     ) -> str:
         """
-        Enqueue AST/symbol code index for an app. nodes need stable_id, file_path, symbol_name, kind, content.
-        edges: source_stable_id, target_stable_id, relation (e.g. CALLS). file_paths: replace index for these paths first.
+        코드 파일의 AST/심볼 인덱스를 서버에 등록한다.
+
+        언제 쓰는가:
+        - 코드를 처음 인덱싱할 때 또는 파일을 수정한 뒤 인덱스를 갱신할 때
+        - analyze_code_impact를 쓰기 전에 먼저 인덱스를 만들어야 할 때
+
+        nodes: 각 심볼(함수·클래스 등) 정보
+          - stable_id: 파일경로+심볼명 기반 고유 ID
+          - file_path, symbol_name, kind (function/class/method), content
+
+        edges: 심볼 간 관계
+          - source_stable_id, target_stable_id, relation (예: CALLS, IMPORTS)
+
+        file_paths에 포함된 경로의 기존 인덱스는 먼저 삭제 후 재삽입된다.
         """
         return push_code_index_impl(app_target, file_paths, nodes, edges)
 
     @mcp.tool()
     def analyze_code_impact(query: str, app_target: str) -> str:
-        """Hybrid search seed + graph traversal (upstream/downstream) over indexed code_nodes/code_edges."""
+        """
+        특정 코드를 수정했을 때 영향받는 상위/하위 코드를 그래프로 찾는다.
+
+        언제 쓰는가:
+        - "payment_service.py 바꾸면 어디까지 영향받아?" 같은 질문에 답할 때
+        - 리팩토링 전 의존성 파악이 필요할 때
+
+        search_documents와의 차이:
+        - search_documents: 기획서/문서 검색
+        - analyze_code_impact: 코드 심볼 의존성 그래프 탐색
+
+        push_code_index로 먼저 코드 인덱스가 만들어져 있어야 한다.
+        """
         return analyze_code_impact_impl(query, app_target)
 
     @mcp.tool()
     def find_historical_reference(new_spec_text: str, app_target: str, top_n: int = 5) -> str:
-        """Find similar past spec chunks and linked related_files for few-shot / Spec-to-Code context."""
+        """
+        지금 작성하려는 기획서 초안과 의미적으로 유사한 과거 기획서를 찾는다.
+
+        언제 쓰는가:
+        - 새 기획서를 쓰기 전에 "예전에 비슷한 기능을 어떻게 설계했지?" 확인할 때
+        - 기획서 초안이 있고 관련 과거 기획 + 관련 파일 경로를 참고하고 싶을 때
+
+        search_documents와의 차이:
+        - search_documents: 키워드/주제로 기획서를 찾는 일반 검색
+        - find_historical_reference: 기획서 본문 전체를 넘겨서 의미 유사도로 비교
+          → 관련 파일 경로(related_files)까지 함께 반환해서 코드 위치 파악에 유용
+
+        new_spec_text: 작성 중인 기획서 텍스트 (최대 8000자)
+        top_n: 반환할 유사 기획서 개수 (기본 5)
+        """
         return find_historical_reference_impl(new_spec_text, app_target, top_n)

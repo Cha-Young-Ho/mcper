@@ -164,7 +164,19 @@ def register_document_tools(mcp: FastMCP) -> None:
         related_files: list[str] | str | None = None,
         title: str | None = None,
     ) -> str:
-        """Insert document with optional chunking and embedding indexing. related_files can be a list or JSON array string."""
+        """
+        기획서(스펙) 1건을 DB에 저장하고, 자동으로 청킹·임베딩 색인을 예약한다.
+
+        언제 쓰는가:
+        - 새 기획서를 작성했거나 사용자가 기획서 내용을 넘겨줬을 때
+        - 기존 기획서를 수정해서 최신 내용으로 교체하려 할 때
+
+        related_files: 이 기획서와 관련된 소스 파일 경로 목록 (예: ["src/payment/service.py"])
+        title: 어드민 UI 목록에 표시되는 제목. 나중에 검색할 때 식별자 역할.
+
+        저장 후 Celery 워커가 백그라운드에서 청킹·임베딩을 처리하므로
+        search_documents로 검색되기까지 수 초~수십 초 소요된다.
+        """
         return upload_document_impl(
             content=content,
             app_target=app_target,
@@ -175,22 +187,40 @@ def register_document_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def search_documents(query: str, app_target: str) -> str:
-        """Search documents by app target. Uses vector+FTS (RRF) if indexed chunks exist, otherwise ILIKE fallback. Returns JSON."""
+        """
+        현재 작업과 관련된 기획서나 코드 문서를 검색한다 (벡터+FTS 하이브리드).
+
+        언제 쓰는가:
+        - "결제 모듈 기획서 찾아줘"처럼 특정 기능/주제의 기획서를 찾을 때
+        - 코드 작성 전 관련 기획 내용을 참고하고 싶을 때
+        - 특정 파일 경로나 키워드가 포함된 기획서를 찾을 때
+
+        find_historical_reference와의 차이:
+        - search_documents: 키워드·주제로 관련 기획서를 찾는 "일반 검색"
+        - find_historical_reference: 내가 지금 쓰려는 기획서 초안을 넘겨서
+          "과거에 유사한 기획이 있었는지" 비교할 때 쓰는 "유사 기획 탐색"
+
+        임베딩 인덱스가 없으면 키워드 ILIKE 검색으로 자동 대체된다.
+        """
         return search_documents_impl(query=query, app_target=app_target)
 
     @mcp.tool()
     def upload_documents_batch(documents: list[dict]) -> dict:
         """
-        Upload multiple documents in a single batch.
+        기획서 여러 건을 한 번에 DB에 저장한다.
 
-        Each document dict should contain:
-          - title (str): Document title
-          - content (str): Document content text
-          - app_target (str, optional): App identifier
-          - base_branch (str, optional): Base branch name (default: main)
-          - related_files (list[str] | str | None, optional): Related file paths
+        언제 쓰는가:
+        - 기존 기획서 파일들을 일괄 등록할 때
+        - 어드민 UI의 "문서 일괄 업로드" 기능과 동일한 동작
 
-        Returns counts of succeeded and failed uploads, plus error list.
+        각 문서 dict 형식:
+          - title (str): 기획서 제목 (검색 및 식별용)
+          - content (str): 기획서 전체 내용
+          - app_target (str, optional): 앱 식별자
+          - base_branch (str, optional): 기준 브랜치 (기본값: main)
+          - related_files (list[str] | str | None, optional): 관련 파일 경로
+
+        반환: { succeeded: N, failed: N, errors: [...] }
         """
         succeeded = 0
         failed = 0

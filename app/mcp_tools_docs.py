@@ -190,30 +190,49 @@ MCP_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "upload_spec_to_db",
-        "one_liner": "기획서 내용과 관련 파일 경로를 specs 테이블에 INSERT",
-        "title": "upload_spec_to_db — 기획서 저장",
-        "summary": "기획서 내용과 메타데이터를 specs 테이블에 INSERT합니다.",
+        "one_liner": "기획서 내용과 관련 파일 경로를 specs 테이블에 INSERT (upload_document의 구 이름)",
+        "title": "upload_document — 기획서 저장",
+        "summary": (
+            "기획서(스펙) 1건을 DB에 저장하고, 자동으로 청킹·임베딩 색인을 예약합니다. "
+            "저장 후 Celery 워커가 백그라운드에서 청킹·임베딩을 처리하므로 "
+            "search_documents로 검색되기까지 수 초~수십 초 소요됩니다."
+        ),
         "params": [
-            "content, app_target, base_branch (필수)",
-            "related_files: 목록 또는 JSON 배열 문자열, 선택",
-            "title (선택): 어드민 목록에 표시할 기획서 제목",
+            "content (필수): 기획서 전체 내용",
+            "app_target (필수): 앱 식별자",
+            "base_branch (필수): 기준 브랜치 (예: main)",
+            "related_files (선택): 관련 소스 파일 경로 목록 또는 JSON 배열 문자열",
+            "title (선택): 어드민 목록에 표시할 기획서 제목 (검색 식별자 역할)",
         ],
-        "notes": [],
+        "notes": [
+            "upload_spec_to_db는 이전 이름. 현재 MCP 도구명은 upload_document.",
+        ],
         "examples": [
-            '`upload_spec_to_db(content="…", app_target="your_app_name", base_branch="main", related_files=["a.php"], title="결제기획")`',
+            '`upload_document(content="…", app_target="your_app_name", base_branch="main", related_files=["src/payment/service.py"], title="결제 모듈 기획")`',
         ],
     },
     {
         "name": "search_spec_and_code",
-        "one_liner": "앱별 기획서 내용과 파일 경로를 키워드 검색 (JSON 결과 반환)",
-        "title": "search_spec_and_code — 기획서 검색",
-        "summary": "특정 app_target 내 기획서 내용과 관련 파일 경로를 ILIKE 검색. 최대 50건 JSON 반환.",
+        "one_liner": "현재 작업과 관련된 기획서를 키워드·벡터로 검색 (search_documents의 구 이름)",
+        "title": "search_documents — 기획서 검색",
+        "summary": (
+            "특정 app_target 내 기획서를 벡터+FTS 하이브리드로 검색합니다. "
+            "임베딩 인덱스가 없으면 키워드 ILIKE로 자동 대체됩니다. "
+            "<b>find_historical_reference와의 차이</b>: "
+            "search_documents는 키워드·주제로 기획서를 찾는 일반 검색이고, "
+            "find_historical_reference는 기획서 초안 본문을 넘겨서 유사한 과거 기획을 찾는 유사도 검색입니다."
+        ),
         "params": [
-            "query, app_target (필수)",
+            "query (필수): 검색 키워드 또는 문장 (예: '결제 모듈', 'OAuth 인증')",
+            "app_target (필수): 앱 식별자",
         ],
-        "notes": [],
+        "notes": [
+            "search_spec_and_code는 이전 이름. 현재 MCP 도구명은 search_documents.",
+            "벡터 인덱스 없으면 search_mode=legacy_ilike로 자동 대체.",
+        ],
         "examples": [
-            '`search_spec_and_code(query="결제", app_target="your_app_name")`',
+            '`search_documents(query="결제", app_target="your_app_name")`',
+            '`search_documents(query="OAuth 인증 플로우", app_target="your_app_name")`',
         ],
     },
     {
@@ -264,12 +283,29 @@ MCP_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "find_historical_reference",
-        "one_liner": "새 기획서 텍스트와 유사한 과거 기획서 청크를 찾아 관련 파일 경로 반환",
-        "title": "find_historical_reference — 유사 기획서 참조",
-        "summary": "임베딩 유사도로 상위 N개 spec_chunks와 관련 파일 경로를 반환합니다 (Few-shot 참조용).",
-        "params": ["new_spec_text", "app_target", "top_n (선택, 기본값 5)"],
-        "notes": ["Celery index_spec으로 기획서 청크 인덱스가 먼저 구축돼 있어야 합니다."],
-        "examples": [],
+        "one_liner": "기획서 초안 본문과 의미적으로 유사한 과거 기획서를 찾아 관련 파일 경로 반환",
+        "title": "find_historical_reference — 유사 기획서 탐색",
+        "summary": (
+            "작성 중인 기획서 텍스트를 넘기면, 임베딩 유사도로 과거 유사 기획서 청크와 "
+            "관련 파일 경로(related_files)를 반환합니다. "
+            "<b>search_documents와의 차이</b>: "
+            "search_documents는 키워드 검색, "
+            "find_historical_reference는 기획서 본문 전체를 의미적으로 비교합니다. "
+            "코드 위치(related_files)까지 함께 반환해서 '과거에 이런 기능을 어느 파일에 구현했는지' 파악에 유용합니다."
+        ),
+        "params": [
+            "new_spec_text (필수): 작성 중인 기획서 텍스트 (최대 8000자)",
+            "app_target (필수): 앱 식별자",
+            "top_n (선택, 기본값 5): 반환할 유사 기획서 개수",
+        ],
+        "notes": [
+            "Celery index_spec 태스크로 기획서 청크 인덱스가 먼저 구축돼 있어야 합니다.",
+            "upload_document 저장 후 인덱싱 완료까지 수십 초 소요.",
+        ],
+        "examples": [
+            '`find_historical_reference(new_spec_text="알림 발송 기능을 추가한다...", app_target="your_app_name")`',
+            '`find_historical_reference(new_spec_text="...", app_target="your_app_name", top_n=3)`',
+        ],
     },
 ]
 

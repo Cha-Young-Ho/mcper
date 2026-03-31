@@ -32,10 +32,13 @@ def spec_chunk_vector_ids(
     query_embedding: list[float],
     limit: int = 40,
 ) -> list[int]:
+    # chunk_type != 'parent' 필터: parent 는 embedding=NULL 이라 cosine_distance 불가
     stmt = (
         select(SpecChunk.id)
         .join(Spec, Spec.id == SpecChunk.spec_id)
         .where(Spec.app_target == app_target)
+        .where(SpecChunk.chunk_type != "parent")
+        .where(SpecChunk.embedding.isnot(None))
         .order_by(SpecChunk.embedding.cosine_distance(query_embedding))
         .limit(limit)
     )
@@ -52,10 +55,12 @@ def spec_chunk_fts_ids(
     q = (query or "").strip()
     if not q:
         return []
+    # chunk_type != 'parent' 필터: 검색 결과에 parent 노출 방지
     stmt = (
         select(SpecChunk.id)
         .join(Spec, Spec.id == SpecChunk.spec_id)
         .where(Spec.app_target == app_target)
+        .where(SpecChunk.chunk_type != "parent")
         .where(
             text("spec_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)").bindparams(
                 fts_q=q
@@ -89,6 +94,7 @@ def hybrid_spec_search(
             .select_from(SpecChunk)
             .join(Spec, Spec.id == SpecChunk.spec_id)
             .where(Spec.app_target == app_target)
+            .where(SpecChunk.chunk_type != "parent")  # parent 만 있는 경우 false 처리
         )
     )
     if not has_chunks:
@@ -117,15 +123,27 @@ def hybrid_spec_search(
     spec_ids = {r.spec_id for r in ordered}
     specs = {s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()}
 
+    # child 청크가 매칭된 경우 → parent 의 섹션 원문을 컨텍스트로 함께 반환
+    parent_ids = [ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None]
+    parents_by_id: dict[int, SpecChunk] = {}
+    if parent_ids:
+        parents_by_id = {
+            p.id: p
+            for p in db.scalars(select(SpecChunk).where(SpecChunk.id.in_(parent_ids))).all()
+        }
+
     out: list[dict[str, Any]] = []
     for ch in ordered:
         sp = specs.get(ch.spec_id)
+        parent = parents_by_id.get(ch.parent_chunk_id) if ch.parent_chunk_id else None
         out.append(
             {
                 "chunk_id": ch.id,
                 "spec_id": ch.spec_id,
                 "chunk_index": ch.chunk_index,
-                "content": ch.content,
+                "chunk_type": ch.chunk_type,
+                "content": ch.content,               # 매칭된 child 원문 (하이라이트용)
+                "parent_content": parent.content if parent else None,  # 섹션 전체 (컨텍스트)
                 "metadata": ch.chunk_metadata,
                 "spec_title": sp.title if sp else None,
                 "related_files": sp.related_files if sp else [],

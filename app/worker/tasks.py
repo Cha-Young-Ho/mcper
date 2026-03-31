@@ -12,7 +12,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.db.database import SessionLocal
 from app.db.models import Spec
 from app.db.rag_models import CodeEdge, CodeNode, SpecChunk
-from app.services.chunking import chunk_spec_text
 from app.services.document_parser import parse_uploaded_file
 from app.services.embeddings import embed_texts
 from app.services.celery_monitoring import CeleryMonitoring
@@ -23,55 +22,31 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name="index_spec", bind=True, max_retries=3)
 def index_spec_task(self, spec_id: int) -> dict[str, Any]:
+    """기획서 청킹·임베딩·저장 — SpecIndexingService 로 위임."""
+    from app.spec.service import make_default_service
+
     db = SessionLocal()
     try:
         spec = db.get(Spec, spec_id)
         if spec is None:
             return {"ok": False, "error": "spec not found", "spec_id": spec_id}
-        db.execute(delete(SpecChunk).where(SpecChunk.spec_id == spec_id))
-        db.commit()
 
-        pairs = [
-            (t, m)
-            for t, m in chunk_spec_text(
-                spec.content,
-                base_metadata={
-                    "app_target": spec.app_target,
-                    "base_branch": spec.base_branch,
-                    "spec_title": spec.title,
-                    "spec_id": spec.id,
-                },
-            )
-            if (t or "").strip()
-        ]
-        if not pairs:
-            return {"ok": True, "spec_id": spec_id, "chunks": 0}
-
-        texts = [p[0] for p in pairs]
-        try:
-            vectors = embed_texts(texts)
-        except Exception as exc:
-            logger.exception("embed failed spec_id=%s", spec_id)
-            raise self.retry(exc=exc, countdown=10) from exc
-
-        for i, ((text, meta), vec) in enumerate(zip(pairs, vectors, strict=True)):
-            meta = dict(meta)
-            meta["chunk_index"] = i
-            db.add(
-                SpecChunk(
-                    spec_id=spec_id,
-                    chunk_index=i,
-                    content=text,
-                    embedding=list(vec),
-                    chunk_metadata=meta,
-                )
-            )
-        db.commit()
-        return {"ok": True, "spec_id": spec_id, "chunks": len(pairs)}
+        result = make_default_service(db).index(
+            spec_id=spec_id,
+            content=spec.content,
+            title=spec.title,
+            app_target=spec.app_target,
+            base_branch=spec.base_branch,
+        )
+        return {
+            "ok": result.ok,
+            "spec_id": result.spec_id,
+            "chunks": result.child_count,
+            "parents": result.parent_count,
+            "error": result.error,
+        }
     except Exception as exc:
         db.rollback()
-
-        # Log failure for monitoring
         CeleryMonitoring.log_task_failure(
             db,
             task_id=self.request.id,
@@ -81,14 +56,9 @@ def index_spec_task(self, spec_id: int) -> dict[str, Any]:
             traceback=traceback.format_exc(),
             max_retries=self.max_retries,
         )
-
         logger.exception("index_spec_task failed spec_id=%s", spec_id)
-
-        # Retry with exponential backoff
         if self.request.retries < self.max_retries:
-            countdown = 10 * (self.request.retries + 1)
-            raise self.retry(exc=exc, countdown=countdown) from exc
-
+            raise self.retry(exc=exc, countdown=10 * (self.request.retries + 1)) from exc
         return {"ok": False, "error": str(exc), "spec_id": spec_id}
     finally:
         db.close()
@@ -148,45 +118,22 @@ def parse_and_index_upload_task(
         db.flush()
         spec_id = spec.id
 
-        pairs = [
-            (t, m)
-            for t, m in chunk_spec_text(
-                text,
-                base_metadata={
-                    "app_target": app_key,
-                    "base_branch": branch,
-                    "spec_title": title,
-                    "spec_id": spec_id,
-                },
+        # 청킹·임베딩은 SpecIndexingService 로 위임 (Spec 행은 이미 flush 완료)
+        from app.spec.service import make_default_service
+        try:
+            result = make_default_service(db).index(
+                spec_id=spec_id,
+                content=text,
+                title=title,
+                app_target=app_key,
+                base_branch=branch,
             )
-            if (t or "").strip()
-        ]
-
-        if pairs:
-            texts = [p[0] for p in pairs]
-            try:
-                vectors = embed_texts(texts)
-            except Exception as exc:
-                logger.exception("embed failed filename=%s", filename)
-                db.rollback()
-                raise self.retry(exc=exc, countdown=10) from exc
-
-            for i, ((chunk_text, meta), vec) in enumerate(zip(pairs, vectors, strict=True)):
-                meta = dict(meta)
-                meta["chunk_index"] = i
-                db.add(
-                    SpecChunk(
-                        spec_id=spec_id,
-                        chunk_index=i,
-                        content=chunk_text,
-                        embedding=list(vec),
-                        chunk_metadata=meta,
-                    )
-                )
-
-        db.commit()
+        except Exception as exc:
+            logger.exception("embed failed filename=%s", filename)
+            db.rollback()
+            raise self.retry(exc=exc, countdown=10) from exc
         rdb.delete(redis_key)  # 성공 시 정리
-        return {"ok": True, "filename": filename, "spec_id": spec_id, "chunks": len(pairs)}
+        return {"ok": True, "filename": filename, "spec_id": spec_id, "chunks": result.child_count}
 
     except Exception as exc:
         db.rollback()

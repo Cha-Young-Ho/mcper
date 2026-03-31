@@ -14,7 +14,13 @@ from app.db.models import Base, Spec
 
 
 class SpecChunk(Base):
-    """Semantic slice of a planning spec with embedding + FTS (content_tsv via migration)."""
+    """Semantic slice of a planning spec with embedding + FTS (content_tsv via migration).
+
+    chunk_type:
+        'child'  — 임베딩 대상 작은 조각 (검색 히트). chunk_index >= 0.
+        'parent' — 섹션 원문 전체 (컨텍스트 반환용). chunk_index < 0. embedding = NULL.
+    레거시 행(마이그레이션 이전)은 chunk_type='child', parent_chunk_id=NULL 로 간주.
+    """
 
     __tablename__ = "spec_chunks"
     __table_args__ = (
@@ -30,8 +36,23 @@ class SpecChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(Vector(settings.embedding_dim), nullable=False)
+
+    # parent 청크는 embedding 없음 → nullable
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.embedding_dim), nullable=True
+    )
     chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+
+    # Parent-Child 관계 컬럼 (마이그레이션 필요: scripts/migrate_spec_chunks_parent_child.sql)
+    chunk_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="child", index=True
+    )
+    parent_chunk_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("spec_chunks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     spec: Mapped[Spec] = relationship("Spec", back_populates="chunks")
 
