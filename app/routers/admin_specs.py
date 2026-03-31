@@ -20,7 +20,11 @@ from app.routers.admin_base import (
     _spec_app_cards,
     templates,
 )
-from app.services.celery_client import enqueue_index_spec, enqueue_or_index_sync
+from app.services.celery_client import (
+    enqueue_index_spec,
+    enqueue_or_index_sync,
+    enqueue_parse_and_index_upload,
+)
 from app.services.document_parser import fetch_url_as_text, parse_uploaded_file
 from app.services.spec_admin import content_looks_like_vector_or_blob, spec_display_title
 
@@ -227,48 +231,38 @@ async def plan_bulk_upload_submit(
     base_branch: str = Form("main"),
     files: list[UploadFile] = File(...),
 ):
-    """기획서 일괄 업로드 처리."""
+    """
+    기획서 일괄 업로드.
+
+    - 파일 파싱(PDF/DOCX 포함) + 임베딩은 Celery worker에서 처리 (CPU-bound off event loop)
+    - 파일 바이너리는 Redis에 30분 TTL로 보관; Celery 메시지엔 Redis key만 전달 (base64 없음)
+    - Celery 미설정 시 동기 fallback
+    """
     app_key = app_target.strip().lower()
     if not app_key:
         raise HTTPException(400, "app_target 필수")
 
+    branch = (base_branch or "main").strip() or "main"
     results = []
+
     for f in files:
         filename = f.filename or "unnamed"
         ext = Path(filename).suffix.lower()
+
         if ext not in ADMIN_UPLOAD_ALLOWED_EXTENSIONS:
-            results.append({"file": filename, "ok": False, "error": f"지원하지 않는 형식: {ext}"})
+            results.append({"file": filename, "ok": False, "queued": False, "error": f"지원하지 않는 형식: {ext}"})
             continue
+
         try:
             raw = await f.read()
-            text = parse_uploaded_file(filename, raw)
-            if not text.strip():
-                results.append({"file": filename, "ok": False, "error": "파일 내용이 비어 있습니다"})
-                continue
-
-            title = Path(filename).stem
-            spec = Spec(
-                title=title,
-                content=text,
-                app_target=app_key,
-                base_branch=(base_branch or "main").strip() or "main",
-                related_files=[],
-            )
-            db.add(spec)
-            db.flush()  # spec.id 확보
-            index_result = enqueue_or_index_sync(spec.id)
-            db.commit()
-            results.append({
-                "file": filename,
-                "ok": True,
-                "spec_id": spec.id,
-                **index_result,
-            })
+            result = enqueue_parse_and_index_upload(filename, raw, app_key, branch)
+            results.append({"file": filename, **result})
         except Exception as exc:
-            db.rollback()
-            results.append({"file": filename, "ok": False, "error": str(exc)})
+            results.append({"file": filename, "ok": False, "queued": False, "error": str(exc)})
 
-    ok_count = sum(1 for r in results if r["ok"])
+    queued_count = sum(1 for r in results if r.get("queued"))
+    ok_count = sum(1 for r in results if r.get("ok") is True)  # 동기 fallback 성공 수
+
     return templates.TemplateResponse(
         request,
         "admin/plan_bulk_upload.html",
@@ -277,6 +271,7 @@ async def plan_bulk_upload_submit(
             "title": "기획서 일괄 업로드",
             "known_apps": sorted({row for (row,) in db.execute(select(Spec.app_target).distinct()).all()}),
             "results": results,
+            "queued_count": queued_count,
             "ok_count": ok_count,
             "total": len(results),
             "app_target": app_key,

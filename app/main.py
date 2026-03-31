@@ -141,7 +141,11 @@ app.add_middleware(
 
 # ── CSRF 미들웨어 등록 ────────────────────────────────────────────────
 if _AUTH_ENABLED or _ADMIN_ENABLED:
-    app.add_middleware(CSRFMiddleware, secret_key=settings.auth.secret_key or "default-csrf-key")
+    app.add_middleware(
+        CSRFMiddleware,
+        secret_key=settings.auth.secret_key or "default-csrf-key",
+        cookie_secure=settings.security.secure_cookie,
+    )
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

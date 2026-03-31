@@ -33,6 +33,7 @@ env/
 ENV/
 .env/
 .env.*.local
+infra/docker/.env.local
 .venv.*
 
 # PyInstaller

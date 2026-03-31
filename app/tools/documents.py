@@ -218,6 +218,6 @@ def register_document_tools(mcp: FastMCP) -> None:
 
 
 # Deprecated aliases — kept for backward compatibility
-upload_spec_to_db = upload_document
-search_spec_and_code = search_documents
+upload_spec_to_db = upload_document_impl
+search_spec_and_code = search_documents_impl
 register_spec_tools = register_document_tools

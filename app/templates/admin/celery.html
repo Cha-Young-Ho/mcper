@@ -1,6 +1,30 @@
 {% extends "admin/base.html" %}
 
 {% block body %}
+<!-- Active Tasks (live via Inspect API) -->
+<div style="margin-bottom:1.5rem">
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem">
+    <h3 style="margin:0">실행 중인 태스크</h3>
+    <span id="active-badge" style="font-size:.78rem;color:#888">조회 중…</span>
+    <button onclick="refreshActive()" style="padding:.2rem .55rem;font-size:.8rem;border:1px solid var(--border,#ccc);border-radius:4px;cursor:pointer;background:none">↻ 갱신</button>
+  </div>
+  <div id="active-tasks-wrap">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem" id="active-table">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+          <th style="padding:.4rem .6rem">상태</th>
+          <th style="padding:.4rem .6rem">Task</th>
+          <th style="padding:.4rem .6rem">Worker</th>
+          <th style="padding:.4rem .6rem">Args</th>
+        </tr>
+      </thead>
+      <tbody id="active-tbody"></tbody>
+    </table>
+    <p id="active-empty" style="color:#888;font-size:.85rem;display:none;padding:.5rem 0">실행 중인 태스크 없음</p>
+  </div>
+</div>
+<hr style="margin-bottom:1.5rem;border:none;border-top:1px solid var(--border,#e0e0e0)">
+
 <!-- Summary Cards -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem">
   <div class="stat-card" style="padding:1rem;border:1px solid var(--border,#e0e0e0);border-radius:8px;text-align:center">
@@ -64,7 +88,7 @@
     </select>
     <select name="entity_type" style="padding:.35rem .5rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:.85rem">
       <option value="">All types</option>
-      {% for v in ['spec','code_index'] %}
+      {% for v in ['spec','code_index','upload'] %}
       <option value="{{ v }}" {% if filter_entity_type == v %}selected{% endif %}>{{ v }}</option>
       {% endfor %}
     </select>
@@ -162,7 +186,7 @@ async function resolveTask(id) {
   } catch(e) { alert('Request failed'); }
 }
 
-// Auto-refresh stats every 30 seconds
+// Auto-refresh summary stats every 30s
 setInterval(async () => {
   try {
     const r = await fetch('/admin/celery/stats');
@@ -174,5 +198,49 @@ setInterval(async () => {
     document.getElementById('stat-resolved').textContent = d.resolved;
   } catch(e) {}
 }, 30000);
+
+// Active tasks via Celery Inspect
+async function refreshActive() {
+  const badge  = document.getElementById('active-badge');
+  const tbody  = document.getElementById('active-tbody');
+  const empty  = document.getElementById('active-empty');
+  const table  = document.getElementById('active-table');
+  badge.textContent = '조회 중…';
+  try {
+    const r = await fetch('/admin/celery/active');
+    const d = await r.json();
+    const rows = [...(d.active || []).map(t => ({...t, _status:'실행중'})),
+                  ...(d.reserved || []).map(t => ({...t, _status:'대기중'}))];
+    tbody.innerHTML = '';
+    if (!rows.length) {
+      table.style.display = 'none';
+      empty.style.display = 'block';
+      badge.textContent = '없음';
+    } else {
+      table.style.display = '';
+      empty.style.display = 'none';
+      badge.textContent = `${rows.length}개`;
+      rows.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border,#e0e0e0)';
+        const statusColor = t._status === '실행중' ? '#27ae60' : '#e67e22';
+        tr.innerHTML = `
+          <td style="padding:.4rem .6rem;color:${statusColor};font-weight:600">${t._status}</td>
+          <td style="padding:.4rem .6rem"><code style="font-size:.8rem">${t.name}</code></td>
+          <td style="padding:.4rem .6rem;font-size:.8rem;color:#666">${t.worker.replace('celery@','')}</td>
+          <td style="padding:.4rem .6rem;font-size:.8rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.args}">${t.args}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  } catch(e) {
+    badge.textContent = '조회 실패';
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    table.style.display = 'none';
+  }
+}
+
+refreshActive();
+setInterval(refreshActive, 5000);  // 5초마다 자동 갱신
 </script>
 {% endblock %}

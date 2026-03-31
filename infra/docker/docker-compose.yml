@@ -1,20 +1,24 @@
 # infra/docker/docker-compose.yml
-# 프로덕션/스테이징용 (볼륨 마운트·핫리로드 없음)
-# 사용법: docker compose -f infra/docker/docker-compose.yml up -d
-# 개발 환경: docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.override.yml up
 #
-# 사내(Private Network) 운영 시 주의사항:
-#   - ADMIN_PASSWORD / AUTH_SECRET_KEY 반드시 강력한 값으로 변경
-#   - DB/Redis 포트는 호스트 바인딩을 127.0.0.1 또는 사내 IP 대역으로 제한 권장
-#   - MCP_BYPASS_TRANSPORT_GATE=false 유지 (프로덕션)
-#   - MCPER_AUTH_ENABLED=true 권장 (사내 접근제어)
-name: mcper
+# ┌──────────────┬────────────────────────────────────────────────────────────────────────────────────┐
+# │ 환경         │ 명령어 (infra/docker/ 디렉터리에서 실행)                                             │
+# ├──────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+# │ 로컬 개발    │ docker compose up                                                                  │
+# │ 환경 지정    │ COMPOSE_ENV_FILE=.env.staging docker compose up                                   │
+# │ 테스트       │ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit    │
+# │              │   --exit-code-from test                                                            │
+# └──────────────┴────────────────────────────────────────────────────────────────────────────────────┘
+#
+# env 파일 목록:
+#   .env.local   — 로컬 개발 기본값 (기본값, gitignore)
+#   .env.example — 프로덕션용 템플릿 (cp .env.example .env.prod 후 사용)
+name: spec-mcp
 
 services:
   web:
-    image: mcper:local
+    image: spec-mcp:local
     build:
-      context: ../..          # 저장소 루트
+      context: ../..
       dockerfile: Dockerfile
     ports:
       - "${MCPER_HOST_BIND:-127.0.0.1}:${MCPER_WEB_PORT:-8001}:8000"
@@ -24,7 +28,15 @@ services:
       redis:
         condition: service_started
     env_file:
-      - .env                  # infra/docker/.env (gitignore)
+      - path: ${COMPOSE_ENV_FILE:-.env.local}
+        required: true
+    volumes:
+      - ../..:/app
+    command: >
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      ${UVICORN_EXTRA_OPTS:-}
     environment:
       - MCPER_ADMIN_ENABLED=${MCPER_ADMIN_ENABLED:-true}
       - MCPER_MCP_ENABLED=true
@@ -37,7 +49,7 @@ services:
       start_period: 30s
 
   worker:
-    image: mcper:local
+    image: spec-mcp:local
     command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
     depends_on:
       db:
@@ -45,7 +57,10 @@ services:
       redis:
         condition: service_started
     env_file:
-      - .env
+      - path: ${COMPOSE_ENV_FILE:-.env.local}
+        required: true
+    volumes:
+      - ../..:/app
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
@@ -55,7 +70,7 @@ services:
       start_period: 30s
 
   db:
-    image: pgvector/pgvector:pg17    # PostgreSQL 17 + pgvector
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: ${DB_USER:-user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
@@ -73,7 +88,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7.4.2-alpine        # latest 금지
+    image: redis:7.4.2-alpine
     ports:
       - "${MCPER_HOST_BIND:-127.0.0.1}:${REDIS_PORT:-6380}:6379"
     volumes:
@@ -85,7 +100,7 @@ services:
   ollama:
     profiles:
       - local-embed
-    image: ollama/ollama:0.6.5       # latest 금지
+    image: ollama/ollama:0.6.5
     ports:
       - "${MCPER_HOST_BIND:-127.0.0.1}:11434:11434"
     volumes:
