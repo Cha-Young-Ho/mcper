@@ -1,6 +1,6 @@
 """MCP tools: get_global_skill + publish_*_skill.
 
-Skills = 배경 지식 / 시스템 이해 (Rules = 행동 지침과 완전 구분)
+Skills = 스킬 / 시스템 이해 (Rules = 행동 지침과 완전 구분)
 
 반환 형식:
 - 카테고리별 독립 파일 블록
@@ -41,7 +41,7 @@ def register_skill_tools(mcp: FastMCP) -> None:
         origin_url: str | None = None,
     ) -> str:
         """
-        배경 지식(Skills)을 로드한다.
+        스킬(Skills)을 로드한다.
 
         get_global_rule 과 별개로 동작하며 카테고리별 독립 파일 블록을 반환한다.
 

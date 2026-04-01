@@ -1,4 +1,4 @@
-"""Admin 배경 지식(Skills) 관리 — Global / App / Repo 카테고리별 CRUD."""
+"""Admin 스킬(Skills) 관리 — Global / App / Repo 카테고리별 CRUD."""
 
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def global_skills_board(
     return templates.TemplateResponse(
         request,
         "admin/skills/global_skills_board.html",
-        {"request": request, "title": "Global 배경 지식", "sections": sections},
+        {"request": request, "title": "Global 스킬", "sections": sections},
     )
 
 
@@ -74,7 +74,7 @@ def global_skill_category_new_form(
         "admin/skills/category_new.html",
         {
             "request": request,
-            "title": "새 카테고리 — Global 배경 지식",
+            "title": "새 카테고리 — Global 스킬",
             "existing_sections": vs.list_sections_for_global_skill(db),
             "form_action": "/admin/global-skills/s/new",
             "cancel_url": "/admin/global-skills",
@@ -98,7 +98,7 @@ def global_skill_category_new_submit(
             "admin/skills/category_new.html",
             {
                 "request": request,
-                "title": "새 카테고리 — Global 배경 지식",
+                "title": "새 카테고리 — Global 스킬",
                 "existing_sections": vs.list_sections_for_global_skill(db),
                 "form_action": "/admin/global-skills/s/new",
                 "cancel_url": "/admin/global-skills",
@@ -142,7 +142,7 @@ def global_skill_category_board(
         "admin/skills/category_board.html",
         {
             "request": request,
-            "title": f"Global 배경 지식 — {_section_display(sn)}",
+            "title": f"Global 스킬 — {_section_display(sn)}",
             "section_name": sn,
             "section_display": _section_display(sn),
             "section_url_encoded": quote(sn, safe=""),
@@ -150,7 +150,7 @@ def global_skill_category_board(
             "can_delete_section": can_delete_section,
             "can_delete_version": _can_del,
             "breadcrumb_home": "/admin/global-skills",
-            "breadcrumb_home_label": "Global 배경 지식",
+            "breadcrumb_home_label": "Global 스킬",
             "publish_url": f"/admin/global-skills/s/{quote(sn, safe='')}/publish",
             "delete_section_url": f"/admin/global-skills/s/{quote(sn, safe='')}/delete",
             "version_view_base": f"/admin/global-skills/s/{quote(sn, safe='')}/v",
@@ -255,7 +255,7 @@ def global_skill_version_view(
             "save_as_new_url": f"/admin/global-skills/s/{quote(sn, safe='')}/save-as-new",
             "delete_version_url": f"/admin/global-skills/s/{quote(sn, safe='')}/v/{version}/delete",
             "back_url": f"/admin/global-skills/s/{quote(sn, safe='')}",
-            "back_label": f"Global 배경 지식 / {_section_display(sn)}",
+            "back_label": f"Global 스킬 / {_section_display(sn)}",
         },
     )
 
@@ -314,7 +314,7 @@ def app_skills_cards(
     return templates.TemplateResponse(
         request,
         "admin/skills/app_skills_cards.html",
-        {"request": request, "title": "App 배경 지식", "cards": cards, "q": q},
+        {"request": request, "title": "App 스킬", "cards": cards, "q": q},
     )
 
 
@@ -326,7 +326,7 @@ def new_app_skill_form(
     return templates.TemplateResponse(
         request,
         "admin/skills/app_skill_new.html",
-        {"request": request, "title": "새 앱 배경 지식", "error": None},
+        {"request": request, "title": "새 앱 스킬", "error": None},
     )
 
 
@@ -343,7 +343,7 @@ def new_app_skill_submit(
         return templates.TemplateResponse(
             request,
             "admin/skills/app_skill_new.html",
-            {"request": request, "title": "새 앱 배경 지식", "error": "앱 이름은 필수입니다."},
+            {"request": request, "title": "새 앱 스킬", "error": "앱 이름은 필수입니다."},
             status_code=400,
         )
     existing = db.scalars(select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)).first()
@@ -385,7 +385,7 @@ def app_skill_board(
         "admin/skills/app_skill_board.html",
         {
             "request": request,
-            "title": f"App 배경 지식: {key}",
+            "title": f"App 스킬: {key}",
             "app_name": key,
             "app_display": key,
             "app_url_encoded": quote(key, safe=""),
@@ -422,7 +422,7 @@ def app_skill_category_new_form(
         "admin/skills/category_new.html",
         {
             "request": request,
-            "title": f"새 카테고리 — {key} 배경 지식",
+            "title": f"새 카테고리 — {key} 스킬",
             "existing_sections": vs.list_sections_for_app_skill(db, key),
             "form_action": f"/admin/app-skills/app/{quote(key, safe='')}/s/new",
             "cancel_url": f"/admin/app-skills/app/{quote(key, safe='')}",
@@ -448,7 +448,7 @@ def app_skill_category_new_submit(
             "admin/skills/category_new.html",
             {
                 "request": request,
-                "title": f"새 카테고리 — {key} 배경 지식",
+                "title": f"새 카테고리 — {key} 스킬",
                 "existing_sections": vs.list_sections_for_app_skill(db, key),
                 "form_action": f"/admin/app-skills/app/{quote(key, safe='')}/s/new",
                 "cancel_url": f"/admin/app-skills/app/{quote(key, safe='')}",
@@ -497,7 +497,7 @@ def app_skill_category_board(
         "admin/skills/category_board.html",
         {
             "request": request,
-            "title": f"App 배경 지식: {key} — {_section_display(sn)}",
+            "title": f"App 스킬: {key} — {_section_display(sn)}",
             "section_name": sn,
             "section_display": _section_display(sn),
             "section_url_encoded": quote(sn, safe=""),
@@ -505,7 +505,7 @@ def app_skill_category_board(
             "can_delete_section": can_delete_section,
             "can_delete_version": _can_del,
             "breadcrumb_home": f"/admin/app-skills/app/{quote(key, safe='')}",
-            "breadcrumb_home_label": f"App 배경 지식: {key}",
+            "breadcrumb_home_label": f"App 스킬: {key}",
             "publish_url": f"/admin/app-skills/app/{quote(key, safe='')}/s/{quote(sn, safe='')}/publish",
             "delete_section_url": f"/admin/app-skills/app/{quote(key, safe='')}/s/{quote(sn, safe='')}/delete",
             "version_view_base": f"/admin/app-skills/app/{quote(key, safe='')}/s/{quote(sn, safe='')}/v",
@@ -704,7 +704,7 @@ def repo_skills_cards(
     return templates.TemplateResponse(
         request,
         "admin/skills/repo_skills_cards.html",
-        {"request": request, "title": "Repository 배경 지식", "cards": cards, "q": q},
+        {"request": request, "title": "Repository 스킬", "cards": cards, "q": q},
     )
 
 
@@ -716,7 +716,7 @@ def new_repo_skill_form(
     return templates.TemplateResponse(
         request,
         "admin/skills/repo_skill_new.html",
-        {"request": request, "title": "새 Repository 패턴 배경 지식", "error": None},
+        {"request": request, "title": "새 Repository 패턴 스킬", "error": None},
     )
 
 
@@ -734,7 +734,7 @@ def new_repo_skill_submit(
         return templates.TemplateResponse(
             request,
             "admin/skills/repo_skill_new.html",
-            {"request": request, "title": "새 Repository 패턴 배경 지식",
+            {"request": request, "title": "새 Repository 패턴 스킬",
              "error": f"이미 존재하는 패턴: {key or '(기본)'}"},
             status_code=400,
         )
@@ -772,7 +772,7 @@ def repo_skill_board(
         "admin/skills/repo_skill_board.html",
         {
             "request": request,
-            "title": f"Repo 배경 지식: {display}",
+            "title": f"Repo 스킬: {display}",
             "pattern": key,
             "pattern_display": display,
             "sections": sections,
@@ -811,7 +811,7 @@ def repo_skill_category_new_form(
         "admin/skills/category_new.html",
         {
             "request": request,
-            "title": f"새 카테고리 — {display} 배경 지식",
+            "title": f"새 카테고리 — {display} 스킬",
             "existing_sections": vs.list_sections_for_repo_skill(db, key),
             "form_action": f"/admin/repo-skills/pat/{pat_url}/s/new",
             "cancel_url": f"/admin/repo-skills/pat/{pat_url}",
@@ -838,7 +838,7 @@ def repo_skill_category_new_submit(
             "admin/skills/category_new.html",
             {
                 "request": request,
-                "title": f"새 카테고리 — {vs.repo_skill_pattern_card_display(key)} 배경 지식",
+                "title": f"새 카테고리 — {vs.repo_skill_pattern_card_display(key)} 스킬",
                 "existing_sections": vs.list_sections_for_repo_skill(db, key),
                 "form_action": f"/admin/repo-skills/pat/{pat_url}/s/new",
                 "cancel_url": f"/admin/repo-skills/pat/{pat_url}",
@@ -891,7 +891,7 @@ def repo_skill_category_board(
         "admin/skills/category_board.html",
         {
             "request": request,
-            "title": f"Repo 배경 지식: {display} — {_section_display(sn)}",
+            "title": f"Repo 스킬: {display} — {_section_display(sn)}",
             "section_name": sn,
             "section_display": _section_display(sn),
             "section_url_encoded": quote(sn, safe=""),
@@ -899,7 +899,7 @@ def repo_skill_category_board(
             "can_delete_section": can_delete_section,
             "can_delete_version": _can_del,
             "breadcrumb_home": f"/admin/repo-skills/pat/{pat_url}",
-            "breadcrumb_home_label": f"Repo 배경 지식: {display}",
+            "breadcrumb_home_label": f"Repo 스킬: {display}",
             "publish_url": f"/admin/repo-skills/pat/{pat_url}/s/{quote(sn, safe='')}/publish",
             "delete_section_url": f"/admin/repo-skills/pat/{pat_url}/s/{quote(sn, safe='')}/delete",
             "version_view_base": f"/admin/repo-skills/pat/{pat_url}/s/{quote(sn, safe='')}/v",

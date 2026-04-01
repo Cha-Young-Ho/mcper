@@ -2,6 +2,21 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-04-01: 스킬(Skills) 정리 및 텍스트 정규화
+
+### 변경 개요
+- **스킬 데이터 모두 삭제**: global_skill_versions, app_skill_versions, repo_skill_versions 비움
+- **"배경 지식" → "스킬" 변경**: 코드 14개 파일에서 모든 "배경 지식" 텍스트를 "스킬"로 변경
+
+### 변경 대상 파일
+- Python: `admin_skills.py`, `skill_tools.py`, `skill_models.py`, `versioned_skills.py`, `mcp_app.py`
+- HTML: `base.html`, `index.html`, 스킬 관련 템플릿 9개
+
+### 기술 상세
+- DB: skill_versions 테이블 모두 비움 (12개 레코드 삭제)
+- 코드: "배경 지식(Skills)" → "스킬(Skills)", "배경 지식이" → "스킬이" 등 표준화
+- 컨테이너 재시작 ✅
+
 ## 2026-04-01: 데이터베이스 카테고리 마이그레이션 완료
 
 ### 변경 개요
@@ -581,3 +596,4 @@ Repository Rules
 ## 세션 종료: 2026-04-01 11:02
 ## 세션 종료: 2026-04-01 11:24
 ## 세션 종료: 2026-04-01 11:25
+## 세션 종료: 2026-04-01 11:28

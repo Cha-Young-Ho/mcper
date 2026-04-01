@@ -1,8 +1,8 @@
-"""ORM models: versioned global + repository + per-app SKILLS (배경 지식 / 시스템 이해).
+"""ORM models: versioned global + repository + per-app SKILLS (스킬 / 시스템 이해).
 
 Skills는 Rules와 별개의 개념:
 - Rules  = 행동 지침 (반드시 따라야 할 것)
-- Skills = 배경 지식 / 시스템 이해 (문맥 정보)
+- Skills = 스킬 / 시스템 이해 (문맥 정보)
 
 구조는 rule_models.py와 동일:
 - section_name 으로 카테고리 분리 (기본: "main")

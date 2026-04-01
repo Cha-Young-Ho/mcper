@@ -1,6 +1,6 @@
 """Skills 버전 관리 서비스 레이어.
 
-Skills = 배경 지식 / 시스템 이해 (Rules = 행동 지침과 구분)
+Skills = 스킬 / 시스템 이해 (Rules = 행동 지침과 구분)
 
 MCP 응답 형식:
 - get_global_skill 호출 시 카테고리별로 별도 파일 블록 반환
@@ -388,7 +388,7 @@ _AGENT_SKILL_SAVE_INSTRUCTIONS = """
 - 디렉터리가 없으면 생성
 - 저장 후 커서에서 .cursor/skills/ 폴더가 Agent Context로 로드됩니다
 
-Skills = 배경 지식 (시스템 구조, 환경, 아키텍처 등)
+Skills = 스킬 (시스템 구조, 환경, 아키텍처 등)
 Rules  = 행동 지침 (반드시 따를 규칙) ← get_global_rule 로 별도 관리
 """
 
@@ -433,7 +433,7 @@ def get_skills_markdown(
             blocks.append(_skill_file_block(path, display, row.body))
 
     if not blocks:
-        return "# Skills\n\n등록된 배경 지식(Skills)이 없습니다. 어드민 > 배경 지식 메뉴에서 추가하세요."
+        return "# Skills\n\n등록된 스킬(Skills)이 없습니다. 어드민 > 스킬 메뉴에서 추가하세요."
 
-    header = f"# Skills (배경 지식)\n\n총 {len(blocks)}개 카테고리\n\n"
+    header = f"# Skills (스킬)\n\n총 {len(blocks)}개 카테고리\n\n"
     return header + "\n".join(blocks) + _AGENT_SKILL_SAVE_INSTRUCTIONS
