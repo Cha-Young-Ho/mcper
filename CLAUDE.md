@@ -49,6 +49,31 @@
 
 ---
 
+## MCP Rule 라우팅 (stz-game-service)
+
+**로컬 LLM이 MCP 서버에서 자동으로 받아오는 Rule들**:
+
+| Section | 내용 | 문서 |
+|---------|------|------|
+| **commit** | 커밋 컨벤션 (feat, fix, docs 등) | COMMIT_GUIDE.md |
+| **deployment** | 배포 체크리스트, 환경, 롤백 | DEPLOYMENT_GUIDE.md |
+| **code_style** | Python/JS 스타일, 명명규칙 | CODE_STYLE.md |
+| **planning** | Phase 1-4 계획, 의존성 | PLANS.md |
+| **design** | 아키텍처 결정, 설계 원칙 | DESIGN.md |
+| **security** | 보안 정책, 위협 모델 | SECURITY.md |
+| **reliability** | 배포 가이드, 장애 대응 | RELIABILITY.md |
+
+**사용 방법**:
+```
+로컬 LLM에서 사용자가 요청:
+  "규칙 받아와줘"
+  → MCP 서버 (stz-game-service pattern) 조회
+  → 위의 Rule들 자동 로드
+  → Agent가 가이드 기반으로 작업
+```
+
+---
+
 ## @archivist 활용
 
 다음 중 하나라도 해당하면 먼저 @archivist 요청:
