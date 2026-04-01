@@ -607,12 +607,13 @@ def _repo_all_sections_latest_for_pattern(
         .subquery()
     )
     rows = session.scalars(
-        select(RepoRuleVersion).join(
+        select(RepoRuleVersion).distinct(RepoRuleVersion.section_name).join(
             subq,
             (RepoRuleVersion.pattern == key)
             & (RepoRuleVersion.section_name == subq.c.sn)
             & (RepoRuleVersion.version == subq.c.mv),
         )
+        .order_by(RepoRuleVersion.section_name)
     ).all()
     return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
 
