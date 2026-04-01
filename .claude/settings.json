@@ -12,5 +12,5 @@
       }
     ]
   },
-  "teammateMode": "auto"
+  "teammateMode": "tmux"
 }

@@ -49,28 +49,39 @@
 
 ---
 
-## MCP Rule 라우팅 (stz-game-service)
+## MCP Rule 라우팅 (stz-game-service 카테고리 구조)
 
-**로컬 LLM이 MCP 서버에서 자동으로 받아오는 Rule들**:
+**로컬 LLM이 MCP 서버에서 자동으로 받아오는 Rule들** (카테고리별):
 
-| Section | 내용 | 문서 |
-|---------|------|------|
-| **commit** | 커밋 컨벤션 (feat, fix, docs 등) | COMMIT_GUIDE.md |
-| **deployment** | 배포 체크리스트, 환경, 롤백 | DEPLOYMENT_GUIDE.md |
-| **code_style** | Python/JS 스타일, 명명규칙 | CODE_STYLE.md |
-| **planning** | Phase 1-4 계획, 의존성 | PLANS.md |
-| **design** | 아키텍처 결정, 설계 원칙 | DESIGN.md |
-| **security** | 보안 정책, 위협 모델 | SECURITY.md |
-| **reliability** | 배포 가이드, 장애 대응 | RELIABILITY.md |
+```
+Rules
+└── Repository: stz-game-service
+    ├── Development (v1)
+    │   ├── COMMIT_GUIDE.md (커밋 컨벤션)
+    │   └── CODE_STYLE.md (Python/JS 스타일)
+    ├── Deployment (v1)
+    │   ├── DEPLOYMENT_GUIDE.md (배포 체크리스트)
+    │   └── RELIABILITY.md (모니터링, 장애 대응)
+    ├── Architecture (v1)
+    │   ├── DESIGN.md (설계 원칙, 아키텍처)
+    │   └── PLANS.md (Phase 1-4 계획)
+    └── Security (v1)
+        └── SECURITY.md (보안 정책, 위협 모델)
+```
 
 **사용 방법**:
 ```
 로컬 LLM에서 사용자가 요청:
   "규칙 받아와줘"
-  → MCP 서버 (stz-game-service pattern) 조회
-  → 위의 Rule들 자동 로드
-  → Agent가 가이드 기반으로 작업
+  → MCP 서버 /get_global_rule (stz-game-service)
+  → 4개 카테고리의 Rule 자동 로드
+  → Agent가 카테고리별 가이드 기반으로 작업
 ```
+
+**어드민 화면에서**:
+- Rules > Repository > stz-game-service 클릭
+- 4개 카테고리 탭 표시 (Development, Deployment, Architecture, Security)
+- 각 카테고리 내 여러 파일 포함
 
 ---
 
