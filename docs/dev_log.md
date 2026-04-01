@@ -2,36 +2,48 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
-## 2026-04-01: 데이터베이스 완전 정리 (repo_rule_versions 구조 재설계)
+## 2026-04-01: 데이터베이스 카테고리 마이그레이션 완료
 
 ### 변경 개요
-repo_rule_versions의 혼란스러운 다중 섹션 구조를 정리하고, **stz-game-service 패턴에 버전만 1,2,3,4로 단순화**.
+26개의 혼란스러운 repo_rule_versions 섹션을 **4개 카테고리(Development, Deployment, Architecture, Security)**로 정리.
+각 카테고리별로 버전 1, 2로 구분하여 관리.
 
 ### 마이그레이션 결과
-- **패턴별 구조**:
-  - `stz-game-service`: main 섹션, 버전 1-4 (COMMIT_GUIDE, DEPLOYMENT_GUIDE, DESIGN, SECURITY)
-  - `api`: main 섹션, 버전 1
-  - `web`: main 섹션, 버전 1
-  - `(default)`: main 섹션, 버전 1
-- **DB 레코드**: 34개 → 4개 (88% 감소)
-- **섹션**: 26개 → 1개 (모두 main으로 통일)
+- **stz-game-service 패턴**:
+  - Development: 버전 1 (COMMIT_GUIDE) + 버전 2 (CODE_STYLE, ERROR_HANDLING, LOGGING 등)
+  - Deployment: 버전 1 (DEPLOYMENT_GUIDE) + 버전 2 (PERFORMANCE, RELIABILITY)
+  - Architecture: 버전 1 (DESIGN) + 버전 2 (CACHE, CONFIG, DATABASE, PLANNING)
+  - Security: 버전 1 (SECURITY) + 버전 2 (ACTION_TRACKING, DATA_ENCRYPTION)
+
+- **기타 패턴**:
+  - `api`, `web`, `(default)`: 각각 main 섹션, 버전 1만 유지
+
+- **DB 레코드**: 34개 → 12개 (65% 감소)
 
 ### 어드민 UI 표시 방식
 ```
 Repository Rules
-└── stz-game-service (pattern)
-    ├── 버전: 1 — COMMIT_GUIDE (커밋 가이드)
-    ├── 버전: 2 — DEPLOYMENT_GUIDE (배포 가이드)
-    ├── 버전: 3 — DESIGN (설계 가이드)
-    └── 버전: 4 — SECURITY (보안 정책)
+└── stz-game-service
+    ├── Development
+    │   ├── 버전: 1 — COMMIT_GUIDE
+    │   └── 버전: 2 — CODE_STYLE & ERROR_HANDLING
+    ├── Deployment
+    │   ├── 버전: 1 — DEPLOYMENT_GUIDE
+    │   └── 버전: 2 — PERFORMANCE & RELIABILITY
+    ├── Architecture
+    │   ├── 버전: 1 — DESIGN
+    │   └── 버전: 2 — CACHE, CONFIG, DATABASE
+    └── Security
+        ├── 버전: 1 — SECURITY
+        └── 버전: 2 — ACTION_TRACKING & ENCRYPTION
 ```
 
 ### 기술 상세
-- 불필요한 Development/Deployment/Architecture/Security 섹션 제거
-- 모든 섹션을 main으로 통합
-- 버전 번호: v1, v2 형식 제거 → 1, 2, 3, 4 형식으로 단순화
-- 각 버전의 body에 "버전: N — [제목]" 헤더 추가
-- 컨테이너 재시작 완료, 정상 작동 확인 ✅
+- 섹션 구조 유지 (Development, Deployment, Architecture, Security)
+- 버전 포맷: "v" 제거 → 숫자만 (1, 2, 3...)
+- 각 버전 body: "버전: N — [제목]" 헤더로 시작
+- UNIQUE 제약: `(pattern, section_name, version)` 복합 키 유지
+- 컨테이너 재시작: web/worker 재시작 완료 ✅
 
 ## 2026-03-31: 룰 섹션(Section) 분리 저장 기능 추가
 
@@ -568,3 +580,4 @@ Repository Rules
 ## 세션 종료: 2026-04-01 10:44
 ## 세션 종료: 2026-04-01 11:02
 ## 세션 종료: 2026-04-01 11:24
+## 세션 종료: 2026-04-01 11:25
