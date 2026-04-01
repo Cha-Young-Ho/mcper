@@ -2,6 +2,32 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-04-01: 데이터베이스 카테고리 마이그레이션 완료
+
+### 변경 개요
+데이터베이스의 26개 혼란스러운 `repo_rule_versions` 섹션을 **CLAUDE.md에서 정의한 4개 카테고리**로 통합.
+
+### 마이그레이션 결과
+- **섹션 통합**: 26개 → 5개 (Development, Deployment, Architecture, Security, main)
+- **DB 레코드**: 34개 → 11개 (68% 감소)
+- **버전 관리**:
+  - Development: v1 → v2 (code_style, commit, error_handling, logging, routing 등 8개 섹션 병합)
+  - Deployment: v1 → v3 (deployment, performance, reliability 병합)
+  - Architecture: v1 → v2 (cache, config, database, design, planning 등 6개 섹션 병합)
+  - Security: v1 → v2 (action_tracking, data_encryption 병합)
+  - main: 유지 (api, web, default 패턴 3개)
+
+### 기술 상세
+- 마이그레이션 전략: 기존 4개 카테고리 유지 + 나머지 22개 섹션 병합
+- UNIQUE 제약조건: `(pattern, section_name, version)` 복합 키 유지
+- 컨테이너 재시작: web/worker 재시작 완료, 정상 작동 확인 ✅
+- MCP 서버: 에러 없음, 4개 카테고리 정상 응답
+
+### 영향 범위
+- 기존 코드 변경 없음 (이미 섹션 지원)
+- MCP 응답: 4개 카테고리로 정리되어 LLM 에이전트가 명확하게 로드
+- 어드민 UI: 동일 (카테고리별 탭 표시)
+
 ## 2026-03-31: 룰 섹션(Section) 분리 저장 기능 추가
 
 ### 변경 개요
@@ -534,3 +560,4 @@
 ## 세션 종료: 2026-04-01 01:13
 ## 세션 종료: 2026-04-01 09:56
 ## 세션 종료: 2026-04-01 09:59
+## 세션 종료: 2026-04-01 10:44
