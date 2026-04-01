@@ -607,15 +607,23 @@ def _repo_all_sections_latest_for_pattern(
         .subquery()
     )
     rows = session.scalars(
-        select(RepoRuleVersion).distinct(RepoRuleVersion.section_name).join(
+        select(RepoRuleVersion).join(
             subq,
             (RepoRuleVersion.pattern == key)
             & (RepoRuleVersion.section_name == subq.c.sn)
             & (RepoRuleVersion.version == subq.c.mv),
         )
-        .order_by(RepoRuleVersion.section_name)
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+
+    # 중복 제거 (같은 section_name은 1개만)
+    seen = set()
+    unique_rows = []
+    for row in rows:
+        if row.section_name not in seen:
+            seen.add(row.section_name)
+            unique_rows.append(row)
+
+    return sorted(unique_rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
 
 
 def _repo_latest_rows_ordered(
