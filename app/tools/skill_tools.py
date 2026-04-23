@@ -11,8 +11,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+import json
+
 from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
+from app.tools._auth_check import check_read, check_write
 from app.services.versioned_skills import (
     DEFAULT_SECTION,
     get_skills_markdown,
@@ -60,6 +63,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
         record_mcp_tool_call("get_global_skill")
         trimmed = _normalize_app_name(app_name or "")
         with SessionLocal() as db:
+            denied = check_read(db, app_name=trimmed or None)
+            if denied:
+                return denied
             return get_skills_markdown(
                 db,
                 app_name=trimmed or None,
@@ -82,6 +88,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
         """
         record_mcp_tool_call("list_skill_sections")
         with SessionLocal() as db:
+            denied = check_read(db, app_name=_normalize_app_name(app_name or "") or None)
+            if denied:
+                return denied
             if scope == "app":
                 if not app_name:
                     return "app_name 이 필요합니다."
@@ -121,6 +130,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
         """
         record_mcp_tool_call("publish_global_skill")
         with SessionLocal() as db:
+            denied = check_write(db)
+            if denied:
+                return denied
             nv = publish_global_skill(db, body, section_name)
             return f"Global Skill [{section_name}] v{nv} 발행 완료"
 
@@ -139,6 +151,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
         record_mcp_tool_call("publish_app_skill")
         key = _normalize_app_name(app_name)
         with SessionLocal() as db:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             _, sn, nv = publish_app_skill(db, key, body, section_name)
             return f"App Skill [{key}/{sn}] v{nv} 발행 완료"
 
@@ -156,6 +171,54 @@ def register_skill_tools(mcp: FastMCP) -> None:
         """
         record_mcp_tool_call("publish_repo_skill")
         with SessionLocal() as db:
+            denied = check_write(db)
+            if denied:
+                return denied
             _, sn, nv = publish_repo_skill(db, pattern.strip(), body, section_name)
             pat_display = pattern.strip() or "(default)"
             return f"Repo Skill [{pat_display}/{sn}] v{nv} 발행 완료"
+
+    @mcp.tool()
+    def search_skills(
+        query: str,
+        app_name: str | None = None,
+        scope: str = "all",
+        top_n: int = 10,
+    ) -> str:
+        """
+        스킬을 의미 검색한다 (벡터+FTS 하이브리드).
+
+        get_global_skill 은 전체 스킬을 로드하는 반면,
+        search_skills 는 쿼리와 관련된 스킬 청크만 검색해서 반환한다.
+
+        스킬이 많을 때(수십~수백 개) 관련 스킬만 빠르게 찾을 때 사용.
+
+        Args:
+            query: 검색 쿼리 (자연어)
+            app_name: 특정 앱의 스킬만 검색 (없으면 전체)
+            scope: "all" | "global" | "app" | "repo"
+            top_n: 반환할 최대 결과 수 (기본 10)
+        """
+        record_mcp_tool_call("search_skills")
+        trimmed = _normalize_app_name(app_name or "")
+        with SessionLocal() as db:
+            denied = check_read(db, app_name=trimmed or None)
+            if denied:
+                return denied
+            from app.services.search_skills import hybrid_skill_search
+            chunks, mode = hybrid_skill_search(
+                db,
+                query=query,
+                app_name=trimmed or None,
+                scope=scope,
+                top_n=top_n,
+            )
+            return json.dumps(
+                {
+                    "ok": True,
+                    "search_mode": mode,
+                    "count": len(chunks),
+                    "chunks": chunks,
+                },
+                ensure_ascii=False,
+            )

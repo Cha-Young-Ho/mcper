@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 
 from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
+from app.tools._auth_check import check_read, check_write
 from app.services.versioned_rules import (
     DEFAULT_SECTION,
     append_to_app_rule as append_app_rule_body,
@@ -62,6 +63,9 @@ def get_global_rule_impl(
     ou = (origin_url or "").strip() or None
     db = SessionLocal()
     try:
+        denied = check_read(db, app_name=trimmed if trimmed else None)
+        if denied:
+            return denied
         return get_rules_markdown(
             db,
             app_name=trimmed if trimmed else None,
@@ -74,7 +78,7 @@ def get_global_rule_impl(
 
 
 def register_global_rule_tool(mcp: FastMCP) -> None:
-    """Expose get_global_rule, check_rule_versions, publish_* , append_to_app_rule."""
+    """Expose get_global_rule, check_rule_versions, publish_* , append_to_app_rule, search_rules."""
 
     @mcp.tool()
     def get_global_rule(
@@ -132,6 +136,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         ou = (origin_url or "").strip() or None
         db = SessionLocal()
         try:
+            denied = check_read(db, app_name=trimmed if trimmed else None)
+            if denied:
+                return denied
             snap = get_rule_version_snapshot(
                 db,
                 app_name=trimmed if trimmed else None,
@@ -152,6 +159,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("publish_global_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db)
+            if denied:
+                return denied
             v = publish_global(db, body)
             return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
         finally:
@@ -179,6 +189,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("publish_app_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             name, sn_out, v = publish_app(db, key, body, sn)
             return json.dumps(
                 {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
@@ -206,6 +219,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("append_to_app_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             name, sn_out, v = append_app_rule_body(db, key, append_markdown, sn)
             return json.dumps(
                 {"scope": "app", "app_name": name, "section_name": sn_out, "version": v, "appended": True},
@@ -233,6 +249,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         db = SessionLocal()
         try:
+            denied = check_write(db)
+            if denied:
+                return denied
             p, sn_out, v = publish_repo(db, key, body, section_name=sn)
             return json.dumps(
                 {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
@@ -268,6 +287,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("list_rule_sections")
         db = SessionLocal()
         try:
+            denied = check_read(db, app_name=_normalize_app_name(app_name or "") or None)
+            if denied:
+                return denied
             from app.services.versioned_rules import (
                 _app_all_sections_latest,
                 _global_all_sections_latest,
@@ -325,6 +347,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("publish_section_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             name, sn_out, v = publish_app(db, key, body, sn)
             return json.dumps(
                 {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
@@ -343,6 +368,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("patch_global_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db)
+            if denied:
+                return denied
             scope, v = patch_global_rule(db, patch_markdown)
             return json.dumps({"scope": scope, "version": v}, ensure_ascii=False)
         finally:
@@ -366,6 +394,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("patch_app_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             name, sn_out, v = patch_app_rule(db, key, patch_markdown, sn)
             return json.dumps(
                 {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
@@ -389,6 +420,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("patch_repo_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db)
+            if denied:
+                return denied
             p, sn_out, v = patch_repo_rule(db, pattern, patch_markdown, sn)
             return json.dumps(
                 {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
@@ -407,6 +441,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("rollback_global_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db)
+            if denied:
+                return denied
             v = rollback_global_rule(db, target_version)
             return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
         except ValueError as e:
@@ -432,6 +469,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("rollback_app_rule")
         db = SessionLocal()
         try:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
             name, sn_out, v = rollback_app_rule(db, key, target_version, sn)
             return json.dumps(
                 {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
@@ -452,8 +492,57 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("export_rules")
         db = SessionLocal()
         try:
+            denied = check_read(db)
+            if denied:
+                return denied
             if format.lower() == "json":
                 return json.dumps(export_rules_json(db), ensure_ascii=False)
             return export_rules_markdown(db)
         finally:
             db.close()
+
+    @mcp.tool()
+    def search_rules(
+        query: str,
+        app_name: str | None = None,
+        scope: str = "all",
+        top_n: int = 10,
+    ) -> str:
+        """
+        룰을 의미 검색한다 (벡터+FTS 하이브리드).
+
+        get_global_rule 은 전체 룰을 로드하는 반면,
+        search_rules 는 쿼리와 관련된 룰 청크만 검색해서 반환한다.
+
+        특정 작업을 수행하기 전에 관련 룰이 있는지 확인할 때 사용.
+        예: "인증 처리 규칙", "에러 핸들링 방침", "코드 리뷰 체크리스트" 등.
+
+        Args:
+            query: 검색 쿼리 (자연어)
+            app_name: 특정 앱의 룰만 검색 (없으면 전체)
+            scope: "all" | "global" | "app" | "repo"
+            top_n: 반환할 최대 결과 수 (기본 10)
+        """
+        record_mcp_tool_call("search_rules")
+        trimmed = _normalize_app_name(app_name or "")
+        with SessionLocal() as db:
+            denied = check_read(db, app_name=trimmed or None)
+            if denied:
+                return denied
+            from app.services.search_rules import hybrid_rule_search
+            chunks, mode = hybrid_rule_search(
+                db,
+                query=query,
+                app_name=trimmed or None,
+                scope=scope,
+                top_n=top_n,
+            )
+            return json.dumps(
+                {
+                    "ok": True,
+                    "search_mode": mode,
+                    "count": len(chunks),
+                    "chunks": chunks,
+                },
+                ensure_ascii=False,
+            )

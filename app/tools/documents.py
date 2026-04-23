@@ -15,6 +15,7 @@ from app.db.models import Spec
 from app.services.celery_client import enqueue_index_spec
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.services.search_hybrid import hybrid_spec_search
+from app.tools._auth_check import check_read, check_write
 
 
 def _normalize_related_files(related_files: Any) -> list[str]:
@@ -52,6 +53,13 @@ def upload_document_impl(
 ) -> str:
     """Insert one document row. Returns JSON message with new id."""
     record_mcp_tool_call("upload_document")
+    db: Session = SessionLocal()
+    try:
+        denied = check_write(db)
+        if denied:
+            return denied
+    finally:
+        db.close()
     paths = _normalize_related_files(related_files)
     t = (title or "").strip() or None
     row = Spec(
@@ -88,6 +96,9 @@ def search_documents_impl(query: str, app_target: str) -> str:
     record_mcp_tool_call("search_documents")
     db: Session = SessionLocal()
     try:
+        denied = check_read(db)
+        if denied:
+            return denied
         chunks, mode = hybrid_spec_search(db, query=query, app_target=app_target, top_n=15)
         if mode == "hybrid_ok" and chunks:
             return json.dumps(

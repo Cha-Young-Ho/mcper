@@ -14,12 +14,15 @@ MCP 응답 형식:
 
 from __future__ import annotations
 
+import logging
 import re
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SECTION = "main"
 
@@ -53,22 +56,34 @@ def list_sections_for_global_skill(session: Session) -> list[str]:
     return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
 
 
-def _global_skill_all_sections_latest(session: Session) -> list[GlobalSkillVersion]:
-    subq = (
-        select(
-            GlobalSkillVersion.section_name.label("sn"),
-            func.max(GlobalSkillVersion.version).label("mv"),
-        )
-        .group_by(GlobalSkillVersion.section_name)
-        .subquery()
+def _domain_filter(col, domain: str | None):
+    """domain 필터 조건 생성. development는 NULL도 포함."""
+    if domain is None:
+        return None
+    if domain == "development":
+        return (col == "development") | (col.is_(None))
+    return col == domain
+
+
+def _global_skill_all_sections_latest(
+    session: Session, *, domain: str | None = None
+) -> list[GlobalSkillVersion]:
+    base = select(
+        GlobalSkillVersion.section_name.label("sn"),
+        func.max(GlobalSkillVersion.version).label("mv"),
     )
-    rows = session.scalars(
-        select(GlobalSkillVersion).join(
-            subq,
-            (GlobalSkillVersion.section_name == subq.c.sn)
-            & (GlobalSkillVersion.version == subq.c.mv),
-        )
-    ).all()
+    df = _domain_filter(GlobalSkillVersion.domain, domain)
+    if df is not None:
+        base = base.where(df)
+    subq = base.group_by(GlobalSkillVersion.section_name).subquery()
+    q = select(GlobalSkillVersion).join(
+        subq,
+        (GlobalSkillVersion.section_name == subq.c.sn)
+        & (GlobalSkillVersion.version == subq.c.mv),
+    )
+    if df is not None:
+        q = q.where(_domain_filter(GlobalSkillVersion.domain, domain))
+    rows = session.scalars(q).all()
     return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
 
 
@@ -95,10 +110,40 @@ def next_global_skill_version(session: Session, section_name: str = DEFAULT_SECT
     return (cur or 0) + 1
 
 
-def publish_global_skill(session: Session, body: str, section_name: str = DEFAULT_SECTION) -> int:
+def _try_index_skill(
+    session: Session,
+    skill_type: str,
+    skill_entity_id: int,
+    body: str,
+    *,
+    app_name: str | None = None,
+    domain: str | None = None,
+    section_name: str = DEFAULT_SECTION,
+) -> None:
+    """Best-effort skill indexing after publish. Failure is logged, not raised."""
+    try:
+        from app.skill.service import make_default_skill_service
+        svc = make_default_skill_service(session)
+        svc.index_skill(
+            skill_type=skill_type,
+            skill_entity_id=skill_entity_id,
+            body=body,
+            app_name=app_name,
+            domain=domain,
+            section_name=section_name,
+        )
+    except Exception:
+        logger.warning("skill indexing failed type=%s id=%s", skill_type, skill_entity_id, exc_info=True)
+
+
+def publish_global_skill(
+    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+) -> int:
     nv = next_global_skill_version(session, section_name)
-    session.add(GlobalSkillVersion(section_name=section_name, version=nv, body=body))
+    row = GlobalSkillVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    session.add(row)
     session.commit()
+    _try_index_skill(session, "global", row.id, body, domain=domain, section_name=section_name)
     return nv
 
 
@@ -123,8 +168,12 @@ def delete_global_skill_section(session: Session, section_name: str) -> int:
 # ── App skills ─────────────────────────────────────────────────────────────
 
 
-def list_distinct_apps_with_skills(session: Session) -> list[str]:
-    rows = session.scalars(select(AppSkillVersion.app_name).distinct()).all()
+def list_distinct_apps_with_skills(session: Session, *, domain: str | None = None) -> list[str]:
+    q = select(AppSkillVersion.app_name).distinct()
+    df = _domain_filter(AppSkillVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    rows = session.scalars(q).all()
     return sorted({r for r in rows if r})
 
 
@@ -190,12 +239,14 @@ def next_app_skill_version(session: Session, app_name: str, section_name: str = 
 
 
 def publish_app_skill(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION
+    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
 ) -> tuple[str, str, int]:
     key = (app_name or "").lower().strip()
     nv = next_app_skill_version(session, key, section_name)
-    session.add(AppSkillVersion(app_name=key, section_name=section_name, version=nv, body=body))
+    row = AppSkillVersion(app_name=key, section_name=section_name, version=nv, body=body, domain=domain)
+    session.add(row)
     session.commit()
+    _try_index_skill(session, "app", row.id, body, app_name=key, domain=domain, section_name=section_name)
     return key, section_name, nv
 
 
@@ -248,8 +299,12 @@ def repo_skill_pattern_card_display(pattern: str) -> str:
     return "(default)" if not (pattern or "").strip() else pattern
 
 
-def list_distinct_repo_patterns_with_skills(session: Session) -> list[str]:
-    rows = session.scalars(select(RepoSkillVersion.pattern).distinct()).all()
+def list_distinct_repo_patterns_with_skills(session: Session, *, domain: str | None = None) -> list[str]:
+    q = select(RepoSkillVersion.pattern).distinct()
+    df = _domain_filter(RepoSkillVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    rows = session.scalars(q).all()
     return sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
 
 
@@ -320,11 +375,15 @@ def publish_repo_skill(
     body: str,
     section_name: str = DEFAULT_SECTION,
     sort_order: int = 100,
+    *,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     key = (pattern or "").strip()
     nv = next_repo_skill_version(session, key, section_name)
-    session.add(RepoSkillVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order))
+    row = RepoSkillVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order, domain=domain)
+    session.add(row)
     session.commit()
+    _try_index_skill(session, "repo", row.id, body, domain=domain, section_name=section_name)
     return key, section_name, nv
 
 

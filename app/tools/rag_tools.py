@@ -21,6 +21,7 @@ from app.services.search_hybrid import (
 )
 from app.services.embeddings import embed_query
 from app.services.spec_indexing import insert_spec_chunks_with_embeddings
+from app.tools._auth_check import check_read, check_write
 
 
 def _parse_json_list(raw: Any) -> list[Any]:
@@ -47,6 +48,10 @@ def push_code_index_impl(
     edges: list[dict[str, Any]] | str,
 ) -> str:
     record_mcp_tool_call("push_code_index")
+    with SessionLocal() as _db:
+        denied = check_write(_db)
+        if denied:
+            return denied
     if isinstance(file_paths, list):
         fps = [str(x).strip() for x in file_paths if str(x).strip()]
     else:
@@ -80,6 +85,9 @@ def analyze_code_impact_impl(query: str, app_target: str) -> str:
     record_mcp_tool_call("analyze_code_impact")
     db: Session = SessionLocal()
     try:
+        denied = check_read(db)
+        if denied:
+            return denied
         seeds = hybrid_code_seed_ids(db, query=query, app_target=app_target, top_n=5)
         if not seeds:
             return json.dumps(
@@ -112,6 +120,10 @@ def analyze_code_impact_impl(query: str, app_target: str) -> str:
 def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str:
     """로컬에서 임베딩한 청크를 DB에 직접 반영 (서버 워커 큐 밀릴 때 폴백)."""
     record_mcp_tool_call("push_spec_chunks_with_embeddings")
+    with SessionLocal() as _db:
+        denied = check_write(_db)
+        if denied:
+            return denied
     if isinstance(chunks_json, str):
         s = chunks_json.strip()
         if not s:
@@ -158,6 +170,9 @@ def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: i
     record_mcp_tool_call("find_historical_reference")
     db: Session = SessionLocal()
     try:
+        denied = check_read(db)
+        if denied:
+            return denied
         snippet = (new_spec_text or "")[:8000]
         if not snippet.strip():
             return json.dumps(

@@ -16,6 +16,14 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 logger = logging.getLogger(__name__)
 
+# sse_starlette 기본 ping 주기를 5초로 단축 — Claude Code 등
+# SSE 클라이언트가 idle 스트림을 30초 내에 끊는 문제 방지
+try:
+    from sse_starlette.sse import EventSourceResponse
+    EventSourceResponse.DEFAULT_PING_INTERVAL = 5
+except Exception:
+    pass
+
 
 def _default_hosts(listen_port: int) -> list[str]:
     p = int(listen_port)

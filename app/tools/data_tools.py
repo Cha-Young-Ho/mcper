@@ -1,6 +1,10 @@
 # app/tools/data_tools.py
 """MCP tools for querying registered data sources."""
 
+from app.db.database import SessionLocal
+from app.tools._auth_check import check_read
+
+
 def register_data_tools(mcp) -> None:
     @mcp.tool()
     def get_data(source: str, query: str = "", limit: int = 50) -> dict:
@@ -16,6 +20,10 @@ def register_data_tools(mcp) -> None:
             dict with 'records' list and 'count'.
         """
         from app.services.datasources.registry import get
+        with SessionLocal() as db:
+            denied = check_read(db)
+            if denied:
+                return {"error": denied}
         try:
             backend = get(source)
             records = backend.fetch(query, limit=limit)
@@ -32,4 +40,8 @@ def register_data_tools(mcp) -> None:
             dict with 'sources' list.
         """
         from app.services.datasources.registry import list_sources
+        with SessionLocal() as db:
+            denied = check_read(db)
+            if denied:
+                return {"error": denied}
         return {"sources": list_sources()}

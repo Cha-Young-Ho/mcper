@@ -26,6 +26,8 @@ from app.db.rule_models import (
 )
 from app.services.git import GitContext, get_git_context
 
+logger = __import__("logging").getLogger(__name__)
+
 # URL 경로에서 빈 pattern 표현 (DB에는 "" 로 저장)
 REPO_PATTERN_URL_DEFAULT = "__default__"
 
@@ -370,23 +372,35 @@ def _global_latest(
     ).first()
 
 
-def _global_all_sections_latest(session: Session) -> list[GlobalRuleVersion]:
+def _domain_filter(col, domain: str | None):
+    """domain 필터 조건 생성. development는 NULL도 포함."""
+    if domain is None:
+        return None
+    if domain == "development":
+        return (col == "development") | (col.is_(None))
+    return col == domain
+
+
+def _global_all_sections_latest(
+    session: Session, *, domain: str | None = None
+) -> list[GlobalRuleVersion]:
     """모든 섹션의 최신 global 룰 행 (섹션별 max version)."""
-    subq = (
-        select(
-            GlobalRuleVersion.section_name.label("sn"),
-            func.max(GlobalRuleVersion.version).label("mv"),
-        )
-        .group_by(GlobalRuleVersion.section_name)
-        .subquery()
+    base = select(
+        GlobalRuleVersion.section_name.label("sn"),
+        func.max(GlobalRuleVersion.version).label("mv"),
     )
-    rows = session.scalars(
-        select(GlobalRuleVersion).join(
-            subq,
-            (GlobalRuleVersion.section_name == subq.c.sn)
-            & (GlobalRuleVersion.version == subq.c.mv),
-        )
-    ).all()
+    df = _domain_filter(GlobalRuleVersion.domain, domain)
+    if df is not None:
+        base = base.where(df)
+    subq = base.group_by(GlobalRuleVersion.section_name).subquery()
+    q = select(GlobalRuleVersion).join(
+        subq,
+        (GlobalRuleVersion.section_name == subq.c.sn)
+        & (GlobalRuleVersion.version == subq.c.mv),
+    )
+    if df is not None:
+        q = q.where(_domain_filter(GlobalRuleVersion.domain, domain))
+    rows = session.scalars(q).all()
     return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
 
 
@@ -1074,16 +1088,47 @@ def next_repo_version(session: Session, pattern: str, section_name: str = DEFAUL
     return int(m or 0) + 1
 
 
-def publish_global(session: Session, body: str, section_name: str = DEFAULT_SECTION) -> int:
+def _try_index_rule(
+    session: Session,
+    rule_type: str,
+    rule_entity_id: int,
+    body: str,
+    *,
+    app_name: str | None = None,
+    pattern: str | None = None,
+    domain: str | None = None,
+    section_name: str = DEFAULT_SECTION,
+) -> None:
+    try:
+        from app.rule.service import make_default_rule_service
+        svc = make_default_rule_service(session)
+        svc.index_rule(
+            rule_type=rule_type,
+            rule_entity_id=rule_entity_id,
+            body=body,
+            app_name=app_name,
+            pattern=pattern,
+            domain=domain,
+            section_name=section_name,
+        )
+    except Exception:
+        logger.warning("rule indexing failed type=%s id=%s", rule_type, rule_entity_id, exc_info=True)
+
+
+def publish_global(
+    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+) -> int:
     """섹션별 다음 버전 번호를 자동 할당해 글로벌 룰 추가."""
     nv = next_global_version(session, section_name)
-    session.add(GlobalRuleVersion(section_name=section_name, version=nv, body=body))
+    row = GlobalRuleVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    session.add(row)
     session.commit()
+    _try_index_rule(session, "global", row.id, body, domain=domain, section_name=section_name)
     return nv
 
 
 def publish_app(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION
+    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
 ) -> tuple[str, str, int]:
     """(app_name, section_name) 스트림의 다음 버전 자동 할당. 반환: (app_name, section_name, version)."""
     key = app_name.lower().strip()
@@ -1091,8 +1136,10 @@ def publish_app(
         raise ValueError("app_name is required")
     sn = (section_name or DEFAULT_SECTION).strip()
     nv = next_app_version(session, key, sn)
-    session.add(AppRuleVersion(app_name=key, section_name=sn, version=nv, body=body))
+    row = AppRuleVersion(app_name=key, section_name=sn, version=nv, body=body, domain=domain)
+    session.add(row)
     session.commit()
+    _try_index_rule(session, "app", row.id, body, app_name=key, domain=domain, section_name=sn)
     return key, sn, nv
 
 
@@ -1125,6 +1172,7 @@ def publish_repo(
     *,
     sort_order: int | None = None,
     section_name: str = DEFAULT_SECTION,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     """(pattern, section_name) 스트림의 다음 버전. 반환: (pattern, section_name, version)."""
     key = pattern.strip()
@@ -1150,16 +1198,15 @@ def publish_repo(
     elif prev is not None:
         so = prev.sort_order
     else:
-        # 같은 pattern의 다른 섹션에서 sort_order 가져옴
         any_prev = session.scalars(
             select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
         ).first()
         so = any_prev.sort_order if any_prev else 100
-    session.add(
-        RepoRuleVersion(pattern=key, section_name=sn, version=nv, body=body.strip(), sort_order=so)
-    )
+    row = RepoRuleVersion(pattern=key, section_name=sn, version=nv, body=body.strip(), sort_order=so, domain=domain)
+    session.add(row)
     session.commit()
     ensure_mcp_repo_pattern_pull_option(session, key)
+    _try_index_rule(session, "repo", row.id, body, pattern=key, domain=domain, section_name=sn)
     return key, sn, nv
 
 
@@ -1320,13 +1367,21 @@ def export_rules_json(session: Session) -> dict:
     }
 
 
-def list_distinct_apps(session: Session) -> list[str]:
-    rows = session.scalars(select(AppRuleVersion.app_name).distinct()).all()
+def list_distinct_apps(session: Session, *, domain: str | None = None) -> list[str]:
+    q = select(AppRuleVersion.app_name).distinct()
+    df = _domain_filter(AppRuleVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    rows = session.scalars(q).all()
     return sorted({r for r in rows if r})
 
 
-def list_distinct_repo_patterns(session: Session) -> list[str]:
-    rows = session.scalars(select(RepoRuleVersion.pattern).distinct()).all()
+def list_distinct_repo_patterns(session: Session, *, domain: str | None = None) -> list[str]:
+    q = select(RepoRuleVersion.pattern).distinct()
+    df = _domain_filter(RepoRuleVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    rows = session.scalars(q).all()
     return sorted(
         {r for r in rows if r is not None},
         key=lambda p: (0 if (p or "").strip() else 1, (p or "").lower()),

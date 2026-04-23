@@ -307,6 +307,127 @@ MCP_TOOLS: list[dict[str, Any]] = [
             '`find_historical_reference(new_spec_text="...", app_target="your_app_name", top_n=3)`',
         ],
     },
+    # ── Skill search ─────────────────────────────────────────────
+    {
+        "name": "search_skills",
+        "one_liner": "스킬을 벡터+FTS 하이브리드로 의미 검색 (관련 스킬만 반환)",
+        "title": "search_skills — 스킬 의미 검색",
+        "summary": (
+            "등록된 스킬을 벡터+FTS 하이브리드(RRF)로 검색하여 쿼리와 관련된 스킬 청크만 반환합니다. "
+            "get_global_skill은 전체 스킬을 로드하는 반면, search_skills는 스킬이 많을 때 "
+            "관련 것만 빠르게 찾을 때 사용합니다."
+        ),
+        "params": [
+            "query (필수): 검색 쿼리 (자연어)",
+            "app_name (선택): 특정 앱 스킬만 검색",
+            "scope (선택): 'all' | 'global' | 'app' | 'repo'",
+            "top_n (선택, 기본값 10): 반환할 최대 결과 수",
+        ],
+        "notes": [
+            "스킬 publish 시 자동으로 인덱싱됩니다.",
+            "기존 스킬을 일괄 인덱싱하려면: scripts/reindex_all_skills.py 실행.",
+            "벡터 인덱스 없으면 search_mode='no_index'로 빈 결과 반환.",
+        ],
+        "examples": [
+            '`search_skills(query="테스트 관련", app_name="adventure")`',
+            '`search_skills(query="보안 설정", scope="global")`',
+        ],
+    },
+    # ── Harness docs ──────────────────────────────────────────────
+    {
+        "name": "sync_harness_docs",
+        "one_liner": "MCPER 프로젝트 하네스 파일(CLAUDE.md, .agents/*.md 등)을 DB에 동기화",
+        "title": "sync_harness_docs — 하네스 문서 동기화",
+        "summary": (
+            "프로젝트 루트의 하네스 파일(22개)을 읽어 specs 테이블에 동기화합니다. "
+            "이미 동일한 내용이면 건너뛰고, 변경된 파일만 갱신 후 재색인합니다. "
+            "app_target='mcper_harness'로 기존 기획서와 네임스페이스가 분리됩니다."
+        ),
+        "params": [],
+        "notes": [
+            "멱등(idempotent) — 여러 번 실행해도 안전합니다.",
+            "Celery 있으면 비동기 색인, 없으면 동기 폴백.",
+        ],
+        "examples": ["`sync_harness_docs()`"],
+    },
+    {
+        "name": "search_harness_docs",
+        "one_liner": "MCPER 프로젝트 하네스 문서를 벡터+FTS 하이브리드로 검색",
+        "title": "search_harness_docs — 하네스 문서 검색",
+        "summary": (
+            "하네스 문서(아키텍처, 에이전트 가이드, 설계 원칙 등)를 "
+            "벡터+FTS 하이브리드로 검색합니다. scope로 범위를 제한할 수 있습니다."
+        ),
+        "params": [
+            "query (필수): 검색어",
+            "scope (선택): core / agent / guide / design / principles 중 하나",
+        ],
+        "notes": [
+            "scope 생략 시 전체 하네스 문서에서 검색.",
+            "임베딩 인덱스 없으면 ILIKE 폴백.",
+        ],
+        "examples": [
+            '`search_harness_docs(query="보안 정책")`',
+            '`search_harness_docs(query="코더 역할", scope="agent")`',
+        ],
+    },
+    {
+        "name": "get_harness_config",
+        "one_liner": "특정 하네스 문서의 전체 내용을 이름으로 직접 조회",
+        "title": "get_harness_config — 하네스 문서 직접 조회",
+        "summary": (
+            "문서 이름(예: CLAUDE, pm, ARCHITECTURE)으로 전체 내용을 반환합니다. "
+            "검색이 아닌 직접 조회이므로 에이전트 부트스트래핑에 적합합니다."
+        ),
+        "params": [
+            "target (필수): 문서 이름 (예: 'CLAUDE', 'pm', 'core-beliefs'). .md 접미사 생략 가능.",
+        ],
+        "notes": [
+            "1순위: 제목 정확 매칭, 2순위: 파일 경로 stem 매칭, 3순위: 부분 매칭.",
+            "미발견 시 등록된 문서 목록을 반환합니다.",
+        ],
+        "examples": [
+            '`get_harness_config(target="CLAUDE")`',
+            '`get_harness_config(target="pm")`',
+            '`get_harness_config(target="core-beliefs")`',
+        ],
+    },
+    {
+        "name": "list_harness_docs",
+        "one_liner": "등록된 모든 하네스 문서 목록 (제목, 범위, 경로, 길이)",
+        "title": "list_harness_docs — 하네스 문서 목록",
+        "summary": (
+            "DB에 등록된 모든 하네스 문서의 제목, 범위(scope), 파일 경로, "
+            "내용 길이를 반환합니다. sync_harness_docs 후 등록 상태를 확인할 때 유용합니다."
+        ),
+        "params": [],
+        "notes": ["sync_harness_docs를 먼저 실행해야 결과가 표시됩니다."],
+        "examples": ["`list_harness_docs()`"],
+    },
+    {
+        "name": "upload_harness",
+        "one_liner": "로컬 하네스 파일들을 MCP에 일괄 업로드 (스킬·룰 등록)",
+        "title": "upload_harness — 하네스 일괄 업로드",
+        "summary": (
+            "로컬에 구축한 하네스 파일(.claude/agents/*.md, .claude/skills/*.md, "
+            ".claude/docs/*.md, .claude/rules/*.md 등)을 읽어서 MCP에 스킬 또는 "
+            "룰로 일괄 등록합니다. 이미 등록된 섹션은 새 버전으로 갱신됩니다."
+        ),
+        "params": [
+            "app_name (str): 앱 식별자 (예: 'adventure')",
+            "files (list[dict]): 파일 목록. 각 항목: path, content, type('skill'|'rule'), "
+            "scope('app'|'repo'), section_name",
+            "origin_url (str, optional): git remote origin URL (repo scope 매칭용)",
+        ],
+        "notes": [
+            "type='skill'이 기본값. 규칙 파일은 type='rule'로 지정.",
+            "scope='repo'로 지정하면 origin_url에서 추출한 패턴으로 repo 스킬/룰 등록.",
+            "section_name 생략 시 파일명에서 자동 추출.",
+        ],
+        "examples": [
+            '`upload_harness(app_name="adventure", files=[{"path":".claude/agents/code.md","content":"...","section_name":"agent-code"}])`',
+        ],
+    },
 ]
 
 
