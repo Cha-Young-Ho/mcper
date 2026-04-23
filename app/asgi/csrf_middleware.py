@@ -33,10 +33,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         self.cookie_secure = cookie_secure
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # CSRF 토큰 생성/검증 (MCP, WebSocket, health, API Bearer 인증 제외)
+        # CSRF 토큰 생성/검증 (MCP, WebSocket, health, auth/login, API Bearer 인증 제외)
         if request.url.path.startswith("/mcp") or request.url.path == "/ws":
             return await call_next(request)
         if request.url.path.startswith("/health"):
+            return await call_next(request)
+        if request.url.path.startswith("/auth/login") or request.url.path.startswith("/auth/mcp-authorize"):
             return await call_next(request)
         # Bearer 토큰 인증 요청은 CSRF 검증 제외 (API 클라이언트)
         auth_header = request.headers.get("authorization", "")

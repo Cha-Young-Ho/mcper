@@ -65,6 +65,7 @@
     {% endif %}
 
     <form method="post" action="/auth/login">
+      {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
       <div class="form-group">
         <label for="username">아이디</label>
         <input type="text" id="username" name="username" placeholder="admin" autofocus required />

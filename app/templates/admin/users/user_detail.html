@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+{% block body %}
+<p class="muted" style="margin-top:0"><a href="/admin/users">&larr; 유저 목록</a></p>
+
+{# ── 유저 정보 ─────────────────────────────────────────────────── #}
+<section style="margin-bottom:2rem">
+  <h2 style="font-size:1.1rem;margin-bottom:1rem">기본 정보</h2>
+  <form method="post" action="/admin/users/{{ user_obj.id }}/edit">
+    <div class="form-grid" style="display:grid;grid-template-columns:140px 1fr;gap:.5rem 1rem;max-width:480px">
+      <label>사용자명</label>
+      <span><strong>{{ user_obj.username }}</strong></span>
+
+      <label for="email">이메일</label>
+      <input id="email" name="email" class="input" type="email" value="{{ user_obj.email or '' }}" placeholder="(선택)" />
+
+      <label for="password">비밀번호 변경</label>
+      <input id="password" name="password" class="input" type="password" placeholder="변경 시 입력" autocomplete="new-password" />
+
+      <label for="is_admin">관리자</label>
+      <label><input id="is_admin" name="is_admin" type="checkbox" {% if user_obj.is_admin %}checked{% endif %} /> admin</label>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:.5rem">
+      <button type="submit" class="btn btn-primary btn-sm">저장</button>
+      <form method="post" action="/admin/users/{{ user_obj.id }}/toggle-active" style="display:inline">
+        <button type="submit" class="btn btn-secondary btn-sm">
+          {% if user_obj.is_active %}비활성화{% else %}활성화{% endif %}
+        </button>
+      </form>
+    </div>
+  </form>
+  <div style="margin-top:.5rem">
+    <span class="muted" style="font-size:.85rem">상태: {% if user_obj.is_active %}<span style="color:var(--clr-success,green)">활성</span>{% else %}<span style="color:var(--clr-danger,red)">비활성</span>{% endif %} &middot; 생성: {{ user_obj.created_at | datefmt }}</span>
+  </div>
+</section>
+
+{# ── 권한 목록 ─────────────────────────────────────────────────── #}
+<section style="margin-bottom:2rem">
+  <h2 style="font-size:1.1rem;margin-bottom:1rem">권한</h2>
+
+  {% if permissions %}
+  <table class="admin-table" style="width:100%;max-width:640px">
+    <thead>
+      <tr>
+        <th>도메인</th>
+        <th>앱</th>
+        <th>역할</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in permissions %}
+      <tr>
+        <td>{{ p.domain_slug or "(전체)" }}</td>
+        <td>{{ p.app_name or "(전체)" }}</td>
+        <td><span class="ver-badge ver-badge--sm">{{ p.role }}</span></td>
+        <td>
+          <form method="post" action="/admin/users/{{ user_obj.id }}/permissions/{{ p.id }}/delete" style="display:inline"
+                onsubmit="return confirm('이 권한을 삭제할까요?');">
+            <button type="submit" class="btn btn-danger btn-xs">삭제</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">부여된 권한이 없습니다.</p>
+  {% endif %}
+
+  <h3 style="font-size:1rem;margin-top:1.5rem;margin-bottom:.75rem">권한 추가</h3>
+  <form method="post" action="/admin/users/{{ user_obj.id }}/permissions/add"
+        style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;max-width:640px">
+    <div>
+      <label style="display:block;font-size:.8rem;margin-bottom:.25rem">도메인</label>
+      <select name="domain_slug" class="input" style="min-width:120px">
+        <option value="">(전체)</option>
+        {% for d in domains %}
+        <option value="{{ d.slug }}">{{ d.display_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:.8rem;margin-bottom:.25rem">앱 (선택)</label>
+      <input name="app_name" class="input" placeholder="예: myapp" style="width:140px" />
+    </div>
+    <div>
+      <label style="display:block;font-size:.8rem;margin-bottom:.25rem">역할</label>
+      <select name="role" class="input" style="min-width:100px">
+        {% for r in roles %}
+        <option value="{{ r }}">{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">추가</button>
+  </form>
+</section>
+
+{# ── 유저 삭제 ─────────────────────────────────────────────────── #}
+<section style="border-top:1px solid var(--clr-border,#ddd);padding-top:1.5rem;margin-top:2rem">
+  <form method="post" action="/admin/users/{{ user_obj.id }}/delete"
+        onsubmit="return confirm('정말 이 유저를 삭제할까요? 모든 권한도 함께 삭제됩니다.');">
+    <button type="submit" class="btn btn-danger btn-sm">유저 삭제</button>
+  </form>
+</section>
+{% endblock %}

@@ -14,10 +14,19 @@ from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorization
 from jose import ExpiredSignatureError, JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.service import decode_token
 from app.db.auth_models import ApiKey, User
 from app.db.database import get_db
+
+
+def _raise_redirect(url: str) -> None:
+    """Dependency에서 리다이렉트를 트리거. Starlette HTTPException + 303 + Location 헤더."""
+    raise StarletteHTTPException(
+        status_code=303,
+        headers={"Location": url},
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +148,7 @@ async def require_admin_user(
             except ExpiredSignatureError:
                 accept = request.headers.get("accept", "")
                 if "text/html" in accept:
-                    return RedirectResponse(url="/auth/login", status_code=303)
+                    _raise_redirect("/auth/login")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token expired",
@@ -149,7 +158,7 @@ async def require_admin_user(
 
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
-            return RedirectResponse(url="/auth/login", status_code=303)
+            _raise_redirect("/auth/login")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
@@ -165,6 +174,6 @@ async def require_admin_user(
     if user.password_changed_at is None:
         # 이미 /auth/change-password-forced 페이지인지 확인
         if not request.url.path.startswith("/auth/change-password-forced"):
-            return RedirectResponse(url="/auth/change-password-forced", status_code=303)
+            _raise_redirect("/auth/change-password-forced")
 
     return user.username
