@@ -57,7 +57,7 @@ mcp = FastMCP(
         "[app_name 확인] "
         "프로젝트 루트의 config.dev.ini 또는 config.ini 에서 [Global] > app_name 값을 읽는다. "
         "파일이 없으면 사용자에게 app_name 을 직접 물어본다. 폴더명·브랜치명으로 추측 금지. "
-        "INI app_name 식별자만 사용(예: adventure). /master 등 접미사 금지. "
+        "INI app_name 식별자만 사용(예: my_app). /master 등 접미사 금지. "
         "origin_url 은 git remote -v 의 origin fetch URL. "
 
         # ── 0-1. 공통 전제: 룰 로드 (모든 워크플로우의 선행 조건) ──

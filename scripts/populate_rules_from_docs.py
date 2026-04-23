@@ -5,7 +5,7 @@
 구조:
   Rules
   ├── Global (category 내 여러 파일)
-  ├── Repository (stz-game-service)
+  ├── Repository (my-repo)
   │   └── category (Development, Deployment, Architecture)
   │       ├── File 1
   │       ├── File 2
@@ -64,7 +64,7 @@ def load_markdown_files():
                 results.append({
                     "filename": filename,
                     "category": category,  # section_name으로 사용
-                    "pattern": "stz-game-service",
+                    "pattern": "my-repo",
                     "body": body,
                     "description": description,
                 })
@@ -96,7 +96,7 @@ def publish_to_db(rules):
 
             pattern, section, version = publish_repo(
                 session,
-                pattern=rules[0]["pattern"],  # stz-game-service
+                pattern=rules[0]["pattern"],  # my-repo
                 body=combined_body,
                 section_name=category,  # 카테고리를 section으로
                 sort_order=100,
@@ -131,7 +131,7 @@ def main():
     print("✅ 완료!")
     print("=" * 70)
     print("\n📍 DB 구조:")
-    print("   Rules > Repository (stz-game-service) > Category")
+    print("   Rules > Repository (my-repo) > Category")
     print("   ├── Development (COMMIT_GUIDE, CODE_STYLE)")
     print("   ├── Deployment (DEPLOYMENT_GUIDE, RELIABILITY)")
     print("   ├── Architecture (DESIGN, PLANS)")

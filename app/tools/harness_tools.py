@@ -593,8 +593,8 @@ def register_harness_tools(mcp: FastMCP) -> None:
 
         예시:
         upload_harness(
-            app_name="adventure",
-            origin_url="git@github.com:sundaytoz/stz-game-service.git",
+            app_name="my_app",
+            origin_url="git@github.com:org/my-repo.git",
             files=[
                 {"path": ".claude/agents/code.md", "content": "...", "type": "skill", "section_name": "agent-code"},
                 {"path": ".claude/docs/SECURITY.md", "content": "...", "type": "skill", "section_name": "security"},

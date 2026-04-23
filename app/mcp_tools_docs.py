@@ -329,7 +329,7 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "벡터 인덱스 없으면 search_mode='no_index'로 빈 결과 반환.",
         ],
         "examples": [
-            '`search_skills(query="테스트 관련", app_name="adventure")`',
+            '`search_skills(query="테스트 관련", app_name="my_app")`',
             '`search_skills(query="보안 설정", scope="global")`',
         ],
     },
@@ -414,7 +414,7 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "룰로 일괄 등록합니다. 이미 등록된 섹션은 새 버전으로 갱신됩니다."
         ),
         "params": [
-            "app_name (str): 앱 식별자 (예: 'adventure')",
+            "app_name (str): 앱 식별자 (예: 'my_app')",
             "files (list[dict]): 파일 목록. 각 항목: path, content, type('skill'|'rule'), "
             "scope('app'|'repo'), section_name",
             "origin_url (str, optional): git remote origin URL (repo scope 매칭용)",
@@ -425,7 +425,7 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "section_name 생략 시 파일명에서 자동 추출.",
         ],
         "examples": [
-            '`upload_harness(app_name="adventure", files=[{"path":".claude/agents/code.md","content":"...","section_name":"agent-code"}])`',
+            '`upload_harness(app_name="my_app", files=[{"path":".claude/agents/code.md","content":"...","section_name":"agent-code"}])`',
         ],
     },
 ]

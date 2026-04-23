@@ -87,29 +87,29 @@
 
 ---
 
-## 2026-04-15: adventure 앱 데이터 시딩 — Skills + Rules 3계층 셋업
+## 2026-04-15: 앱 데이터 시딩 — Skills + Rules 3계층 셋업
 
 ### 작업 내용
-- `scripts/seed_adventure_data.py` 신규 생성 — adventure 앱 전체 데이터 시딩 스크립트
-- stz-game-service/adventure 하네스 파일 22개를 분석하여 MCP 데이터로 변환
+- 시드 스크립트 생성 — 앱 전체 데이터 시딩
+- 하네스 파일을 분석하여 MCP 데이터로 변환
 
 ### 시딩 데이터 (10개 레코드)
 | 계층 | 섹션 | 내용 |
 |------|------|------|
 | Global Skill | mcp-usage | MCP 도구 사용법, 초기화 절차, 워크플로우 |
 | Global Skill | harness-construction | 하네스 구축 가이드 (에이전트 팀, 문서 구조) |
-| Repo Skill (stz-game-service) | main | 프로젝트 개요, 기술 스택, 디렉터리 구조 |
-| Repo Skill (stz-game-service) | workflow | 브랜치 전략, 개발 프로세스, 배포 절차 |
-| App Skill (adventure) | main | 에이전트 팀, 이벤트 시스템, 스킬 목록 |
-| App Skill (adventure) | events | 이벤트 레퍼런스 (시즌제, 시트 구조) |
-| App Skill (adventure) | api-patterns | API 규약, apidoc, URL 라우팅, 테스트 API |
-| App Skill (adventure) | testing | 테스트 가이드 (api-test, browser-test, eventitemtest) |
-| App Rule (adventure) | main | 코드 규칙, 금지사항, 기획서 워크플로우 |
-| Repo Rule (stz-game-service) | main | 공용 코드 보호, API 버전 관리, 보안 |
+| Repo Skill | main | 프로젝트 개요, 기술 스택, 디렉터리 구조 |
+| Repo Skill | workflow | 브랜치 전략, 개발 프로세스, 배포 절차 |
+| App Skill | main | 에이전트 팀, 이벤트 시스템, 스킬 목록 |
+| App Skill | events | 이벤트 레퍼런스 |
+| App Skill | api-patterns | API 규약, URL 라우팅, 테스트 API |
+| App Skill | testing | 테스트 가이드 |
+| App Rule | main | 코드 규칙, 금지사항, 기획서 워크플로우 |
+| Repo Rule | main | 공용 코드 보호, API 버전 관리, 보안 |
 
 ### 검증 결과
-- ✅ get_global_skill(adventure, stz-game-service) → 8개 SKILL FILE 블록 반환
-- ✅ get_global_rule(adventure, stz-game-service) → Global + Repo + App 3계층 반환
+- ✅ get_global_skill → SKILL FILE 블록 반환
+- ✅ get_global_rule → Global + Repo + App 3계층 반환
 - ✅ check_rule_versions → 모든 버전 정보 정상
 - ✅ list_skill_sections → global(2), repo(2), app(4) 카테고리 확인
 
@@ -160,7 +160,7 @@
 - 전체 broken reference 수정 (core-beliefs.md/index.md/db-schema.md/product-specs 인코딩 수정 포함)
 
 ### 판단 이유
-- Why: 하네스 파일 총 ~10,000줄 → ~5,000줄로 축소. 중복 제거, stz-game-service 전용 파일 삭제, 인코딩 오류 수정.
+- Why: 하네스 파일 총 ~10,000줄 → ~5,000줄로 축소. 중복 제거, 프로젝트 전용 파일 삭제, 인코딩 오류 수정.
 - Risk: DESIGN_CRITICAL_SECURITY.md (1039줄), DESIGN_HIGH_REFACTOR.md (1580줄)은 Phase 2 구현 참조용으로 유지.
 
 ### 결과
@@ -191,7 +191,7 @@
 각 카테고리별로 버전 1, 2로 구분하여 관리.
 
 ### 마이그레이션 결과
-- **stz-game-service 패턴**:
+- **Repository 패턴**:
   - Development: 버전 1 (COMMIT_GUIDE) + 버전 2 (CODE_STYLE, ERROR_HANDLING, LOGGING 등)
   - Deployment: 버전 1 (DEPLOYMENT_GUIDE) + 버전 2 (PERFORMANCE, RELIABILITY)
   - Architecture: 버전 1 (DESIGN) + 버전 2 (CACHE, CONFIG, DATABASE, PLANNING)
@@ -205,7 +205,7 @@
 ### 어드민 UI 표시 방식
 ```
 Repository Rules
-└── stz-game-service
+└── {repo-pattern}
     ├── Development
     │   ├── 버전: 1 — COMMIT_GUIDE
     │   └── 버전: 2 — CODE_STYLE & ERROR_HANDLING

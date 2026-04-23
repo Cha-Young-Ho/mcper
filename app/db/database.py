@@ -462,12 +462,12 @@ def _apply_lightweight_migrations(connection) -> None:
             FROM global_skill_versions WHERE section_name='error-hunt-workflow' AND version=3
             ON CONFLICT DO NOTHING;
 
-            -- app: orchestrator → spec-implementation 워크플로우
+            -- app: orchestrator → spec-implementation 워크플로우 (범용)
             INSERT INTO app_workflow_versions (app_name, section_name, version, body, domain, created_at)
             SELECT app_name, 'spec-implementation', 1, body, domain, created_at
             FROM app_skill_versions
-            WHERE app_name='adventure' AND section_name='orchestrator'
-              AND version=(SELECT MAX(version) FROM app_skill_versions WHERE app_name='adventure' AND section_name='orchestrator')
+            WHERE section_name='orchestrator'
+              AND version=(SELECT MAX(version) FROM app_skill_versions asv2 WHERE asv2.app_name=app_skill_versions.app_name AND asv2.section_name='orchestrator')
             ON CONFLICT DO NOTHING;
 
             -- repo: workflow-* → 워크플로우 테이블
@@ -490,8 +490,8 @@ def _apply_lightweight_migrations(connection) -> None:
               AND EXISTS (SELECT 1 FROM global_workflow_versions WHERE section_name='spec-scan');
             DELETE FROM global_skill_versions WHERE section_name='error-hunt-workflow'
               AND EXISTS (SELECT 1 FROM global_workflow_versions WHERE section_name='error-hunt');
-            DELETE FROM app_skill_versions WHERE app_name='adventure' AND section_name='orchestrator'
-              AND EXISTS (SELECT 1 FROM app_workflow_versions WHERE app_name='adventure' AND section_name='spec-implementation');
+            DELETE FROM app_skill_versions WHERE section_name='orchestrator'
+              AND EXISTS (SELECT 1 FROM app_workflow_versions WHERE app_workflow_versions.app_name=app_skill_versions.app_name AND section_name='spec-implementation');
             DELETE FROM repo_skill_versions WHERE section_name LIKE 'workflow-%'
               AND EXISTS (SELECT 1 FROM repo_workflow_versions LIMIT 1);
 
