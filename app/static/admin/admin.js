@@ -21,16 +21,19 @@
 
   function highlightNav() {
     var path = window.location.pathname;
+    var domainParam = new URLSearchParams(window.location.search).get("domain") || "";
 
     var rulesOpen =
       path.indexOf("/admin/global-rules") === 0 ||
       path.indexOf("/admin/repo-rules") === 0 ||
-      path.indexOf("/admin/app-rules") === 0;
+      path.indexOf("/admin/app-rules") === 0 ||
+      path.indexOf("/admin/rules-dev") === 0;
 
     var skillsOpen =
       path.indexOf("/admin/global-skills") === 0 ||
       path.indexOf("/admin/repo-skills") === 0 ||
-      path.indexOf("/admin/app-skills") === 0;
+      path.indexOf("/admin/app-skills") === 0 ||
+      path.indexOf("/admin/skills-dev") === 0;
 
     var plansOpen =
       path.indexOf("/admin/plans") === 0 ||
@@ -44,6 +47,14 @@
     if (skillsDetails) skillsDetails.open = skillsOpen;
     if (plansDetails)  plansDetails.open  = plansOpen;
 
+    // 규칙/스킬 경로 판별 헬퍼
+    var isRulesPath = path.indexOf("/admin/global-rules") === 0 ||
+                      path.indexOf("/admin/repo-rules") === 0 ||
+                      path.indexOf("/admin/app-rules") === 0;
+    var isSkillsPath = path.indexOf("/admin/global-skills") === 0 ||
+                       path.indexOf("/admin/repo-skills") === 0 ||
+                       path.indexOf("/admin/app-skills") === 0;
+
     qsa(".admin-nav a[data-nav]").forEach(function (a) {
       var key = a.getAttribute("data-nav");
       var active = false;
@@ -51,12 +62,22 @@
       else if (key === "bulk-upload" && path.indexOf("/admin/plans/bulk-upload") === 0) active = true;
       else if (key === "plan-code" && path.indexOf("/admin/plan-code") === 0) active = true;
       else if (key === "plans" && path.indexOf("/admin/plans") === 0 && path.indexOf("/admin/plans/bulk-upload") !== 0) active = true;
-      else if (key === "global-rules"  && path.indexOf("/admin/global-rules") === 0)  active = true;
-      else if (key === "repo-rules"    && path.indexOf("/admin/repo-rules") === 0)    active = true;
-      else if (key === "app-rules"     && path.indexOf("/admin/app-rules") === 0)     active = true;
-      else if (key === "global-skills" && path.indexOf("/admin/global-skills") === 0) active = true;
-      else if (key === "repo-skills"   && path.indexOf("/admin/repo-skills") === 0)   active = true;
-      else if (key === "app-skills"    && path.indexOf("/admin/app-skills") === 0)    active = true;
+      // 도메인 기반 Rules
+      else if (key === "rules-planning" && isRulesPath && domainParam === "planning") active = true;
+      else if (key === "rules-analysis" && isRulesPath && domainParam === "analysis") active = true;
+      else if (key === "rules-development") {
+        active = path.indexOf("/admin/rules-dev") === 0 ||
+                 (isRulesPath && domainParam === "development");
+      }
+      // 도메인 기반 Skills
+      else if (key === "skills-planning" && isSkillsPath && domainParam === "planning") active = true;
+      else if (key === "skills-analysis" && isSkillsPath && domainParam === "analysis") active = true;
+      else if (key === "skills-development") {
+        active = path.indexOf("/admin/skills-dev") === 0 ||
+                 (isSkillsPath && domainParam === "development");
+      }
+      // 기타
+      else if (key === "users"  && path.indexOf("/admin/users") === 0) active = true;
       else if (key === "tools"  && path.indexOf("/admin/tools") === 0)  active = true;
       else if (key === "celery" && path.indexOf("/admin/celery") === 0) active = true;
       a.classList.toggle("is-active", active);

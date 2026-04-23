@@ -19,10 +19,26 @@ from app.db.rule_models import (
     McpAppPullOption,
     RepoRuleVersion,
 )
-from app.routers.admin_base import _count, templates
+from app.routers.admin_base import DOMAIN_CONFIG, _count, templates
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ----- 개발 도메인 허브 -----
+
+
+@router.get("/rules-dev")
+def rules_dev_hub(
+    request: Request,
+    _user: str = Depends(require_admin_user),
+):
+    """개발 도메인 행동 지침 허브 (Global / Repository / App 선택)."""
+    return templates.TemplateResponse(
+        request,
+        "admin/rules_dev_hub.html",
+        {"request": request, "title": "행동 지침 — 개발"},
+    )
 
 
 # ----- 앱 추가 마법사 -----
@@ -133,9 +149,11 @@ def global_rules_board(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
+    domain: str = "",
 ):
     """글로벌 규칙 카테고리 오버뷰."""
-    section_rows = vr._global_all_sections_latest(db)
+    domain_filter = domain.strip() or None
+    section_rows = vr._global_all_sections_latest(db, domain=domain_filter)
     sections = []
     for r in section_rows:
         sections.append({
@@ -145,14 +163,16 @@ def global_rules_board(
             "created_at": r.created_at,
             "url": f"/admin/global-rules/s/{quote(r.section_name, safe='')}",
         })
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/global_rules_board.html",
         {
             "request": request,
-            "title": "Global rules",
+            "title": f"Global rules — {domain_cfg['display']}" if domain_cfg else "Global rules",
             "sections": sections,
             "include_app_default_global": vr.get_mcp_include_app_default_global(db),
+            "domain": domain_filter or "",
         },
     )
 
@@ -481,9 +501,11 @@ def app_rules_cards(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
+    domain: str = "",
 ):
     """앱 규칙 카드 목록."""
-    names = _sort_app_names(vr.list_distinct_apps(db))
+    domain_filter = domain.strip() or None
+    names = _sort_app_names(vr.list_distinct_apps(db, domain=domain_filter))
     qn = q.strip().lower()
     if qn:
         names = [n for n in names if qn in n.lower()]
@@ -516,14 +538,16 @@ def app_rules_cards(
             }
         )
 
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/app_rules_cards.html",
         {
             "request": request,
-            "title": "App rules",
+            "title": f"App rules — {domain_cfg['display']}" if domain_cfg else "App rules",
             "cards": cards,
             "q": q,
+            "domain": domain_filter or "",
         },
     )
 
@@ -1108,9 +1132,11 @@ def repo_rules_cards(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
+    domain: str = "",
 ):
     """레포 규칙 카드 목록."""
-    patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db))
+    domain_filter = domain.strip() or None
+    patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db, domain=domain_filter))
     qn = q.strip().lower()
     if qn:
 
@@ -1150,14 +1176,16 @@ def repo_rules_cards(
             }
         )
 
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/repo_rules_cards.html",
         {
             "request": request,
-            "title": "Repository rules",
+            "title": f"Repository rules — {domain_cfg['display']}" if domain_cfg else "Repository rules",
             "cards": cards,
             "q": q,
+            "domain": domain_filter or "",
         },
     )
 

@@ -4,7 +4,7 @@
 <div class="card-filter-bar">
   <input type="search" class="input card-filter-bar__input" placeholder="앱 검색…" autocomplete="off" data-card-search value="{{ q }}" />
   <span class="card-filter-bar__count" data-card-count></span>
-  <a href="/admin/app-rules/new" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
+  <a href="/admin/app-rules/new{% if domain %}?domain={{ domain }}{% endif %}" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
 </div>
 <p class="muted" style="margin-top:0;margin-bottom:0.75rem;font-size:0.875rem">각 앱 카드에서 <strong>rule pull 시 default 포함</strong> 을 켜거나 끌 수 있어요.</p>
 

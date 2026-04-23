@@ -4,7 +4,7 @@
 <div class="card-filter-bar">
   <input type="search" class="input card-filter-bar__input" placeholder="앱 검색…" autocomplete="off" data-card-search value="{{ q }}" />
   <span class="card-filter-bar__count" data-card-count></span>
-  <a href="/admin/app-skills/new" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
+  <a href="/admin/app-skills/new{% if domain %}?domain={{ domain }}{% endif %}" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
 </div>
 
 <div class="app-card-grid" data-card-grid>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 from urllib.parse import quote
 
@@ -9,10 +10,12 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 import jinja2
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
+from app.auth.service import hash_api_key
+from app.db.auth_models import ApiKey, User
 from app.db.database import get_db
 from app.db.models import Spec
 from app.db.mcp_tool_stats import McpToolCallStat
@@ -46,6 +49,25 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # 상수
 ADMIN_ITEMS_PER_PAGE = 20
 ADMIN_UPLOAD_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+
+# ── 도메인 설정 ─────────────────────────────────────────────────────────────
+DOMAIN_CONFIG: dict[str, dict] = {
+    "planning":    {"slug": "planning",    "display": "기획", "scopes": ["app"]},
+    "analysis":    {"slug": "analysis",    "display": "분석", "scopes": ["app"]},
+    "development": {"slug": "development", "display": "개발", "scopes": ["global", "repo", "app"]},
+}
+
+DOMAIN_ORDER = ["planning", "analysis", "development"]
+
+
+def get_domain_config(slug: str) -> dict | None:
+    """도메인 slug로 설정 반환. 없으면 None."""
+    return DOMAIN_CONFIG.get(slug)
+
+
+def get_all_domains() -> list[dict]:
+    """정렬된 도메인 목록 반환."""
+    return [DOMAIN_CONFIG[k] for k in DOMAIN_ORDER]
 
 
 def _count(db: Session, model) -> int:
@@ -132,3 +154,78 @@ def seed_force_run(
         raise HTTPException(400, 'Type "yes" in confirm field')
     seed_force(db)
     return RedirectResponse("/admin", status_code=303)
+
+
+# ----- API Key 관리 -----
+
+
+def _server_url(request: Request) -> str:
+    """요청의 Host 헤더로부터 서버 URL 생성."""
+    host = request.headers.get("host", "localhost:8001")
+    scheme = "https" if "443" in host else "http"
+    return f"{scheme}://{host}"
+
+
+@router.get("/api-keys")
+def api_keys_page(
+    request: Request,
+    username: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """API 키 관리 페이지."""
+    user = db.scalar(select(User).where(User.username == username))
+    keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())).all() if user else []
+    return templates.TemplateResponse(
+        request,
+        "admin/api_keys.html",
+        {
+            "request": request,
+            "title": "API 키 관리",
+            "keys": keys,
+            "new_key": None,
+            "server_url": _server_url(request),
+        },
+    )
+
+
+@router.post("/api-keys/new")
+def api_keys_create(
+    request: Request,
+    name: str = Form(...),
+    username: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """새 API 키 발급 → 키 표시와 함께 페이지 다시 렌더링."""
+    user = db.scalar(select(User).where(User.username == username))
+    if user is None:
+        raise HTTPException(404, "User not found")
+    raw_key = secrets.token_urlsafe(32)
+    db.add(ApiKey(user_id=user.id, key_hash=hash_api_key(raw_key), name=name.strip()))
+    db.commit()
+    keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())).all()
+    return templates.TemplateResponse(
+        request,
+        "admin/api_keys.html",
+        {
+            "request": request,
+            "title": "API 키 관리",
+            "keys": keys,
+            "new_key": raw_key,
+            "server_url": _server_url(request),
+        },
+    )
+
+
+@router.post("/api-keys/{key_id}/revoke")
+def api_keys_revoke(
+    key_id: int,
+    username: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """API 키 삭제."""
+    user = db.scalar(select(User).where(User.username == username))
+    if user is None:
+        raise HTTPException(404, "User not found")
+    db.execute(delete(ApiKey).where(ApiKey.id == key_id, ApiKey.user_id == user.id))
+    db.commit()
+    return RedirectResponse("/admin/api-keys", status_code=303)

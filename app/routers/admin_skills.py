@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
 from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion
-from app.routers.admin_base import templates
+from app.routers.admin_base import DOMAIN_CONFIG, templates
 from app.services import versioned_skills as vs
 
 router = APIRouter(prefix="/admin", tags=["admin-skills"])
@@ -36,6 +36,22 @@ def _section_display(sn: str) -> str:
     return "기본" if sn == vs.DEFAULT_SECTION else sn
 
 
+# ── 개발 도메인 허브 ──────────────────────────────────────────────────────────
+
+
+@router.get("/skills-dev")
+def skills_dev_hub(
+    request: Request,
+    _user: str = Depends(require_admin_user),
+):
+    """개발 도메인 스킬 허브 (Global / Repository / App 선택)."""
+    return templates.TemplateResponse(
+        request,
+        "admin/skills_dev_hub.html",
+        {"request": request, "title": "스킬 — 개발"},
+    )
+
+
 # ── Global skills ────────────────────────────────────────────────────────────
 
 
@@ -44,8 +60,10 @@ def global_skills_board(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
+    domain: str = "",
 ):
-    section_rows = vs._global_skill_all_sections_latest(db)
+    domain_filter = domain.strip() or None
+    section_rows = vs._global_skill_all_sections_latest(db, domain=domain_filter)
     sections = [
         {
             "section_name": r.section_name,
@@ -56,10 +74,16 @@ def global_skills_board(
         }
         for r in section_rows
     ]
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/skills/global_skills_board.html",
-        {"request": request, "title": "Global 스킬", "sections": sections},
+        {
+            "request": request,
+            "title": f"Global 스킬 — {domain_cfg['display']}" if domain_cfg else "Global 스킬",
+            "sections": sections,
+            "domain": domain_filter or "",
+        },
     )
 
 
@@ -287,8 +311,10 @@ def app_skills_cards(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
+    domain: str = "",
 ):
-    names = _sort_app_names(vs.list_distinct_apps_with_skills(db))
+    domain_filter = domain.strip() or None
+    names = _sort_app_names(vs.list_distinct_apps_with_skills(db, domain=domain_filter))
     if q.strip():
         names = [n for n in names if q.strip().lower() in n.lower()]
 
@@ -311,10 +337,17 @@ def app_skills_cards(
             "can_delete_stream": True,
         })
 
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/skills/app_skills_cards.html",
-        {"request": request, "title": "App 스킬", "cards": cards, "q": q},
+        {
+            "request": request,
+            "title": f"App 스킬 — {domain_cfg['display']}" if domain_cfg else "App 스킬",
+            "cards": cards,
+            "q": q,
+            "domain": domain_filter or "",
+        },
     )
 
 
@@ -674,8 +707,10 @@ def repo_skills_cards(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     q: str = "",
+    domain: str = "",
 ):
-    patterns = _sort_repo_patterns(vs.list_distinct_repo_patterns_with_skills(db))
+    domain_filter = domain.strip() or None
+    patterns = _sort_repo_patterns(vs.list_distinct_repo_patterns_with_skills(db, domain=domain_filter))
     if q.strip():
         qn = q.strip().lower()
         patterns = [p for p in patterns if qn in (p or "").lower()]
@@ -701,10 +736,17 @@ def repo_skills_cards(
             "pat_segment": seg,
         })
 
+    domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/skills/repo_skills_cards.html",
-        {"request": request, "title": "Repository 스킬", "cards": cards, "q": q},
+        {
+            "request": request,
+            "title": f"Repository 스킬 — {domain_cfg['display']}" if domain_cfg else "Repository 스킬",
+            "cards": cards,
+            "q": q,
+            "domain": domain_filter or "",
+        },
     )
 
 

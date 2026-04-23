@@ -31,19 +31,29 @@
         <details class="admin-nav-group" data-nav-rules-group>
           <summary class="admin-nav-group__summary"> 행동 지침 (Rules)</summary>
           <div class="admin-nav-group__sub">
-            <a href="/admin/global-rules" class="nav-link nav-link--sub" data-nav="global-rules">Global</a>
-            <a href="/admin/repo-rules" class="nav-link nav-link--sub" data-nav="repo-rules">Repository</a>
-            <a href="/admin/app-rules" class="nav-link nav-link--sub" data-nav="app-rules">App</a>
+            <a href="/admin/app-rules?domain=planning" class="nav-link nav-link--sub" data-nav="rules-planning">기획</a>
+            <a href="/admin/app-rules?domain=analysis" class="nav-link nav-link--sub" data-nav="rules-analysis">분석</a>
+            <a href="/admin/rules-dev" class="nav-link nav-link--sub" data-nav="rules-development">개발</a>
           </div>
         </details>
         <details class="admin-nav-group" data-nav-skills-group>
           <summary class="admin-nav-group__summary"> 스킬 (Skills)</summary>
           <div class="admin-nav-group__sub">
-            <a href="/admin/global-skills" class="nav-link nav-link--sub" data-nav="global-skills">Global</a>
-            <a href="/admin/repo-skills" class="nav-link nav-link--sub" data-nav="repo-skills">Repository</a>
-            <a href="/admin/app-skills" class="nav-link nav-link--sub" data-nav="app-skills">App</a>
+            <a href="/admin/app-skills?domain=planning" class="nav-link nav-link--sub" data-nav="skills-planning">기획</a>
+            <a href="/admin/app-skills?domain=analysis" class="nav-link nav-link--sub" data-nav="skills-analysis">분석</a>
+            <a href="/admin/skills-dev" class="nav-link nav-link--sub" data-nav="skills-development">개발</a>
           </div>
         </details>
+        <details class="admin-nav-group" data-nav-workflows-group>
+          <summary class="admin-nav-group__summary"> 워크플로우 (Workflows)</summary>
+          <div class="admin-nav-group__sub">
+            <a href="/admin/app-workflows?domain=planning" class="nav-link nav-link--sub" data-nav="workflows-planning">기획</a>
+            <a href="/admin/app-workflows?domain=analysis" class="nav-link nav-link--sub" data-nav="workflows-analysis">분석</a>
+            <a href="/admin/workflows-dev" class="nav-link nav-link--sub" data-nav="workflows-development">개발</a>
+          </div>
+        </details>
+        <a href="/admin/users" class="nav-link" data-nav="users"> 유저 관리</a>
+        <a href="/admin/api-keys" class="nav-link" data-nav="api-keys"> API 키</a>
         <a href="/admin/tools" class="nav-link" data-nav="tools"> Tools</a>
         <a href="/admin/celery" class="nav-link" data-nav="celery"> Vector Monitoring</a>
       </nav>
