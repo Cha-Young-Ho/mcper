@@ -2,6 +2,173 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-04-15: 도메인 기반 RBAC + 스킬 벡터 검색 구축
+
+### 작업 내용
+
+**Phase 1: 유저 컨텍스트 전파 + DB 스키마**
+- `app/auth/context.py` (신규) — contextvars로 CurrentUser 전파 (ASGI gate → MCP tool)
+- `app/db/rbac_models.py` (신규) — Domain, UserPermission, ContentRestriction ORM 모델
+- `app/asgi/mcp_host_gate.py` — JWT/API Key에서 유저 추출 → contextvar set
+- `app/db/database.py` — 마이그레이션: 3개 RBAC 테이블 + domain 컬럼 + skill_chunks 테이블 + 인덱스
+- `app/db/skill_models.py`, `app/db/rule_models.py` — domain 컬럼 추가
+
+**Phase 2: 권한 체크 서비스 + MCP 도구 적용**
+- `app/auth/permissions.py` (신규) — Role(VIEWER/EDITOR/ADMIN), get_effective_role, check_permission, filter_restricted_sections
+- `app/tools/_auth_check.py` (신규) — check_read/check_write 공통 헬퍼
+- 모든 MCP 도구에 권한 체크 적용: skill_tools, global_rules, documents, harness_tools, rag_tools, data_tools
+- `app/routers/admin_rbac.py` (신규) — 도메인/권한/콘텐츠 제한 관리 REST API (7개 엔드포인트)
+
+**Phase 3: 스킬 벡터 검색**
+- `app/skill/repository.py` (신규) — SqlAlchemySkillChunkRepository (SkillChunk CRUD)
+- `app/skill/service.py` (신규) — SkillIndexingService (HeadingAwareParentChildChunker 재사용)
+- `app/services/search_skills.py` (신규) — hybrid_skill_search (vector + FTS + RRF)
+- `app/tools/skill_tools.py` — search_skills MCP 도구 추가
+- `app/services/versioned_skills.py` — publish 후 자동 인덱싱 (_try_index_skill)
+- `scripts/reindex_all_skills.py` (신규) — 기존 스킬 일괄 인덱싱 스크립트
+
+**Phase 4: 마무리**
+- `app/mcp_app.py` — instructions에 search_skills 안내 + 권한 에러 안내 추가
+- `app/mcp_tools_docs.py` — search_skills 메타데이터 추가
+
+### 수정 파일 요약
+- **신규 8개**: context.py, rbac_models.py, permissions.py, _auth_check.py, admin_rbac.py, repository.py, service.py, search_skills.py, reindex_all_skills.py
+- **수정 12개**: mcp_host_gate.py, database.py, skill_models.py, rule_models.py, skill_tools.py, global_rules.py, documents.py, harness_tools.py, rag_tools.py, data_tools.py, mcp_app.py, mcp_tools_docs.py, main.py
+
+### 검증 결과
+- Docker build 성공, 컨테이너 기동 OK
+- 3개 도메인 시드 확인 (planning, development, analysis)
+- domain 컬럼 존재 확인 (AppSkillVersion 등)
+- 권한 체크 동작 확인 (auth off → 전체 허용)
+- 스킬 publish → 자동 인덱싱 → hybrid search 성공 (end-to-end)
+- admin RBAC REST API 응답 확인
+
+---
+
+## 2026-04-15: 트리거 A 룰-only 전환 + 글로벌 룰에 스킬 on-demand 조회 지시 추가
+
+### 작업 내용
+- **트리거 A (룰 로드)**: `get_global_skill` 호출 제거 — 룰만 다운로드하여 컨텍스트 절약
+- **글로벌 룰 v2 발행**: "Check MCP for Related Skills Before Work" 섹션 추가
+  - 로컬 LLM이 작업 수행 전 `list_skill_sections` → `get_global_skill`로 필요한 스킬만 on-demand 조회
+  - 스킬은 로컬 저장 금지, MCP에서 매번 조회
+- **MCP instructions 전체 정합성 정리**: 트리거 C, 행동 강령, 저장 규칙, 일반 작업 섹션 모두 on-demand 패턴으로 통일
+
+### 변경 흐름 (Before → After)
+| 항목 | Before | After |
+|------|--------|-------|
+| 트리거 A | 룰+스킬 전체 로드 | 룰만 로드 |
+| 스킬 접근 | 트리거 A에서 일괄 다운로드 | 작업 시 on-demand 조회 |
+| 글로벌 룰 | v1 (스킬 언급 없음) | v2 (스킬 조회 절차 명시) |
+| 로컬 저장 | 스킬도 .cursor/skills/ 저장 | 스킬 저장 안 함, 룰만 저장 |
+
+---
+
+## 2026-04-15: upload_harness 도구 + MCP instructions 트리거 체계 구축
+
+### 작업 내용
+- `app/tools/harness_tools.py`에 `upload_harness` MCP 도구 추가 — 로컬 하네스 파일을 일괄 업로드
+- `app/mcp_app.py` instructions 전면 개편 — 4개 명확한 트리거 체계로 재구성
+- `app/mcp_tools_docs.py`에 upload_harness 메타데이터 추가
+
+### 트리거 체계
+| 트리거 | 사용자 프롬프트 예시 | MCP 동작 |
+|--------|---------------------|----------|
+| **A — 룰·스킬 로드** | "룰 가져와", "리모트 mcp를 이용해서" | get_global_rule → get_global_skill → check_rule_versions |
+| **B — 하네스 구축** | "하네스 구축해줘", "하네스 셋업" | get_global_skill → harness-construction 가이드 → 로컬/메모리 선택 |
+| **C — 기획서 구현** | "기획서 구현해줘", "기획서 참고해서" | (A 선행) → search_documents → 스킬 참고 → Rules 준수 구현 |
+| **D — 하네스 업로드** | "하네스 올려줘", "MCP에 올려줘" | 로컬 파일 읽기 → upload_harness 일괄 등록 |
+
+### upload_harness 도구
+- 파라미터: app_name, files[{path, content, type, scope, section_name}], origin_url
+- type: "skill"(기본) / "rule"
+- scope: "app"(기본) / "repo" (origin_url에서 패턴 자동 추출)
+- 이미 등록된 섹션은 새 버전으로 갱신
+
+---
+
+## 2026-04-15: adventure 앱 데이터 시딩 — Skills + Rules 3계층 셋업
+
+### 작업 내용
+- `scripts/seed_adventure_data.py` 신규 생성 — adventure 앱 전체 데이터 시딩 스크립트
+- stz-game-service/adventure 하네스 파일 22개를 분석하여 MCP 데이터로 변환
+
+### 시딩 데이터 (10개 레코드)
+| 계층 | 섹션 | 내용 |
+|------|------|------|
+| Global Skill | mcp-usage | MCP 도구 사용법, 초기화 절차, 워크플로우 |
+| Global Skill | harness-construction | 하네스 구축 가이드 (에이전트 팀, 문서 구조) |
+| Repo Skill (stz-game-service) | main | 프로젝트 개요, 기술 스택, 디렉터리 구조 |
+| Repo Skill (stz-game-service) | workflow | 브랜치 전략, 개발 프로세스, 배포 절차 |
+| App Skill (adventure) | main | 에이전트 팀, 이벤트 시스템, 스킬 목록 |
+| App Skill (adventure) | events | 이벤트 레퍼런스 (시즌제, 시트 구조) |
+| App Skill (adventure) | api-patterns | API 규약, apidoc, URL 라우팅, 테스트 API |
+| App Skill (adventure) | testing | 테스트 가이드 (api-test, browser-test, eventitemtest) |
+| App Rule (adventure) | main | 코드 규칙, 금지사항, 기획서 워크플로우 |
+| Repo Rule (stz-game-service) | main | 공용 코드 보호, API 버전 관리, 보안 |
+
+### 검증 결과
+- ✅ get_global_skill(adventure, stz-game-service) → 8개 SKILL FILE 블록 반환
+- ✅ get_global_rule(adventure, stz-game-service) → Global + Repo + App 3계층 반환
+- ✅ check_rule_versions → 모든 버전 정보 정상
+- ✅ list_skill_sections → global(2), repo(2), app(4) 카테고리 확인
+
+### 의도
+로컬 LLM이 MCP 연결 후 "프로젝트 규칙 참고해서 기획서 구현해줘" → get_global_rule + get_global_skill로 전체 맥락 로드 가능
+
+---
+
+## 2026-04-15: Harness MCP Tools 구축 — 4개 도구 + 시드 스크립트
+
+### 작업 내용
+- `app/tools/harness_tools.py` 신규 생성 (~410줄) — 22개 하네스 문서 레지스트리 + 4개 MCP 도구
+  - `sync_harness_docs`: 파일→DB 동기화 (idempotent, 변경분만 갱신+재색인)
+  - `search_harness_docs`: 벡터+FTS 하이브리드 검색 (scope 필터 지원)
+  - `get_harness_config`: 이름으로 문서 전문 조회 (3단계 매칭: title → path stem → partial)
+  - `list_harness_docs`: 등록 문서 목록 반환
+- `app/mcp_app.py` 수정 — import + register_harness_tools(mcp) + instructions 하네스 섹션 추가
+- `app/mcp_tools_docs.py` 수정 — 4개 도구 메타데이터(name, summary, params, examples) 추가
+- `scripts/seed_harness_docs.py` 신규 생성 — CLI 시드/목록 스크립트
+- Docker buildx 설치 (brew install docker-buildx + ~/.docker/config.json cliPluginsExtraDirs 추가)
+
+### 설계 결정
+- 기존 Spec 모델 재활용 (`app_target="mcper_harness"`로 네임스페이스 분리) — 새 테이블/마이그레이션 없음
+- related_files 태그에 `scope:core`, `path:CLAUDE.md` 등으로 메타데이터 저장
+- 5개 스코프: core(3), agent(8), guide(6), design(3), principles(2) = 22개 문서
+
+### 검증 결과
+- ✅ 22개 문서 DB 삽입 성공
+- ✅ list_harness_docs → 22개 문서 목록 정상
+- ✅ get_harness_config("pm") → pm.md 전문 반환
+- ✅ get_harness_config("CLAUDE") → CLAUDE.md 전문 반환
+- ✅ sync_harness_docs (재실행) → 22개 unchanged (idempotent 확인)
+- ✅ search_harness_docs("보안 정책") → hybrid_rrf 모드, 10개 결과
+- ✅ search_harness_docs("역할", scope="agent") → agent 스코프만 9개 결과
+- ✅ MCP /mcp/ 엔드포인트에서 4개 harness 도구 등록 확인
+
+---
+
+## 2026-04-15: 전체 하네스 재구축 (문서 통합·삭제·compact화)
+
+### 작업 내용
+- CLAUDE.md + AGENTS.md 통합 → CLAUDE.md 단일 파일 (110줄)
+- ARCHITECTURE.md + TECH_GUIDE.md 통합 → ARCHITECTURE.md (111줄)
+- 10개 파일 삭제: AGENTS.md, TECH_GUIDE.md, DESIGN.md, ROADMAP.md, DEPLOYMENT_GUIDE.md, COMMIT_GUIDE.md, CODE_STYLE.md, STATUS_AND_ROADMAP_2026Q2.md, planning_*.md (3개)
+- 6개 파일 compact: RELIABILITY (441→90), SECURITY (430→96), QUALITY_SCORE (286→48), PRODUCT_SENSE (322→57), FRONTEND (200→50), DESIGN_SUMMARY (525→88)
+- .agents/ 7개 파일에서 중복 @archivist 규칙 제거
+- MEMORY.md 정리 (broken ref 제거)
+- 전체 broken reference 수정 (core-beliefs.md/index.md/db-schema.md/product-specs 인코딩 수정 포함)
+
+### 판단 이유
+- Why: 하네스 파일 총 ~10,000줄 → ~5,000줄로 축소. 중복 제거, stz-game-service 전용 파일 삭제, 인코딩 오류 수정.
+- Risk: DESIGN_CRITICAL_SECURITY.md (1039줄), DESIGN_HIGH_REFACTOR.md (1580줄)은 Phase 2 구현 참조용으로 유지.
+
+### 결과
+✅ 완료
+
+### 다음 단계
+- Phase 2 구현 시작 (docs/PLANS.md 참고)
+
 ## 2026-04-01: 스킬(Skills) 정리 및 텍스트 정규화
 
 ### 변경 개요
@@ -597,3 +764,57 @@ Repository Rules
 ## 세션 종료: 2026-04-01 11:24
 ## 세션 종료: 2026-04-01 11:25
 ## 세션 종료: 2026-04-01 11:28
+## 세션 종료: 2026-04-01 17:16
+## 세션 종료: 2026-04-01 17:44
+## 세션 종료: 2026-04-01 17:44
+## 세션 종료: 2026-04-01 17:45
+## 세션 종료: 2026-04-01 17:48
+## 세션 종료: 2026-04-01 17:48
+## 세션 종료: 2026-04-01 17:55
+## 세션 종료: 2026-04-02 09:29
+## 세션 종료: 2026-04-02 09:29
+## 세션 종료: 2026-04-02 09:30
+## 세션 종료: 2026-04-15 12:09
+## 세션 종료: 2026-04-15 12:24
+## 세션 종료: 2026-04-15 12:41
+## 세션 종료: 2026-04-15 13:14
+## 세션 종료: 2026-04-15 14:31
+## 세션 종료: 2026-04-15 14:50
+## 세션 종료: 2026-04-15 14:55
+## 세션 종료: 2026-04-15 14:57
+## 세션 종료: 2026-04-15 15:02
+## 세션 종료: 2026-04-15 16:04
+## 세션 종료: 2026-04-15 17:20
+## 세션 종료: 2026-04-15 17:56
+## 세션 종료: 2026-04-16 15:07
+## 세션 종료: 2026-04-16 15:09
+## 세션 종료: 2026-04-16 15:30
+## 세션 종료: 2026-04-16 15:30
+## 세션 종료: 2026-04-16 15:37
+## 세션 종료: 2026-04-16 15:38
+## 세션 종료: 2026-04-17 09:26
+## 세션 종료: 2026-04-17 09:32
+## 세션 종료: 2026-04-17 09:55
+## 세션 종료: 2026-04-17 09:57
+## 세션 종료: 2026-04-17 09:59
+## 세션 종료: 2026-04-17 10:02
+## 세션 종료: 2026-04-17 10:13
+## 세션 종료: 2026-04-17 14:54
+## 세션 종료: 2026-04-20 12:56
+## 세션 종료: 2026-04-20 13:06
+## 세션 종료: 2026-04-22 09:34
+## 세션 종료: 2026-04-22 09:55
+## 세션 종료: 2026-04-22 09:58
+## 세션 종료: 2026-04-22 10:29
+## 세션 종료: 2026-04-22 10:30
+## 세션 종료: 2026-04-22 10:35
+## 세션 종료: 2026-04-22 11:03
+## 세션 종료: 2026-04-22 11:06
+## 세션 종료: 2026-04-22 11:07
+## 세션 종료: 2026-04-22 11:07
+## 세션 종료: 2026-04-22 11:08
+## 세션 종료: 2026-04-22 11:08
+## 세션 종료: 2026-04-22 11:10
+## 세션 종료: 2026-04-22 11:12
+## 세션 종료: 2026-04-22 12:54
+## 세션 종료: 2026-04-23 10:33

@@ -28,6 +28,13 @@
 
 ### 다음 단계 (필요시)
 - @에이전트: 후속 작업
+
+### Compound Records (해당 시)
+<!-- compound-records-start -->
+- [MISTAKE] context: {파일/기능} | mistake: {무엇이 잘못됐나} | fix: {어떻게 고쳤나} | keywords: {검색 키워드}
+- [FEEDBACK] context: {파일/기능} | directive: {사용자 지시 내용} | keywords: {검색 키워드}
+- [CORRECTION] context: {파일/기능} | original: {원래 접근} | corrected: {수정된 접근} | keywords: {검색 키워드}
+<!-- compound-records-end -->
 ```
 
 ---
@@ -43,6 +50,7 @@
 | `@tester` | 테스트 작성 완료 후 |
 | `@infra` | 검수 완료 후 |
 | `@archivist` | 분석 메모 완성 후 |
+| `@compounder` | 세션 종료 전, 모든 에이전트 작업 완료 후 |
 
 ---
 
@@ -52,3 +60,4 @@
 - Why/Risk 간결히: "Why: 보안 CRITICAL 항목"
 - 다음 단계 실행 가능하게: "@tester: 만료 토큰 E2E 테스트 추가"
 - 분량: 100-200자 내외
+- Compound Records: 실수/피드백 없으면 생략. 있으면 context와 keywords를 구체적으로 (파일 경로, 기능명 포함)

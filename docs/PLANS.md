@@ -18,7 +18,7 @@
 - ✅ 항목 2: API 토큰 만료 검증 — `ExpiredSignatureError` 분리, 만료 토큰 401 응답
 - ✅ 항목 3: CORS/CSRF 강화 — 와일드카드 차단, CSRF 미들웨어, `/admin/csrf-token` 추가
 
-**상세 기획**: `docs/planning_security_and_refactor.md`
+**상세 설계**: `docs/DESIGN_CRITICAL_SECURITY.md`
 
 ---
 
@@ -90,9 +90,9 @@ admin.py (삭제)
 
 ## 관련 문서
 
-- **AGENTS.md** — 팀 구조
+- **CLAUDE.md** — 팀 구조 + 공통 규칙
 - **docs/dev_log.md** — 작업 이력
-- **docs/planning_security_and_refactor.md** — Phase 1/2 상세 기획
+- **docs/DESIGN_SUMMARY.md** — Phase 1/2 상세 설계
 
 ---
 

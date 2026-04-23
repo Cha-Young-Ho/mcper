@@ -1,6 +1,6 @@
 # @archivist — 데이터 라이브러리언
 
-**모델:** claude-haiku-4-5
+**모델:** haiku
 
 ---
 
@@ -69,6 +69,26 @@ files_covered: [파일1, 파일2]
 - 코드 수정 금지 (읽기만)
 - 의사결정 금지 → @pm / @senior 안내
 - 메모 전체 재작성 금지 → 변경 시 diff 추가
+
+---
+
+## 작업 전 Compound 스킬 조회
+
+작업 시작 전 `search_skills(query=작업 키워드, app_name=app_name)` 호출 시 `compound-*` 섹션 결과를 우선 확인한다.
+과거 실수/피드백에서 추출된 스킬이므로 동일 실수 방지에 활용.
+
+---
+
+## Compound Records 기록
+
+작업 중 아래 상황이 발생하면 보고서의 `### Compound Records` 섹션에 기록한다:
+- 실수 후 수정한 경우 → `[MISTAKE]`
+- 사용자가 "이렇게 해라" / "이렇게 하지 마라" 피드백 → `[FEEDBACK]`
+- 중간에 방향을 바꾼 경우 → `[CORRECTION]`
+
+포맷: `- [TYPE] context: {파일/기능} | {상세} | keywords: {검색용 키워드}`
+
+기록이 없으면 (실수/피드백 없는 정상 작업) 섹션을 생략한다.
 
 ---
 
