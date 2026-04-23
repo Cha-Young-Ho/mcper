@@ -23,7 +23,7 @@ from app.services.embeddings import configure_embedding_backend
 from app.services.mcp_auto_hosts import sync_mcp_allowed_hosts
 from app.services.rag_health import rag_health_payload
 from app.mcp_dynamic_mount import mcp_dynamic_asgi
-from app.routers import admin_base, admin_celery, admin_dashboard, admin_specs, admin_rules, admin_skills, admin_tools
+from app.routers import admin_base, admin_celery, admin_dashboard, admin_rbac, admin_specs, admin_rules, admin_skills, admin_workflows, admin_tools, admin_users
 
 logger = logging.getLogger("mcper.startup")
 
@@ -159,6 +159,9 @@ if _ADMIN_ENABLED:
     app.include_router(admin_skills.router)
     app.include_router(admin_tools.router)
     app.include_router(admin_celery.router)
+    app.include_router(admin_rbac.router)
+    app.include_router(admin_users.router)
+    app.include_router(admin_workflows.router)
     logger.info("Admin UI enabled at /admin")
 
 if _AUTH_ENABLED:
@@ -173,6 +176,53 @@ if _AUTH_ENABLED:
 if _MCP_ENABLED:
     app.mount(MCP_MOUNT_PATH, mcp_dynamic_asgi)
     logger.info("MCP endpoint enabled at %s", MCP_MOUNT_PATH)
+
+    # ── MCP OAuth well-known + endpoint proxies at root ──────────────
+    # RFC 9728/8414 require well-known URLs at the root, not inside the mount.
+    # Also, some MCP clients resolve OAuth endpoints relative to the root.
+    if _AUTH_ENABLED:
+        from app.auth.mcp_oauth_provider import MCP_SCOPES
+        from fastapi import Request as _Req
+        from fastapi.responses import Response as _Resp
+        import httpx
+
+        def _mcp_base_url() -> tuple[str, str]:
+            _port = os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8001"
+            _host = os.environ.get("MCPER_PUBLIC_HOST") or f"localhost:{_port}"
+            _sch = "https" if "443" in _host else "http"
+            _mount = MCP_MOUNT_PATH.rstrip("/") or "/mcp"
+            return f"{_sch}://{_host}", _mount
+
+        @app.get("/.well-known/oauth-protected-resource{path:path}")
+        def protected_resource_metadata(path: str = ""):
+            """RFC 9728 Protected Resource Metadata."""
+            _base, _mount = _mcp_base_url()
+            return {
+                "resource": f"{_base}{_mount}/",
+                "authorization_servers": [f"{_base}{_mount}"],
+                "scopes_supported": MCP_SCOPES,
+                "bearer_methods_supported": ["header"],
+            }
+
+        @app.get("/.well-known/oauth-authorization-server{path:path}")
+        def authorization_server_metadata(path: str = ""):
+            """RFC 8414 Authorization Server Metadata (proxy to MCP mount)."""
+            _base, _mount = _mcp_base_url()
+            from app.auth.mcp_oauth_provider import MCP_SCOPES
+            from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+            return {
+                "issuer": f"{_base}{_mount}",
+                "authorization_endpoint": f"{_base}{_mount}/authorize",
+                "token_endpoint": f"{_base}{_mount}/token",
+                "registration_endpoint": f"{_base}{_mount}/register",
+                "scopes_supported": MCP_SCOPES,
+                "response_types_supported": ["code"],
+                "grant_types_supported": ["authorization_code", "refresh_token"],
+                "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+                "revocation_endpoint": f"{_base}{_mount}/revoke",
+                "revocation_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+                "code_challenge_methods_supported": ["S256"],
+            }
 
 
 # ── Health Endpoints (항상 활성) ────────────────────────────────────

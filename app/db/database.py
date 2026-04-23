@@ -19,7 +19,9 @@ import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
 import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
 import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
 import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
+import app.db.rbac_models  # noqa: F401 — mcper_domains, mcper_user_permissions, mcper_content_restrictions
 import app.db.celery_models  # noqa: F401 — failed_tasks, celery_task_stats
+import app.db.workflow_models  # noqa: F401 — register workflow_* tables on Base.metadata
 
 
 def _resolve_database_url() -> str:
@@ -268,6 +270,241 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
+    # ── domain 컬럼 추가 (skill + rule 모든 테이블) ──────────────────────
+    connection.execute(
+        text(
+            """
+            ALTER TABLE global_skill_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            ALTER TABLE app_skill_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            ALTER TABLE repo_skill_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            ALTER TABLE global_rule_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            ALTER TABLE app_rule_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            ALTER TABLE repo_rule_versions ADD COLUMN IF NOT EXISTS domain VARCHAR(64) NULL;
+            CREATE INDEX IF NOT EXISTS ix_global_skill_versions_domain ON global_skill_versions (domain);
+            CREATE INDEX IF NOT EXISTS ix_app_skill_versions_domain ON app_skill_versions (domain);
+            CREATE INDEX IF NOT EXISTS ix_repo_skill_versions_domain ON repo_skill_versions (domain);
+            CREATE INDEX IF NOT EXISTS ix_global_rule_versions_domain ON global_rule_versions (domain);
+            CREATE INDEX IF NOT EXISTS ix_app_rule_versions_domain ON app_rule_versions (domain);
+            CREATE INDEX IF NOT EXISTS ix_repo_rule_versions_domain ON repo_rule_versions (domain);
+            """
+        )
+    )
+
+    # ── RBAC 테이블 (도메인, 권한, 콘텐츠 제한) ─────────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS mcper_domains (
+                id SERIAL PRIMARY KEY,
+                slug VARCHAR(64) NOT NULL UNIQUE,
+                display_name VARCHAR(128) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO mcper_domains (slug, display_name, description)
+            VALUES
+                ('planning', '기획', '기획 도메인 — 기획서, 요구사항, 유저스토리'),
+                ('development', '개발', '개발 도메인 — 코드 규칙, 아키텍처, 패턴'),
+                ('analysis', '분석', '분석 도메인 — 데이터 분석, 리포트, 메트릭')
+            ON CONFLICT (slug) DO NOTHING;
+
+            CREATE TABLE IF NOT EXISTS mcper_user_permissions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES mcper_users(id) ON DELETE CASCADE,
+                domain_slug VARCHAR(64),
+                app_name VARCHAR(128),
+                role VARCHAR(16) NOT NULL DEFAULT 'viewer',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_user_perm_user_domain_app UNIQUE (user_id, domain_slug, app_name)
+            );
+            CREATE INDEX IF NOT EXISTS ix_user_perm_user ON mcper_user_permissions (user_id);
+            CREATE INDEX IF NOT EXISTS ix_user_perm_domain ON mcper_user_permissions (domain_slug);
+
+            CREATE TABLE IF NOT EXISTS mcper_content_restrictions (
+                id SERIAL PRIMARY KEY,
+                domain_slug VARCHAR(64),
+                app_name VARCHAR(128),
+                section_name VARCHAR(128) NOT NULL,
+                restricted_role VARCHAR(16) NOT NULL DEFAULT 'viewer',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_content_restriction UNIQUE (domain_slug, app_name, section_name, restricted_role)
+            );
+            """
+        )
+    )
+
+    # ── skill_chunks 테이블 (스킬 벡터 검색용) ──────────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS skill_chunks (
+                id SERIAL PRIMARY KEY,
+                skill_type VARCHAR(16) NOT NULL,
+                skill_entity_id INTEGER NOT NULL,
+                app_name VARCHAR(128),
+                domain VARCHAR(64),
+                section_name VARCHAR(128) NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                metadata JSONB NOT NULL DEFAULT '{}',
+                chunk_type VARCHAR(16) NOT NULL DEFAULT 'child',
+                parent_chunk_id INTEGER REFERENCES skill_chunks(id) ON DELETE SET NULL,
+                CONSTRAINT uq_skill_chunks_type_entity_idx UNIQUE (skill_type, skill_entity_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_skill_type ON skill_chunks (skill_type);
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_entity_id ON skill_chunks (skill_entity_id);
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_app_name ON skill_chunks (app_name);
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_domain ON skill_chunks (domain);
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_chunk_type ON skill_chunks (chunk_type);
+            CREATE INDEX IF NOT EXISTS ix_skill_chunks_parent ON skill_chunks (parent_chunk_id) WHERE parent_chunk_id IS NOT NULL;
+            """
+        )
+    )
+
+    # ── rule_chunks 테이블 (룰 벡터 검색용) ────────────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS rule_chunks (
+                id SERIAL PRIMARY KEY,
+                rule_type VARCHAR(16) NOT NULL,
+                rule_entity_id INTEGER NOT NULL,
+                app_name VARCHAR(128),
+                pattern VARCHAR(256),
+                domain VARCHAR(64),
+                section_name VARCHAR(128) NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                metadata JSONB NOT NULL DEFAULT '{}',
+                chunk_type VARCHAR(16) NOT NULL DEFAULT 'child',
+                parent_chunk_id INTEGER REFERENCES rule_chunks(id) ON DELETE SET NULL,
+                CONSTRAINT uq_rule_chunks_type_entity_idx UNIQUE (rule_type, rule_entity_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_rule_type ON rule_chunks (rule_type);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_entity_id ON rule_chunks (rule_entity_id);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_app_name ON rule_chunks (app_name);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_pattern ON rule_chunks (pattern);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_domain ON rule_chunks (domain);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_chunk_type ON rule_chunks (chunk_type);
+            CREATE INDEX IF NOT EXISTS ix_rule_chunks_parent ON rule_chunks (parent_chunk_id) WHERE parent_chunk_id IS NOT NULL;
+            """
+        )
+    )
+
+
+    # ── Workflows 테이블 생성 (Rules/Skills와 별개) ──────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS global_workflow_versions (
+                id SERIAL PRIMARY KEY,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_global_workflow_versions_section_version UNIQUE (section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_global_workflow_versions_section_name ON global_workflow_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_global_workflow_versions_domain ON global_workflow_versions (domain);
+
+            CREATE TABLE IF NOT EXISTS app_workflow_versions (
+                id SERIAL PRIMARY KEY,
+                app_name VARCHAR(128) NOT NULL,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_app_workflow_versions_app_section_version UNIQUE (app_name, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_app_workflow_versions_app_name ON app_workflow_versions (app_name);
+            CREATE INDEX IF NOT EXISTS ix_app_workflow_versions_section_name ON app_workflow_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_app_workflow_versions_domain ON app_workflow_versions (domain);
+
+            CREATE TABLE IF NOT EXISTS repo_workflow_versions (
+                id SERIAL PRIMARY KEY,
+                pattern VARCHAR(256) NOT NULL DEFAULT '',
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                sort_order INTEGER NOT NULL DEFAULT 100,
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_repo_workflow_versions_pattern_section_version UNIQUE (pattern, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_repo_workflow_versions_pattern ON repo_workflow_versions (pattern);
+            CREATE INDEX IF NOT EXISTS ix_repo_workflow_versions_section_name ON repo_workflow_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_repo_workflow_versions_domain ON repo_workflow_versions (domain);
+            """
+        )
+    )
+
+    # ── 데이터 마이그레이션: skill → workflow 이동 (idempotent) ─────────
+    connection.execute(
+        text(
+            """
+            -- global: 워크플로우 스킬을 워크플로우 테이블로 이동
+            INSERT INTO global_workflow_versions (section_name, version, body, domain, created_at)
+            SELECT 'spec-implementation', 1, body, domain, created_at
+            FROM global_skill_versions WHERE section_name='spec-implementation-workflow' AND version=1
+            ON CONFLICT DO NOTHING;
+
+            INSERT INTO global_workflow_versions (section_name, version, body, domain, created_at)
+            SELECT 'spec-scan', 1, body, domain, created_at
+            FROM global_skill_versions WHERE section_name='spec-scan-workflow' AND version=2
+            ON CONFLICT DO NOTHING;
+
+            INSERT INTO global_workflow_versions (section_name, version, body, domain, created_at)
+            SELECT 'error-hunt', 1, body, domain, created_at
+            FROM global_skill_versions WHERE section_name='error-hunt-workflow' AND version=3
+            ON CONFLICT DO NOTHING;
+
+            -- app: orchestrator → spec-implementation 워크플로우
+            INSERT INTO app_workflow_versions (app_name, section_name, version, body, domain, created_at)
+            SELECT app_name, 'spec-implementation', 1, body, domain, created_at
+            FROM app_skill_versions
+            WHERE app_name='adventure' AND section_name='orchestrator'
+              AND version=(SELECT MAX(version) FROM app_skill_versions WHERE app_name='adventure' AND section_name='orchestrator')
+            ON CONFLICT DO NOTHING;
+
+            -- repo: workflow-* → 워크플로우 테이블
+            INSERT INTO repo_workflow_versions (pattern, section_name, version, sort_order, body, domain, created_at)
+            SELECT pattern, REPLACE(section_name, 'workflow-', ''), 1, sort_order, body, domain, created_at
+            FROM repo_skill_versions
+            WHERE section_name LIKE 'workflow-%'
+            ON CONFLICT DO NOTHING;
+            """
+        )
+    )
+
+    # ── 이동 완료 후 스킬 테이블 정리 (안전 체크 포함) ────────────────
+    connection.execute(
+        text(
+            """
+            DELETE FROM global_skill_versions WHERE section_name='spec-implementation-workflow'
+              AND EXISTS (SELECT 1 FROM global_workflow_versions WHERE section_name='spec-implementation');
+            DELETE FROM global_skill_versions WHERE section_name='spec-scan-workflow'
+              AND EXISTS (SELECT 1 FROM global_workflow_versions WHERE section_name='spec-scan');
+            DELETE FROM global_skill_versions WHERE section_name='error-hunt-workflow'
+              AND EXISTS (SELECT 1 FROM global_workflow_versions WHERE section_name='error-hunt');
+            DELETE FROM app_skill_versions WHERE app_name='adventure' AND section_name='orchestrator'
+              AND EXISTS (SELECT 1 FROM app_workflow_versions WHERE app_name='adventure' AND section_name='spec-implementation');
+            DELETE FROM repo_skill_versions WHERE section_name LIKE 'workflow-%'
+              AND EXISTS (SELECT 1 FROM repo_workflow_versions LIMIT 1);
+
+            -- 중복/불필요 데이터 정리
+            DELETE FROM global_skill_versions WHERE section_name='compound-workflow';
+            DELETE FROM global_skill_versions WHERE section_name='mcp-usage' AND version=1
+              AND EXISTS (SELECT 1 FROM global_skill_versions WHERE section_name='mcp-usage' AND version=2);
+            DELETE FROM global_skill_versions WHERE section_name='harness-construction' AND version=1
+              AND EXISTS (SELECT 1 FROM global_skill_versions WHERE section_name='harness-construction' AND version=2);
+            """
+        )
+    )
+
 
 def _apply_rag_indexes(connection) -> None:
     """FTS generated columns + GIN + HNSW for RAG tables (idempotent)."""
@@ -342,6 +579,86 @@ def _apply_rag_indexes(connection) -> None:
                 EXECUTE $idx$
                   CREATE INDEX IF NOT EXISTS code_nodes_embedding_hnsw_idx
                   ON code_nodes USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    # ── skill_chunks: FTS generated column + GIN + HNSW ──────────────────
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.skill_chunks') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'skill_chunks'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE skill_chunks ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.skill_chunks') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS skill_chunks_content_tsv_idx
+                  ON skill_chunks USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS skill_chunks_embedding_hnsw_idx
+                  ON skill_chunks USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    # ── rule_chunks: FTS generated column + GIN + HNSW ───────────────────
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.rule_chunks') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'rule_chunks'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE rule_chunks ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.rule_chunks') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS rule_chunks_content_tsv_idx
+                  ON rule_chunks USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS rule_chunks_embedding_hnsw_idx
+                  ON rule_chunks USING hnsw (embedding vector_cosine_ops)
                   WITH (m = 16, ef_construction = 64);
                 $idx$;
               END IF;
