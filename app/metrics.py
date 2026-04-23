@@ -169,13 +169,6 @@ def collect_all_metrics() -> None:
     _collect_db_pool_metrics()
 
 
-def metrics_response() -> Response:
-    """Generate Prometheus /metrics response."""
-    collect_all_metrics()
-    body = generate_latest(registry)
-    return Response(content=body, media_type=CONTENT_TYPE_LATEST)
-
-
 class PrometheusMiddleware(BaseHTTPMiddleware):
     """Record request duration and count for every HTTP request."""
 
