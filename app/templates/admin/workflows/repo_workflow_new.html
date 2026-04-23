@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+{% block head %}
+<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
+{% endblock %}
+{% block body %}
+<p class="muted" style="margin-top:0"><a href="/admin/repo-workflows">← Repository 워크플로우</a></p>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/admin/repo-workflows/new">
+  <div class="form-group" style="max-width:560px; margin-bottom:1.5rem">
+    <label class="form-label" for="pattern">
+      Repository URL 패턴
+      <small class="muted">(비워두면 default — 모든 repo에 적용)</small>
+    </label>
+    <input type="text" id="pattern" name="pattern"
+           class="input" autocomplete="off"
+           placeholder="예: github.com/my-org/my-repo (비어있으면 default)" />
+  </div>
+
+  <div class="split-editor" style="margin-bottom:1.5rem">
+    <div class="split-editor__pane">
+      <label class="form-label">초기 내용 (Markdown) — 기본 카테고리</label>
+      <textarea id="body" name="body" class="input split-editor__source"
+                placeholder="Repository 워크플로우 / 시스템 이해를 입력하세요."
+                spellcheck="false"></textarea>
+    </div>
+    <div class="split-editor__pane split-editor__preview-pane">
+      <label class="form-label">미리보기</label>
+      <div id="preview" class="split-editor__preview markdown-body"></div>
+    </div>
+  </div>
+
+  <div class="page-actions">
+    <button type="submit" class="btn btn-primary">패턴 생성</button>
+    <a href="/admin/repo-workflows" class="btn btn-secondary">취소</a>
+  </div>
+</form>
+
+<script src="/static/admin/markdown-preview.js?v=3"></script>
+{% endblock %}
