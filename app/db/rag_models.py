@@ -57,6 +57,85 @@ class SpecChunk(Base):
     spec: Mapped[Spec] = relationship("Spec", back_populates="chunks")
 
 
+class SkillChunk(Base):
+    """Semantic slice of a skill body with embedding + FTS (content_tsv via migration).
+
+    skill_type: 'global', 'app', 'repo' — 어떤 스킬 테이블의 행인지.
+    skill_entity_id: 해당 *_skill_versions.id.
+    chunk_type: 'child' (임베딩 대상) / 'parent' (섹션 원문 컨텍스트).
+    """
+
+    __tablename__ = "skill_chunks"
+    __table_args__ = (
+        UniqueConstraint(
+            "skill_type", "skill_entity_id", "chunk_index",
+            name="uq_skill_chunks_type_entity_idx",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    skill_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    skill_entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    app_name: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    domain: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    section_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.embedding_dim), nullable=True
+    )
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="child", index=True
+    )
+    parent_chunk_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("skill_chunks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+
+class RuleChunk(Base):
+    """Semantic slice of a rule body with embedding + FTS (content_tsv via migration).
+
+    rule_type: 'global', 'app', 'repo' — 어떤 룰 테이블의 행인지.
+    rule_entity_id: 해당 *_rule_versions.id.
+    chunk_type: 'child' (임베딩 대상) / 'parent' (섹션 원문 컨텍스트).
+    """
+
+    __tablename__ = "rule_chunks"
+    __table_args__ = (
+        UniqueConstraint(
+            "rule_type", "rule_entity_id", "chunk_index",
+            name="uq_rule_chunks_type_entity_idx",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rule_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    rule_entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    app_name: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    pattern: Mapped[str | None] = mapped_column(String(256), nullable=True, index=True)
+    domain: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    section_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.embedding_dim), nullable=True
+    )
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="child", index=True
+    )
+    parent_chunk_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("rule_chunks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+
 class CodeNode(Base):
     """AST-level or symbol-level code unit for GraphRAG search."""
 
