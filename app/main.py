@@ -183,6 +183,37 @@ if _MCP_ENABLED:
     app.mount(MCP_MOUNT_PATH, mcp_dynamic_asgi)
     logger.info("MCP endpoint enabled at %s", MCP_MOUNT_PATH)
 
+    # ── OAuth disabled: RFC 6749 호환 stub 응답 ─────────────────────────
+    # MCP 클라이언트가 저장된 이전 OAuth state 때문에 /register, /token 등을 호출할 때
+    # FastAPI 기본 404 ({"detail": "Not Found"}) 는 OAuth 에러 스키마가 아니라 클라이언트 SDK 파싱 실패.
+    # RFC 6749 §5.2 형식으로 응답해 클라이언트가 깔끔하게 OAuth 비활성을 인지하도록 한다.
+    if not _MCP_AUTH_ENABLED:
+        from fastapi.responses import JSONResponse as _JSON
+
+        _OAUTH_DISABLED_BODY = {
+            "error": "unsupported_response_type",
+            "error_description": "OAuth is not configured on this server",
+        }
+
+        def _oauth_disabled_response():
+            return _JSON(status_code=404, content=_OAUTH_DISABLED_BODY)
+
+        @app.post("/register")
+        @app.get("/register")
+        def _oauth_register_disabled(): return _oauth_disabled_response()
+
+        @app.post("/token")
+        @app.get("/token")
+        def _oauth_token_disabled(): return _oauth_disabled_response()
+
+        @app.post("/revoke")
+        @app.get("/revoke")
+        def _oauth_revoke_disabled(): return _oauth_disabled_response()
+
+        @app.post("/authorize")
+        @app.get("/authorize")
+        def _oauth_authorize_disabled(): return _oauth_disabled_response()
+
     # ── MCP OAuth well-known + endpoint proxies at root ──────────────
     # RFC 9728/8414 require well-known URLs at the root, not inside the mount.
     # Also, some MCP clients resolve OAuth endpoints relative to the root.
