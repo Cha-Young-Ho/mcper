@@ -394,6 +394,38 @@ def _apply_lightweight_migrations(connection) -> None:
     )
 
 
+    # ── workflow_chunks 테이블 (워크플로우 벡터 검색용) ────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS workflow_chunks (
+                id SERIAL PRIMARY KEY,
+                workflow_type VARCHAR(16) NOT NULL,
+                workflow_entity_id INTEGER NOT NULL,
+                app_name VARCHAR(128),
+                pattern VARCHAR(256),
+                domain VARCHAR(64),
+                section_name VARCHAR(128) NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                metadata JSONB NOT NULL DEFAULT '{}',
+                chunk_type VARCHAR(16) NOT NULL DEFAULT 'child',
+                parent_chunk_id INTEGER REFERENCES workflow_chunks(id) ON DELETE SET NULL,
+                CONSTRAINT uq_workflow_chunks_type_entity_idx UNIQUE (workflow_type, workflow_entity_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_workflow_type ON workflow_chunks (workflow_type);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_entity_id ON workflow_chunks (workflow_entity_id);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_app_name ON workflow_chunks (app_name);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_pattern ON workflow_chunks (pattern);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_domain ON workflow_chunks (domain);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_chunk_type ON workflow_chunks (chunk_type);
+            CREATE INDEX IF NOT EXISTS ix_workflow_chunks_parent ON workflow_chunks (parent_chunk_id) WHERE parent_chunk_id IS NOT NULL;
+            """
+        )
+    )
+
+
     # ── Workflows 테이블 생성 (Rules/Skills와 별개) ──────────────────────
     connection.execute(
         text(
@@ -659,6 +691,48 @@ def _apply_rag_indexes(connection) -> None:
                 EXECUTE $idx$
                   CREATE INDEX IF NOT EXISTS rule_chunks_embedding_hnsw_idx
                   ON rule_chunks USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+
+
+    # ── workflow_chunks: FTS generated column + GIN + HNSW ────────────────
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.workflow_chunks') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'workflow_chunks'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE workflow_chunks ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.workflow_chunks') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS workflow_chunks_content_tsv_idx
+                  ON workflow_chunks USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS workflow_chunks_embedding_hnsw_idx
+                  ON workflow_chunks USING hnsw (embedding vector_cosine_ops)
                   WITH (m = 16, ef_construction = 64);
                 $idx$;
               END IF;

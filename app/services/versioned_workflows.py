@@ -57,6 +57,38 @@ def _domain_filter(col, domain: str | None):
     return col == domain
 
 
+def _try_index_workflow(
+    session: Session,
+    workflow_type: str,
+    workflow_entity_id: int,
+    body: str,
+    *,
+    app_name: str | None = None,
+    pattern: str | None = None,
+    domain: str | None = None,
+    section_name: str = DEFAULT_SECTION,
+) -> None:
+    """Best-effort workflow indexing after publish. Failure is logged, not raised."""
+    try:
+        from app.workflow.service import make_default_workflow_service
+
+        svc = make_default_workflow_service(session)
+        svc.index_workflow(
+            workflow_type=workflow_type,
+            workflow_entity_id=workflow_entity_id,
+            body=body,
+            app_name=app_name,
+            pattern=pattern,
+            domain=domain,
+            section_name=section_name,
+        )
+    except Exception:
+        logger.warning(
+            "workflow indexing failed type=%s id=%s",
+            workflow_type, workflow_entity_id, exc_info=True,
+        )
+
+
 # ── Global workflows ──────────────────────────────────────────────────────
 
 
@@ -117,6 +149,10 @@ def publish_global_workflow(
     row = GlobalWorkflowVersion(section_name=section_name, version=nv, body=body, domain=domain)
     session.add(row)
     session.commit()
+    _try_index_workflow(
+        session, "global", row.id, body,
+        domain=domain, section_name=section_name,
+    )
     return nv
 
 
@@ -219,6 +255,10 @@ def publish_app_workflow(
     row = AppWorkflowVersion(app_name=key, section_name=section_name, version=nv, body=body, domain=domain)
     session.add(row)
     session.commit()
+    _try_index_workflow(
+        session, "app", row.id, body,
+        app_name=key, domain=domain, section_name=section_name,
+    )
     return key, section_name, nv
 
 
@@ -355,6 +395,10 @@ def publish_repo_workflow(
     row = RepoWorkflowVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order, domain=domain)
     session.add(row)
     session.commit()
+    _try_index_workflow(
+        session, "repo", row.id, body,
+        pattern=key, domain=domain, section_name=section_name,
+    )
     return key, section_name, nv
 
 
@@ -466,16 +510,17 @@ def get_workflows_markdown(
     return header + "\n".join(blocks) + _AGENT_WORKFLOW_SAVE_INSTRUCTIONS
 
 
-# ── 워크플로우 검색 (ILIKE 기반, 소수 데이터이므로 벡터 불필요) ──────────────
+# ── 워크플로우 검색 (하이브리드 벡터 + FTS, fallback: ILIKE) ──────────────
 
 
-def search_workflows(
+def _legacy_ilike_search_workflows(
     session: Session,
     query: str,
-    app_name: str | None = None,
-    scope: str = "all",
-    top_n: int = 10,
+    app_name: str | None,
+    scope: str,
+    top_n: int,
 ) -> list[dict]:
+    """Fallback: 레거시 ILIKE 기반 키워드 검색 (벡터 인덱스 부재 시)."""
     q = (query or "").strip()
     if not q:
         return []
@@ -545,6 +590,91 @@ def search_workflows(
             })
 
     return results[:top_n]
+
+
+def _enrich_chunks_with_version_rows(
+    session: Session,
+    chunks: list[dict],
+) -> list[dict]:
+    """하이브리드 청크 결과 → 레거시 search_workflows 응답 포맷으로 변환.
+
+    scope/section_name별로 최신 version 테이블 row를 조회해 body/version/domain 필드를 채운다.
+    같은 (workflow_type, section_name, app_name/pattern) 조합은 한 번만 반환.
+    """
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for ch in chunks:
+        wtype = ch.get("workflow_type")
+        section = ch.get("section_name") or DEFAULT_SECTION
+        app = ch.get("app_name")
+        pat = ch.get("pattern")
+
+        key_tuple = (wtype, section, app, pat)
+        if key_tuple in seen:
+            continue
+        seen.add(key_tuple)
+
+        if wtype == "global":
+            row = _global_workflow_latest(session, section)
+            if row is not None:
+                out.append({
+                    "scope": "global",
+                    "section_name": row.section_name,
+                    "version": row.version,
+                    "body": row.body,
+                    "domain": row.domain,
+                })
+        elif wtype == "app" and app:
+            row = _app_workflow_latest(session, app, section)
+            if row is not None:
+                out.append({
+                    "scope": "app",
+                    "app_name": row.app_name,
+                    "section_name": row.section_name,
+                    "version": row.version,
+                    "body": row.body,
+                    "domain": row.domain,
+                })
+        elif wtype == "repo":
+            row = _repo_workflow_latest(session, pat or "", section)
+            if row is not None:
+                out.append({
+                    "scope": "repo",
+                    "pattern": row.pattern,
+                    "section_name": row.section_name,
+                    "version": row.version,
+                    "body": row.body,
+                    "domain": row.domain,
+                })
+    return out
+
+
+def search_workflows(
+    session: Session,
+    query: str,
+    app_name: str | None = None,
+    scope: str = "all",
+    top_n: int = 10,
+) -> list[dict]:
+    """하이브리드 벡터+FTS 검색. 인덱스 미존재 또는 매칭 없음 시 ILIKE 폴백."""
+    q = (query or "").strip()
+    if not q:
+        return []
+
+    try:
+        from app.services.search_workflows import hybrid_workflow_search
+
+        chunks, mode = hybrid_workflow_search(
+            session, query=q, app_name=app_name, scope=scope, top_n=top_n,
+        )
+        if mode == "hybrid_ok" and chunks:
+            enriched = _enrich_chunks_with_version_rows(session, chunks)
+            if enriched:
+                return enriched[:top_n]
+    except Exception:
+        logger.warning("hybrid workflow search failed, falling back to ILIKE", exc_info=True)
+
+    return _legacy_ilike_search_workflows(session, q, app_name, scope, top_n)
 
 
 def update_app_workflow(
