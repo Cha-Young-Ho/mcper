@@ -33,12 +33,20 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         self.cookie_secure = cookie_secure
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # CSRF 토큰 생성/검증 (MCP, WebSocket, health, auth/login, API Bearer 인증 제외)
-        if request.url.path.startswith("/mcp") or request.url.path == "/ws":
+        # CSRF 토큰 생성/검증 (MCP, WebSocket, health, auth/login, OAuth 공개 엔드포인트, API Bearer 인증 제외)
+        path = request.url.path
+        if path.startswith("/mcp") or path == "/ws":
             return await call_next(request)
-        if request.url.path.startswith("/health"):
+        if path.startswith("/health"):
             return await call_next(request)
-        if request.url.path.startswith("/auth/login") or request.url.path.startswith("/auth/mcp-authorize"):
+        if path.startswith("/auth/login") or path.startswith("/auth/mcp-authorize"):
+            return await call_next(request)
+        # OAuth 2.0 공개 엔드포인트 (RFC 6749/7591/7009).
+        # 클라이언트가 브라우저 쿠키 없이 호출하므로 CSRF 불가능.
+        # /register, /token, /revoke, /authorize, /.well-known/* 는 모두 OAuth 프로토콜 일부.
+        if path in ("/register", "/token", "/revoke", "/authorize"):
+            return await call_next(request)
+        if path.startswith("/.well-known/"):
             return await call_next(request)
         # Bearer 토큰 인증 요청은 CSRF 검증 제외 (API 클라이언트)
         auth_header = request.headers.get("authorization", "")
