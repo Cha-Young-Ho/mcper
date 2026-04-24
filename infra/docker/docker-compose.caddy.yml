@@ -1,0 +1,45 @@
+# Caddy HTTPS 프록시 — Let's Encrypt 자동 인증서 (DuckDNS DNS-01 challenge)
+#
+# 사용법 (infra/docker/ 에서):
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#
+# 환경변수:
+#   DUCKDNS_TOKEN — .env.local 에 설정 필요
+
+name: spec-mcp
+
+services:
+  caddy:
+    image: spec-mcp-caddy:local
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    container_name: spec-mcp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    environment:
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # Let's Encrypt 인증서 저장 (영구)
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - web
+    networks:
+      - default
+
+  # web 의 외부 포트 노출 제거 (Caddy 경유만 허용)
+  # 8001 직접 접근이 필요하면 이 블록 주석 처리
+  web:
+    ports: !override []
+    expose:
+      - "8000"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

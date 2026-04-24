@@ -1,0 +1,12 @@
+# Caddy + DuckDNS plugin (for DNS-01 ACME challenge)
+# xcaddy 로 plugin 포함 바이너리 빌드
+# 2.10-builder: Go 1.24+ (caddy-dns/duckdns v0.5.0 요구사항 충족)
+
+FROM caddy:2.10-builder AS builder
+
+RUN xcaddy build \
+    --with github.com/caddy-dns/duckdns
+
+FROM caddy:2.10-alpine
+
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
