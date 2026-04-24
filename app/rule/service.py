@@ -64,7 +64,12 @@ class RuleIndexingService:
 
         vectors = self._embedding.embed_texts([c.embed_text for c in children])
 
-        self._repo.delete_by_rule(rule_type, rule_entity_id)
+        self._repo.delete_by_section(
+            rule_type,
+            app_name=app_name,
+            pattern=pattern,
+            section_name=section_name,
+        )
 
         parent_db_ids: dict[int, int] = {}
         for parent in parents:

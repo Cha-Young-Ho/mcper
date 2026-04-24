@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Re-index all existing skill versions into skill_chunks.
+"""Re-index all existing rule versions into rule_chunks.
 
 Usage:
-    docker compose exec web python scripts/reindex_all_skills.py
-    docker compose exec web python scripts/reindex_all_skills.py --purge-old
+    docker compose exec web python scripts/reindex_all_rules.py
+    docker compose exec web python scripts/reindex_all_rules.py --purge-old
 
 Options:
-    --purge-old    Delete all rows from skill_chunks first, then reindex.
+    --purge-old    Delete all rows from rule_chunks first, then reindex.
                    Useful when chunks from older versions have accumulated.
 """
 
@@ -25,9 +25,9 @@ from app.services.embeddings import configure_embedding_backend  # noqa: E402
 configure_embedding_backend(settings.embedding)
 
 from app.db.database import SessionLocal, init_db  # noqa: E402
-from app.db.rag_models import SkillChunk  # noqa: E402
-from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion  # noqa: E402
-from app.skill.service import make_default_skill_service  # noqa: E402
+from app.db.rag_models import RuleChunk  # noqa: E402
+from app.db.rule_models import AppRuleVersion, GlobalRuleVersion, RepoRuleVersion  # noqa: E402
+from app.rule.service import make_default_rule_service  # noqa: E402
 from sqlalchemy import delete, func, select  # noqa: E402
 
 
@@ -52,11 +52,11 @@ def _latest_versions(db, model, group_cols):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Reindex all skill versions into skill_chunks.")
+    parser = argparse.ArgumentParser(description="Reindex all rule versions into rule_chunks.")
     parser.add_argument(
         "--purge-old",
         action="store_true",
-        help="Delete all existing skill_chunks rows before reindexing (one-time cleanup).",
+        help="Delete all existing rule_chunks rows before reindexing (one-time cleanup).",
     )
     args = parser.parse_args()
 
@@ -64,20 +64,21 @@ def main():
     db = SessionLocal()
 
     if args.purge_old:
-        deleted = db.execute(delete(SkillChunk)).rowcount
+        deleted = db.execute(delete(RuleChunk)).rowcount
         db.commit()
-        print(f"[purge-old] Deleted {deleted} rows from skill_chunks")
+        print(f"[purge-old] Deleted {deleted} rows from rule_chunks")
 
-    svc = make_default_skill_service(db)
+    svc = make_default_rule_service(db)
     total = 0
     errors = 0
 
-    # Global skills
-    global_rows = _latest_versions(db, GlobalSkillVersion, ["section_name"])
+    # Global rules
+    global_rows = _latest_versions(db, GlobalRuleVersion, ["section_name"])
     for row in global_rows:
         try:
-            result = svc.index_skill(
-                "global", row.id, row.body, section_name=row.section_name,
+            result = svc.index_rule(
+                "global", row.id, row.body,
+                domain=row.domain, section_name=row.section_name,
             )
             if result.ok:
                 total += 1
@@ -89,13 +90,13 @@ def main():
             errors += 1
             print(f"  ERROR global/{row.section_name}: {exc}")
 
-    # App skills
-    app_rows = _latest_versions(db, AppSkillVersion, ["app_name", "section_name"])
+    # App rules
+    app_rows = _latest_versions(db, AppRuleVersion, ["app_name", "section_name"])
     for row in app_rows:
         try:
-            result = svc.index_skill(
+            result = svc.index_rule(
                 "app", row.id, row.body,
-                app_name=row.app_name, section_name=row.section_name,
+                app_name=row.app_name, domain=row.domain, section_name=row.section_name,
             )
             if result.ok:
                 total += 1
@@ -107,12 +108,13 @@ def main():
             errors += 1
             print(f"  ERROR app/{row.app_name}/{row.section_name}: {exc}")
 
-    # Repo skills
-    repo_rows = _latest_versions(db, RepoSkillVersion, ["pattern", "section_name"])
+    # Repo rules
+    repo_rows = _latest_versions(db, RepoRuleVersion, ["pattern", "section_name"])
     for row in repo_rows:
         try:
-            result = svc.index_skill(
-                "repo", row.id, row.body, section_name=row.section_name,
+            result = svc.index_rule(
+                "repo", row.id, row.body,
+                pattern=row.pattern, domain=row.domain, section_name=row.section_name,
             )
             if result.ok:
                 total += 1

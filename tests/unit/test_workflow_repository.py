@@ -31,14 +31,38 @@ def _extract_row_from_add(mock_session: MagicMock, index: int = -1) -> WorkflowC
     return call_args[0][0]
 
 
-class TestDeleteByWorkflow:
+class TestDeleteBySection:
     def test_delete_issues_execute(self):
         db = MagicMock()
         repo = SqlAlchemyWorkflowChunkRepository(db)
-        repo.delete_by_workflow("app", 42)
+        repo.delete_by_section(
+            "app", app_name="myapp", pattern=None, section_name="main",
+        )
         assert db.execute.called
-        # The argument is a delete() statement, we just confirm a single call
         assert db.execute.call_count == 1
+
+    def test_delete_with_null_app_name_and_pattern(self):
+        """global workflows have app_name=None, pattern=None — must render IS NULL."""
+        from app.workflow.repository import _eq_or_null
+        from app.db.rag_models import WorkflowChunk
+
+        # _eq_or_null returns an IS NULL clause for None
+        clause_null = _eq_or_null(WorkflowChunk.app_name, None)
+        clause_eq = _eq_or_null(WorkflowChunk.app_name, "x")
+        # compile to SQL text to verify IS NULL vs =
+        assert "IS NULL" in str(clause_null.compile(compile_kwargs={"literal_binds": True}))
+        assert "=" in str(clause_eq.compile(compile_kwargs={"literal_binds": True}))
+
+    def test_delete_all_three_scopes(self):
+        db = MagicMock()
+        repo = SqlAlchemyWorkflowChunkRepository(db)
+        # global
+        repo.delete_by_section("global", app_name=None, pattern=None, section_name="main")
+        # app
+        repo.delete_by_section("app", app_name="adventure", pattern=None, section_name="main")
+        # repo
+        repo.delete_by_section("repo", app_name=None, pattern="gh.com/x", section_name="s")
+        assert db.execute.call_count == 3
 
 
 class TestSaveParent:

@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Re-index all existing workflow versions into workflow_chunks (one-time migration).
+"""Re-index all existing workflow versions into workflow_chunks.
 
 Usage:
     docker compose exec web python scripts/reindex_all_workflows.py
+    docker compose exec web python scripts/reindex_all_workflows.py --purge-old
+
+Options:
+    --purge-old    Delete all rows from workflow_chunks first, then reindex.
+                   Useful when chunks from older versions have accumulated.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -19,13 +25,14 @@ from app.services.embeddings import configure_embedding_backend  # noqa: E402
 configure_embedding_backend(settings.embedding)
 
 from app.db.database import SessionLocal, init_db  # noqa: E402
+from app.db.rag_models import WorkflowChunk  # noqa: E402
 from app.db.workflow_models import (  # noqa: E402
     AppWorkflowVersion,
     GlobalWorkflowVersion,
     RepoWorkflowVersion,
 )
 from app.workflow.service import make_default_workflow_service  # noqa: E402
-from sqlalchemy import func, select  # noqa: E402
+from sqlalchemy import delete, func, select  # noqa: E402
 
 
 def _latest_versions(db, model, group_cols):
@@ -49,8 +56,22 @@ def _latest_versions(db, model, group_cols):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Reindex all workflow versions into workflow_chunks.")
+    parser.add_argument(
+        "--purge-old",
+        action="store_true",
+        help="Delete all existing workflow_chunks rows before reindexing (one-time cleanup).",
+    )
+    args = parser.parse_args()
+
     init_db()
     db = SessionLocal()
+
+    if args.purge_old:
+        deleted = db.execute(delete(WorkflowChunk)).rowcount
+        db.commit()
+        print(f"[purge-old] Deleted {deleted} rows from workflow_chunks")
+
     svc = make_default_workflow_service(db)
     total = 0
     errors = 0

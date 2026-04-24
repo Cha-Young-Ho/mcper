@@ -43,14 +43,22 @@ class _FakeEmbedding:
 
 class _FakeRepository:
     def __init__(self):
-        self.deleted: list[tuple[str, int]] = []
+        # Each entry: (workflow_type, app_name, pattern, section_name)
+        self.deleted: list[tuple[str, str | None, str | None, str]] = []
         self.parents: list[dict] = []
         self.children_calls: list[dict] = []
         self.committed = False
         self._next_id = 100
 
-    def delete_by_workflow(self, workflow_type: str, workflow_entity_id: int) -> None:
-        self.deleted.append((workflow_type, workflow_entity_id))
+    def delete_by_section(
+        self,
+        workflow_type: str,
+        *,
+        app_name: str | None,
+        pattern: str | None,
+        section_name: str,
+    ) -> None:
+        self.deleted.append((workflow_type, app_name, pattern, section_name))
 
     def save_parent(self, workflow_type, workflow_entity_id, record, **kw):
         db_id = self._next_id
@@ -131,8 +139,8 @@ class TestWorkflowIndexingService:
         assert result.ok is True
         assert result.parent_count == 1
         assert result.child_count == 2
-        # delete old chunks first
-        assert repo.deleted == [("app", 7)]
+        # delete old chunks first — by section, not by entity_id
+        assert repo.deleted == [("app", "adventure", None, "spec-implementation")]
         # embed called exactly once with child texts
         assert embed.calls == [["child A", "child B"]]
         # parent stored with context
@@ -180,6 +188,33 @@ class TestWorkflowIndexingService:
         ]
         svc, _strategy, repo, _embed = _make_service(records)
         svc.index_workflow("global", 99, "body")
-        assert repo.deleted == [("global", 99)]
-        # ensure delete happened before children save (not tested by order but presence is enough here
-        # since _FakeRepository tracks per-method; a separate integration test covers real DB order)
+        # delete by section (global, app_name=None, pattern=None, section='main')
+        assert repo.deleted == [("global", None, None, "main")]
+
+    def test_republish_uses_section_basis_not_entity_id(self):
+        """재발행 시 delete가 (type, app, pattern, section) 기준으로 호출되어야,
+        entity_id가 달라져도 같은 섹션의 구버전 청크가 정리된다."""
+        records = [
+            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="p", embed_text=""),
+            _FakeChunkRecord(
+                chunk_type="child", chunk_index=0, content="c",
+                embed_text="c", parent_chunk_index=-1,
+            ),
+        ]
+        svc, _strategy, repo, _embed = _make_service(records)
+        # v1 publish → entity_id=10
+        svc.index_workflow(
+            "app", 10, "body v1", app_name="myapp", section_name="main",
+        )
+        # 새 서비스 인스턴스 대신 같은 repo 재사용
+        svc._strategy = _FakeStrategy(records)
+        svc._embedding = _FakeEmbedding()
+        # v2 publish → entity_id=11 (다른 ID, 같은 section)
+        svc.index_workflow(
+            "app", 11, "body v2", app_name="myapp", section_name="main",
+        )
+        # 두 번의 delete 모두 같은 section basis를 사용해야 함
+        assert repo.deleted == [
+            ("app", "myapp", None, "main"),
+            ("app", "myapp", None, "main"),
+        ]

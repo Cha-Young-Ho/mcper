@@ -9,16 +9,34 @@ from app.db.rag_models import WorkflowChunk
 from app.spec.models import ChunkRecord
 
 
+def _eq_or_null(col, value):
+    """SQLAlchemy helper: `col IS NULL` when value is None, otherwise `col == value`."""
+    return col.is_(None) if value is None else col == value
+
+
 class SqlAlchemyWorkflowChunkRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def delete_by_workflow(self, workflow_type: str, workflow_entity_id: int) -> None:
+    def delete_by_section(
+        self,
+        workflow_type: str,
+        *,
+        app_name: str | None,
+        pattern: str | None,
+        section_name: str,
+    ) -> None:
+        """같은 (type, app_name, pattern, section) 조합의 모든 버전 청크를 삭제.
+
+        entity_id 기준이 아닌 section 기준이므로 재발행 시 이전 버전 청크가 누적되지 않는다.
+        """
         self._db.execute(
             delete(WorkflowChunk).where(
                 WorkflowChunk.workflow_type == workflow_type,
-                WorkflowChunk.workflow_entity_id == workflow_entity_id,
+                _eq_or_null(WorkflowChunk.app_name, app_name),
+                _eq_or_null(WorkflowChunk.pattern, pattern),
+                WorkflowChunk.section_name == section_name,
             )
         )
 

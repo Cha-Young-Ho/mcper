@@ -9,16 +9,34 @@ from app.db.rag_models import RuleChunk
 from app.spec.models import ChunkRecord
 
 
+def _eq_or_null(col, value):
+    """SQLAlchemy helper: `col IS NULL` when value is None, otherwise `col == value`."""
+    return col.is_(None) if value is None else col == value
+
+
 class SqlAlchemyRuleChunkRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def delete_by_rule(self, rule_type: str, rule_entity_id: int) -> None:
+    def delete_by_section(
+        self,
+        rule_type: str,
+        *,
+        app_name: str | None,
+        pattern: str | None,
+        section_name: str,
+    ) -> None:
+        """같은 (type, app_name, pattern, section) 조합의 모든 버전 청크를 삭제.
+
+        entity_id 기준이 아닌 section 기준이므로 재발행 시 이전 버전 청크가 누적되지 않는다.
+        """
         self._db.execute(
             delete(RuleChunk).where(
                 RuleChunk.rule_type == rule_type,
-                RuleChunk.rule_entity_id == rule_entity_id,
+                _eq_or_null(RuleChunk.app_name, app_name),
+                _eq_or_null(RuleChunk.pattern, pattern),
+                RuleChunk.section_name == section_name,
             )
         )
 
