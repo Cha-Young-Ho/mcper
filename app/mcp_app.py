@@ -14,11 +14,20 @@ from app.tools.skill_tools import register_skill_tools
 from app.tools.harness_tools import register_harness_tools
 from app.tools.workflow_tools import register_workflow_tools
 
-# ── MCP OAuth 인증 설정 (MCPER_AUTH_ENABLED=true 시) ────────────────
+# ── MCP OAuth 인증 설정 ────────────────────────────────────────────
+# MCPER_AUTH_ENABLED: Admin UI auth (로그인 페이지/세션)
+# MCPER_MCP_AUTH_ENABLED: MCP 엔드포인트 OAuth (RFC 명세상 HTTPS 필수).
+#   HTTP 개발 환경에서는 false 로 두고, HTTPS 도메인 붙인 뒤 true 로 전환.
+#   미설정 시 _AUTH_ENABLED 값을 따라감 (기존 동작 호환).
 _AUTH_ENABLED = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_MCP_AUTH_RAW = os.environ.get("MCPER_MCP_AUTH_ENABLED")
+if _MCP_AUTH_RAW is None:
+    _MCP_AUTH_ENABLED = _AUTH_ENABLED
+else:
+    _MCP_AUTH_ENABLED = _MCP_AUTH_RAW.lower() in ("1", "true", "yes")
 
 _mcp_auth_kwargs: dict = {}
-if _AUTH_ENABLED:
+if _MCP_AUTH_ENABLED:
     from mcp.server.auth.settings import AuthSettings as McpAuthSettings
     from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
     from pydantic import AnyHttpUrl

@@ -33,6 +33,12 @@ MCP_MOUNT_PATH = settings.mcp.mount_path.rstrip("/") or "/mcp"
 _ADMIN_ENABLED = os.environ.get("MCPER_ADMIN_ENABLED", "true").lower() not in ("0", "false", "no")
 _MCP_ENABLED   = os.environ.get("MCPER_MCP_ENABLED",   "true").lower() not in ("0", "false", "no")
 _AUTH_ENABLED  = os.environ.get("MCPER_AUTH_ENABLED",  "false").lower() in ("1", "true", "yes")
+# MCP OAuth 는 HTTPS 필수 (RFC). HTTP 개발환경에서는 끈다. 미설정 시 _AUTH_ENABLED 따라감.
+_MCP_AUTH_RAW = os.environ.get("MCPER_MCP_AUTH_ENABLED")
+_MCP_AUTH_ENABLED = (
+    _AUTH_ENABLED if _MCP_AUTH_RAW is None
+    else _MCP_AUTH_RAW.lower() in ("1", "true", "yes")
+)
 
 
 def _validate_startup_config() -> None:
@@ -180,7 +186,7 @@ if _MCP_ENABLED:
     # ── MCP OAuth well-known + endpoint proxies at root ──────────────
     # RFC 9728/8414 require well-known URLs at the root, not inside the mount.
     # Also, some MCP clients resolve OAuth endpoints relative to the root.
-    if _AUTH_ENABLED:
+    if _MCP_AUTH_ENABLED:
         from app.auth.mcp_oauth_provider import MCP_SCOPES
         from fastapi import Request as _Req
         from fastapi.responses import Response as _Resp

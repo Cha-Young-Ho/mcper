@@ -32,8 +32,16 @@ ASGIApp = Callable[[dict[str, Any], Callable, Callable], Any]
 
 _auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
 
+# MCP OAuth 독립 스위치 (HTTPS 필수이므로 HTTP 환경에서는 false).
+# mcp_app.py 와 동일한 로직으로 결정.
+_mcp_auth_raw = os.environ.get("MCPER_MCP_AUTH_ENABLED")
+if _mcp_auth_raw is None:
+    _mcp_auth_enabled = _auth_enabled
+else:
+    _mcp_auth_enabled = _mcp_auth_raw.lower() in ("1", "true", "yes")
+
 # SDK OAuth가 활성이면 Bearer 인증은 SDK가 처리 → 게이트는 Host/Origin만 검사
-_sdk_auth_active = _auth_enabled  # SDK auth = auth enabled (mcp_app.py에서 동일 조건)
+_sdk_auth_active = _mcp_auth_enabled  # SDK auth = MCP auth enabled (mcp_app.py와 동일 조건)
 
 
 def _mcp_transport_gate_bypassed() -> bool:
@@ -109,8 +117,9 @@ def _resolve_user_from_api_key(token: str) -> CurrentUser | None:
 
 
 def _check_bearer_auth(auth_header: str | None) -> tuple[bool, int, bytes, CurrentUser | None]:
-    """MCPER_AUTH_ENABLED=true 시 Bearer 토큰(JWT or API 키) 검증 + 유저 추출."""
-    if not _auth_enabled:
+    """MCP endpoint Bearer 토큰(JWT or API 키) 검증 + 유저 추출.
+    MCPER_MCP_AUTH_ENABLED=false 면 체크 스킵 (HTTP 개발 환경용)."""
+    if not _mcp_auth_enabled:
         return True, 0, b"", None
     if not auth_header or not auth_header.startswith("Bearer "):
         return False, 401, b"Authorization required", None
