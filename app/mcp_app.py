@@ -35,9 +35,13 @@ if _MCP_AUTH_ENABLED:
     from app.auth.mcp_oauth_provider import McperOAuthProvider
 
     # issuer_url / resource_server_url: 런타임에 실제 URL 사용
+    # MCP SDK 는 issuer_url 에 HTTPS 를 강제하므로, MCPER_MCP_AUTH_ENABLED=true 일 때는 기본 https.
+    # MCPER_PUBLIC_SCHEME 로 명시 override 가능 (예: 로컬 테스트 시 "http").
     _server_port = os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8001"
     _server_host = os.environ.get("MCPER_PUBLIC_HOST") or f"localhost:{_server_port}"
-    _scheme = "https" if "443" in _server_host else "http"
+    _scheme = os.environ.get("MCPER_PUBLIC_SCHEME") or (
+        "https" if ("443" in _server_host or _MCP_AUTH_ENABLED) else "http"
+    )
     _base_url = f"{_scheme}://{_server_host}"
 
     # MCP 앱이 /mcp에 마운트되므로, issuer_url도 /mcp 경로 포함

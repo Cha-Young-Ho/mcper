@@ -226,7 +226,9 @@ if _MCP_ENABLED:
         def _mcp_base_url() -> tuple[str, str]:
             _port = os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8001"
             _host = os.environ.get("MCPER_PUBLIC_HOST") or f"localhost:{_port}"
-            _sch = "https" if "443" in _host else "http"
+            _sch = os.environ.get("MCPER_PUBLIC_SCHEME") or (
+                "https" if ("443" in _host or _MCP_AUTH_ENABLED) else "http"
+            )
             _mount = MCP_MOUNT_PATH.rstrip("/") or "/mcp"
             return f"{_sch}://{_host}", _mount
 
