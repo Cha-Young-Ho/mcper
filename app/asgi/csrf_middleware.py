@@ -6,10 +6,10 @@ import logging
 import secrets
 from typing import Callable
 
-from fastapi import HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+from starlette.status import HTTP_403_FORBIDDEN
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +91,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     request.url.path,
                     content_type,
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="CSRF token missing or invalid",
+                return JSONResponse(
+                    status_code=HTTP_403_FORBIDDEN,
+                    content={"detail": "CSRF token missing or invalid"},
                 )
 
             if not secrets.compare_digest(token_from_cookie, token_from_request):
@@ -102,9 +102,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     request.method,
                     request.url.path,
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="CSRF token validation failed",
+                return JSONResponse(
+                    status_code=HTTP_403_FORBIDDEN,
+                    content={"detail": "CSRF token validation failed"},
                 )
 
         return await call_next(request)

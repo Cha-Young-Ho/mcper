@@ -21,5 +21,11 @@ testpaths     = ["tests"]
 python_files  = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts       = "-v --tb=short"
+# -m 'not e2e': e2e tests require full-stack env (Redis/Celery/MCPER_AUTH_ENABLED=true).
+# Run them explicitly with `pytest -m e2e`.
+addopts       = "-v --tb=short -m 'not e2e'"
 asyncio_mode  = "auto"
+markers = [
+    "integration: tests that exercise the real DB via db_session fixture",
+    "e2e: end-to-end tests requiring full-stack env (Redis/Celery/auth enabled)",
+]

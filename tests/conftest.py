@@ -43,8 +43,84 @@ def db_session():
 
 @pytest.fixture
 def test_client():
-    """Provide FastAPI test client."""
-    return TestClient(app)
+    """Provide FastAPI test client with auto CSRF token injection for unsafe methods.
+
+    Uses https://testserver so that Secure-flagged CSRF cookies set by CSRFMiddleware
+    are correctly sent back on subsequent requests."""
+    return _CSRFClient(app)
+
+
+class _CSRFClient:
+    """Thin wrapper around TestClient that auto-attaches X-CSRF-Token header for
+    unsafe methods. Backed by a live TestClient so cookies persist across requests.
+
+    Uses https://testserver so that Secure-flagged cookies set by CSRFMiddleware
+    are actually sent back on subsequent requests (TestClient defaults to http)."""
+
+    def __init__(self, app_):
+        self._client = TestClient(app_, base_url="https://testserver")
+        # Prime the csrf_token cookie (GET / triggers CSRFMiddleware's safe-path branch)
+        self._client.get("/")
+        self._token = self._client.cookies.get("csrf_token", "")
+
+    def _with_csrf_headers(self, method, kwargs):
+        headers = dict(kwargs.pop("headers", None) or {})
+        # Do NOT inject automatic CSRF header when the caller is manually setting
+        # its own cookies (likely testing CSRF behavior directly).
+        caller_sets_cookies = "cookies" in kwargs
+        already_has_header = any(k.lower() == "x-csrf-token" for k in headers)
+        if (
+            self._token
+            and method.upper() not in {"GET", "HEAD", "OPTIONS"}
+            and not caller_sets_cookies
+            and not already_has_header
+        ):
+            headers["X-CSRF-Token"] = self._token
+        kwargs["headers"] = headers
+        return kwargs
+
+    def get(self, url, **kwargs):
+        return self._client.get(url, **self._with_csrf_headers("GET", kwargs))
+
+    def post(self, url, **kwargs):
+        return self._client.post(url, **self._with_csrf_headers("POST", kwargs))
+
+    def put(self, url, **kwargs):
+        return self._client.put(url, **self._with_csrf_headers("PUT", kwargs))
+
+    def delete(self, url, **kwargs):
+        return self._client.delete(url, **self._with_csrf_headers("DELETE", kwargs))
+
+    def patch(self, url, **kwargs):
+        return self._client.patch(url, **self._with_csrf_headers("PATCH", kwargs))
+
+    def options(self, url, **kwargs):
+        return self._client.options(url, **self._with_csrf_headers("OPTIONS", kwargs))
+
+    def head(self, url, **kwargs):
+        return self._client.head(url, **self._with_csrf_headers("HEAD", kwargs))
+
+    @property
+    def cookies(self):
+        return self._client.cookies
+
+
+@pytest.fixture
+def csrf_client():
+    """TestClient wrapper that automatically attaches X-CSRF-Token for unsafe requests."""
+    return _CSRFClient(app)
+
+
+def _auth_routes_registered() -> bool:
+    """True if /auth/* routes are mounted (MCPER_AUTH_ENABLED=true at import time)."""
+    return any(getattr(r, "path", "").startswith("/auth/login") for r in app.routes)
+
+
+# Exposed for pytest.mark.skipif in test modules
+auth_disabled_skip = pytest.mark.skipif(
+    not _auth_routes_registered(),
+    reason="Auth routes only registered when MCPER_AUTH_ENABLED=true at import time",
+)
 
 
 @pytest.fixture

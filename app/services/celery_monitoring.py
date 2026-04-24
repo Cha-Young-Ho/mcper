@@ -248,7 +248,12 @@ class CeleryMonitoring:
         stat = db.query(CeleryTaskStat).filter_by(task_name=task_name).first()
 
         if not stat:
-            stat = CeleryTaskStat(task_name=task_name)
+            stat = CeleryTaskStat(
+                task_name=task_name,
+                success_count=0,
+                failure_count=0,
+                total_duration_seconds=0,
+            )
             db.add(stat)
 
         if success:

@@ -548,15 +548,14 @@ class TestUploadDocumentsBatchIntegration:
         """MCP tool call should be recorded in statistics."""
         from app.tools.documents import upload_document_impl
 
-        with patch("app.services.mcp_tool_stats.record_mcp_tool_call") as mock_record:
-            result_json = upload_document_impl(
+        # Patch the name imported into app.tools.documents, not the source module
+        with patch("app.tools.documents.record_mcp_tool_call") as mock_record:
+            upload_document_impl(
                 content="Test",
                 app_target="test",
                 base_branch="main",
                 related_files=None,
             )
-
-            # record_mcp_tool_call should be invoked
             assert mock_record.called
 
     def test_ensure_ascii_false_in_json_response(self):

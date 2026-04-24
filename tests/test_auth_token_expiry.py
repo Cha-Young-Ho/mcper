@@ -13,6 +13,7 @@ from app.auth.service import (
 )
 from app.db.auth_models import User, ApiKey
 from app.db.database import get_db
+from tests.conftest import auth_disabled_skip
 
 
 class TestJWTTokenExpiry:
@@ -251,6 +252,7 @@ class TestRefreshTokenPattern:
                 # This would be caught in the endpoint logic
                 assert payload.get("type") != "access"
 
+    @auth_disabled_skip
     def test_expired_refresh_token_rejected(self, test_client, admin_user: User):
         """Expired refresh token should be rejected."""
         expired_refresh = create_access_token(
@@ -351,6 +353,7 @@ class TestAPIKeyExpiry:
                 assert api_key.last_used_at >= original_last_used
 
 
+@auth_disabled_skip
 class TestTokenValidationEndpoint:
     """Integration tests: POST /auth/token/validate endpoint."""
 
@@ -505,6 +508,7 @@ class TestTokenIntegrity:
             decode_token(token)
 
 
+@auth_disabled_skip
 class TestRefreshEndpointEdgeCases:
     """Edge case tests for POST /auth/token/refresh endpoint."""
 

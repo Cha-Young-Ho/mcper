@@ -1,10 +1,16 @@
 """Integration tests for Celery monitoring service with DB."""
 
+import uuid
+
 import pytest
 from datetime import datetime, timezone
 
 from app.db.celery_models import FailedTask, CeleryTaskStat
 from app.services.celery_monitoring import CeleryMonitoring
+
+
+def _unique_task(prefix: str = "task") -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.mark.integration
@@ -149,53 +155,56 @@ class TestCeleryMonitoringResolve:
 
 @pytest.mark.integration
 class TestCeleryMonitoringStats:
-    """Test task statistics tracking."""
+    """Test task statistics tracking. Each test uses a unique task name to avoid
+    cross-contamination from pre-existing rows in the shared dev database."""
 
     def test_update_task_stat_success(self, db_session):
-        """Update stats on task success."""
+        name = _unique_task("index_spec")
         stat = CeleryMonitoring.update_task_stat(
-            db_session, "index_spec", success=True, duration_seconds=5.0
+            db_session, name, success=True, duration_seconds=5.0
         )
-        assert stat.task_name == "index_spec"
+        assert stat.task_name == name
         assert stat.success_count == 1
         assert stat.failure_count == 0
         assert stat.last_success_at is not None
 
     def test_update_task_stat_failure(self, db_session):
-        """Update stats on task failure."""
+        name = _unique_task("index_code")
         stat = CeleryMonitoring.update_task_stat(
-            db_session, "index_code", success=False, duration_seconds=2.0
+            db_session, name, success=False, duration_seconds=2.0
         )
         assert stat.failure_count == 1
         assert stat.success_count == 0
         assert stat.last_failure_at is not None
 
     def test_update_task_stat_cumulative(self, db_session):
-        """Stats accumulate across multiple updates."""
-        CeleryMonitoring.update_task_stat(db_session, "multi_task", True, 1.0)
-        CeleryMonitoring.update_task_stat(db_session, "multi_task", True, 2.0)
-        CeleryMonitoring.update_task_stat(db_session, "multi_task", False, 3.0)
-        stat = CeleryMonitoring.get_task_stats(db_session, task_name="multi_task")
+        name = _unique_task("multi")
+        CeleryMonitoring.update_task_stat(db_session, name, True, 1.0)
+        CeleryMonitoring.update_task_stat(db_session, name, True, 2.0)
+        CeleryMonitoring.update_task_stat(db_session, name, False, 3.0)
+        stat = CeleryMonitoring.get_task_stats(db_session, task_name=name)
         assert stat.success_count == 2
         assert stat.failure_count == 1
         assert stat.total_duration_seconds == 6
 
     def test_get_task_stats_all(self, db_session):
-        """Get all task stats returns list."""
-        CeleryMonitoring.update_task_stat(db_session, "task_a", True, 1.0)
-        CeleryMonitoring.update_task_stat(db_session, "task_b", False, 2.0)
+        name_a = _unique_task("task_a")
+        name_b = _unique_task("task_b")
+        CeleryMonitoring.update_task_stat(db_session, name_a, True, 1.0)
+        CeleryMonitoring.update_task_stat(db_session, name_b, False, 2.0)
         result = CeleryMonitoring.get_task_stats(db_session)
         assert isinstance(result, list)
-        assert len(result) == 2
+        names = {r.task_name for r in result}
+        assert name_a in names
+        assert name_b in names
 
     def test_get_task_stats_by_name(self, db_session):
-        """Get specific task stats by name."""
-        CeleryMonitoring.update_task_stat(db_session, "specific_task", True, 5.0)
-        result = CeleryMonitoring.get_task_stats(db_session, task_name="specific_task")
+        name = _unique_task("specific")
+        CeleryMonitoring.update_task_stat(db_session, name, True, 5.0)
+        result = CeleryMonitoring.get_task_stats(db_session, task_name=name)
         assert result is not None
-        assert result.task_name == "specific_task"
+        assert result.task_name == name
 
     def test_get_task_stats_nonexistent(self, db_session):
-        """Get stats for nonexistent task returns None."""
-        result = CeleryMonitoring.get_task_stats(db_session, task_name="nonexistent")
+        result = CeleryMonitoring.get_task_stats(db_session, task_name=_unique_task("ghost"))
         assert result is None
