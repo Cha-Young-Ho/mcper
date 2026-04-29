@@ -26,13 +26,7 @@ from app.services.versioned_skills import (
     publish_global_skill,
     publish_repo_skill,
 )
-
-
-def _normalize_app_name(raw: str) -> str:
-    s = raw.strip().strip('"').strip("'")
-    if "/" in s:
-        s = s.split("/", 1)[0].strip()
-    return s
+from app.tools._common import _normalize_app_name
 
 
 def register_skill_tools(mcp: FastMCP) -> None:

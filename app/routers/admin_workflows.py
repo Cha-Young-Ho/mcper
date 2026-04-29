@@ -13,27 +13,14 @@ from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
 from app.db.workflow_models import AppWorkflowVersion, GlobalWorkflowVersion, RepoWorkflowVersion
 from app.routers.admin_base import DOMAIN_CONFIG, templates
+from app.routers.admin_common import _sort_app_names, _sort_repo_patterns, _section_display as _section_display_base
 from app.services import versioned_workflows as vw
 
 router = APIRouter(prefix="/admin", tags=["admin-workflows"])
 
-# ── 공통 헬퍼 ───────────────────────────────────────────────────────────────
-
-
-def _sort_app_names(names: list[str]) -> list[str]:
-    def key(n: str) -> tuple[int, str]:
-        return (0, "") if n.lower() == "__default__" else (1, n.lower())
-    return sorted(names, key=key)
-
-
-def _sort_repo_patterns(patterns: list[str]) -> list[str]:
-    def key(p: str) -> tuple[int, str]:
-        return (0, "") if not (p or "").strip() else (1, (p or "").lower())
-    return sorted(patterns, key=key)
-
 
 def _section_display(sn: str) -> str:
-    return "기본" if sn == vw.DEFAULT_SECTION else sn
+    return _section_display_base(sn, vw.DEFAULT_SECTION)
 
 
 # ── 개발 도메인 허브 ──────────────────────────────────────────────────────────

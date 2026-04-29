@@ -23,13 +23,7 @@ from app.services.versioned_docs import (
     search_docs as _search_docs,
     update_app_doc,
 )
-
-
-def _normalize_app_name(raw: str) -> str:
-    s = raw.strip().strip('"').strip("'")
-    if "/" in s:
-        s = s.split("/", 1)[0].strip()
-    return s
+from app.tools._common import _normalize_app_name
 
 
 def register_doc_tools(mcp: FastMCP) -> None:

@@ -20,6 +20,7 @@ from app.db.rule_models import (
     RepoRuleVersion,
 )
 from app.routers.admin_base import DOMAIN_CONFIG, _count, templates
+from app.routers.admin_common import _sort_app_names, _sort_repo_patterns
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -482,17 +483,6 @@ def global_rule_save_as_new_legacy(
 
 
 # ----- App rules: card index + search -----
-
-
-def _sort_app_names(names: list[str]) -> list[str]:
-    """`__default__` 카드가 그리드 왼쪽 상단에 오도록 먼저 정렬."""
-
-    def key(n: str) -> tuple[int, str]:
-        if n.lower() == "__default__":
-            return (0, "")
-        return (1, n.lower())
-
-    return sorted(names, key=key)
 
 
 @router.get("/app-rules")
@@ -1096,17 +1086,6 @@ def app_rule_section_version_delete(
 
 
 # ----- Repository rules (URL 패턴별) -----
-
-
-def _sort_repo_patterns(patterns: list[str]) -> list[str]:
-    """빈 패턴(default) 카드가 먼저 오도록 정렬."""
-
-    def key(p: str) -> tuple[int, str]:
-        if not (p or "").strip():
-            return (0, "")
-        return (1, (p or "").lower())
-
-    return sorted(patterns, key=key)
 
 
 @router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")

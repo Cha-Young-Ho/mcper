@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.tools._auth_check import check_read, check_write
+from app.tools._common import _normalize_app_name
 from app.services.versioned_rules import (
     DEFAULT_SECTION,
     append_to_app_rule as append_app_rule_body,
@@ -38,16 +39,6 @@ CURSOR_RULE_MDC_PATHS_SPLIT = (
     ".cursor/rules/mcp-rules-repository.mdc",
     ".cursor/rules/mcp-rules-app.mdc",
 )
-
-
-def _normalize_app_name(raw: str) -> str:
-    """
-    INI `app_name` 값만 사용한다. 따옴표 제거, `your_app_name/master` 같은 입력은 `your_app_name`만 사용.
-    """
-    s = raw.strip().strip('"').strip("'")
-    if "/" in s:
-        s = s.split("/", 1)[0].strip()
-    return s
 
 
 def get_global_rule_impl(

@@ -25,13 +25,7 @@ from app.services.versioned_workflows import (
     set_workflow_mermaid,
     update_app_workflow,
 )
-
-
-def _normalize_app_name(raw: str) -> str:
-    s = raw.strip().strip('"').strip("'")
-    if "/" in s:
-        s = s.split("/", 1)[0].strip()
-    return s
+from app.tools._common import _normalize_app_name
 
 
 def register_workflow_tools(mcp: FastMCP) -> None:
