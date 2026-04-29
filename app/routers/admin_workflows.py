@@ -299,11 +299,19 @@ def app_workflows_cards(
     db: Session = Depends(get_db),
     q: str = "",
     domain: str = "",
+    limit: int = 50,
+    offset: int = 0,
 ):
+    """앱 워크플로우 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    names = _sort_app_names(vw.list_distinct_apps_with_workflows(db, domain=domain_filter))
+    all_names = _sort_app_names(vw.list_distinct_apps_with_workflows(db, domain=domain_filter))
     if q.strip():
-        names = [n for n in names if q.strip().lower() in n.lower()]
+        all_names = [n for n in all_names if q.strip().lower() in n.lower()]
+
+    total = len(all_names) if q.strip() else vw.count_distinct_apps_with_workflows(db, domain=domain_filter)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    names = all_names[offset : offset + limit]
 
     cards: list[dict] = []
     for name in names:
@@ -334,6 +342,13 @@ def app_workflows_cards(
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
+            "page_limit": limit,
+            "page_offset": offset,
+            "page_total": total,
+            "has_prev": offset > 0,
+            "has_next": offset + limit < total,
+            "prev_offset": max(0, offset - limit),
+            "next_offset": offset + limit,
         },
     )
 
@@ -695,12 +710,20 @@ def repo_workflows_cards(
     db: Session = Depends(get_db),
     q: str = "",
     domain: str = "",
+    limit: int = 50,
+    offset: int = 0,
 ):
+    """레포 워크플로우 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    patterns = _sort_repo_patterns(vw.list_distinct_repo_patterns_with_workflows(db, domain=domain_filter))
+    all_patterns = _sort_repo_patterns(vw.list_distinct_repo_patterns_with_workflows(db, domain=domain_filter))
     if q.strip():
         qn = q.strip().lower()
-        patterns = [p for p in patterns if qn in (p or "").lower()]
+        all_patterns = [p for p in all_patterns if qn in (p or "").lower()]
+
+    total = len(all_patterns) if q.strip() else vw.count_distinct_repo_patterns_with_workflows(db, domain=domain_filter)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    patterns = all_patterns[offset : offset + limit]
 
     cards: list[dict] = []
     for pat in patterns:
@@ -733,6 +756,13 @@ def repo_workflows_cards(
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
+            "page_limit": limit,
+            "page_offset": offset,
+            "page_total": total,
+            "has_prev": offset > 0,
+            "has_next": offset + limit < total,
+            "prev_offset": max(0, offset - limit),
+            "next_offset": offset + limit,
         },
     )
 

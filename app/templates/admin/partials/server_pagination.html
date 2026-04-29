@@ -1,0 +1,38 @@
+{# 서버사이드 페이지네이션 UI (이전/다음 + 전체 개수).
+   컨텍스트:
+   - page_total: int  전체 항목 수
+   - page_limit: int  페이지당 항목 수
+   - page_offset: int 현재 offset
+   - has_prev / has_next: bool
+   - prev_offset / next_offset: int
+   - q, domain 등 유지할 쿼리 파라미터 (optional)
+   사용 예: {% include "admin/partials/server_pagination.html" %}
+#}
+{% if page_total is defined and page_total > page_limit %}
+  {% set start_idx = page_offset + 1 %}
+  {% set end_idx = page_offset + page_limit %}
+  {% if end_idx > page_total %}{% set end_idx = page_total %}{% endif %}
+  <nav class="pg-server" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
+    {% set _base = request.url.path %}
+    {% set _keep = [] %}
+    {% if q %}{% set _ = _keep.append('q=' ~ (q|urlencode)) %}{% endif %}
+    {% if domain %}{% set _ = _keep.append('domain=' ~ (domain|urlencode)) %}{% endif %}
+    {% set _keep_str = (_keep | join('&')) %}
+    {% set _prefix = '&' if _keep_str else '' %}
+    {% if has_prev %}
+      <a class="btn btn-secondary btn-sm" href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ prev_offset }}">← 이전</a>
+    {% else %}
+      <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:0.5;pointer-events:none">← 이전</span>
+    {% endif %}
+    <span class="muted" style="font-size:0.875rem">
+      {{ start_idx }}–{{ end_idx }} / <strong>{{ page_total }}</strong>
+    </span>
+    {% if has_next %}
+      <a class="btn btn-secondary btn-sm" href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ next_offset }}">다음 →</a>
+    {% else %}
+      <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:0.5;pointer-events:none">다음 →</span>
+    {% endif %}
+  </nav>
+{% elif page_total is defined and page_total > 0 %}
+  <p class="muted" style="text-align:center;margin-top:0.75rem;font-size:0.875rem">총 {{ page_total }}개</p>
+{% endif %}

@@ -21,6 +21,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion
+from app.skill.service import make_default_skill_service
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,6 @@ def _try_index_skill(
 ) -> None:
     """Best-effort skill indexing after publish. Failure is logged, not raised."""
     try:
-        from app.skill.service import make_default_skill_service
         svc = make_default_skill_service(session)
         svc.index_skill(
             skill_type=skill_type,
@@ -168,13 +168,33 @@ def delete_global_skill_section(session: Session, section_name: str) -> int:
 # ── App skills ─────────────────────────────────────────────────────────────
 
 
-def list_distinct_apps_with_skills(session: Session, *, domain: str | None = None) -> list[str]:
+def list_distinct_apps_with_skills(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(AppSkillVersion.app_name).distinct()
     df = _domain_filter(AppSkillVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted({r for r in rows if r})
+    names = sorted({r for r in rows if r})
+    if offset:
+        names = names[offset:]
+    if limit is not None:
+        names = names[:limit]
+    return names
+
+
+def count_distinct_apps_with_skills(session: Session, *, domain: str | None = None) -> int:
+    """AppSkill 스트림 수. 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(AppSkillVersion.app_name)))
+    df = _domain_filter(AppSkillVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
 
 
 def list_sections_for_app_skill(session: Session, app_name: str) -> list[str]:
@@ -299,13 +319,33 @@ def repo_skill_pattern_card_display(pattern: str) -> str:
     return "(default)" if not (pattern or "").strip() else pattern
 
 
-def list_distinct_repo_patterns_with_skills(session: Session, *, domain: str | None = None) -> list[str]:
+def list_distinct_repo_patterns_with_skills(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(RepoSkillVersion.pattern).distinct()
     df = _domain_filter(RepoSkillVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    patterns = sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    if offset:
+        patterns = patterns[offset:]
+    if limit is not None:
+        patterns = patterns[:limit]
+    return patterns
+
+
+def count_distinct_repo_patterns_with_skills(session: Session, *, domain: str | None = None) -> int:
+    """RepoSkill 스트림 수. 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(RepoSkillVersion.pattern)))
+    df = _domain_filter(RepoSkillVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
 
 
 def list_sections_for_repo_skill(session: Session, pattern: str) -> list[str]:

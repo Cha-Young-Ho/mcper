@@ -502,13 +502,22 @@ def app_rules_cards(
     db: Session = Depends(get_db),
     q: str = "",
     domain: str = "",
+    limit: int = 50,
+    offset: int = 0,
 ):
-    """앱 규칙 카드 목록."""
+    """앱 규칙 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    names = _sort_app_names(vr.list_distinct_apps(db, domain=domain_filter))
+    # 전체 목록 가져오고 in-Python으로 q 필터 후 limit/offset 적용.
+    all_names = _sort_app_names(vr.list_distinct_apps(db, domain=domain_filter))
     qn = q.strip().lower()
     if qn:
-        names = [n for n in names if qn in n.lower()]
+        all_names = [n for n in all_names if qn in n.lower()]
+
+    total = len(all_names) if qn else vr.count_distinct_apps(db, domain=domain_filter)
+    # 안전 범위 체크.
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    names = all_names[offset : offset + limit]
 
     # N+1 방지: 앱당 최신 행을 2 쿼리(집계 + 조인)로 일괄 조회 후 dict 룩업.
     latest_by_app = {
@@ -549,6 +558,13 @@ def app_rules_cards(
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
+            "page_limit": limit,
+            "page_offset": offset,
+            "page_total": total,
+            "has_prev": offset > 0,
+            "has_next": offset + limit < total,
+            "prev_offset": max(0, offset - limit),
+            "next_offset": offset + limit,
         },
     )
 
@@ -1134,10 +1150,12 @@ def repo_rules_cards(
     db: Session = Depends(get_db),
     q: str = "",
     domain: str = "",
+    limit: int = 50,
+    offset: int = 0,
 ):
-    """레포 규칙 카드 목록."""
+    """레포 규칙 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db, domain=domain_filter))
+    all_patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db, domain=domain_filter))
     qn = q.strip().lower()
     if qn:
 
@@ -1149,7 +1167,12 @@ def repo_rules_cards(
                 return True
             return False
 
-        patterns = [p for p in patterns if _repo_pattern_matches_query(p)]
+        all_patterns = [p for p in all_patterns if _repo_pattern_matches_query(p)]
+
+    total = len(all_patterns) if qn else vr.count_distinct_repo_patterns(db, domain=domain_filter)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    patterns = all_patterns[offset : offset + limit]
 
     # N+1 방지: 패턴당 최신 행을 2 쿼리로 일괄 조회.
     latest_by_pat = {
@@ -1188,6 +1211,13 @@ def repo_rules_cards(
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
+            "page_limit": limit,
+            "page_offset": offset,
+            "page_total": total,
+            "has_prev": offset > 0,
+            "has_next": offset + limit < total,
+            "prev_offset": max(0, offset - limit),
+            "next_offset": offset + limit,
         },
     )
 

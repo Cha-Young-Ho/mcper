@@ -24,6 +24,7 @@ from app.db.rule_models import (
     McpRuleReturnOptions,
     RepoRuleVersion,
 )
+from app.rule.service import make_default_rule_service
 from app.services.git import GitContext, get_git_context
 
 logger = __import__("logging").getLogger(__name__)
@@ -1100,7 +1101,6 @@ def _try_index_rule(
     section_name: str = DEFAULT_SECTION,
 ) -> None:
     try:
-        from app.rule.service import make_default_rule_service
         svc = make_default_rule_service(session)
         svc.index_rule(
             rule_type=rule_type,
@@ -1367,25 +1367,65 @@ def export_rules_json(session: Session) -> dict:
     }
 
 
-def list_distinct_apps(session: Session, *, domain: str | None = None) -> list[str]:
+def list_distinct_apps(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(AppRuleVersion.app_name).distinct()
     df = _domain_filter(AppRuleVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted({r for r in rows if r})
+    names = sorted({r for r in rows if r})
+    if offset:
+        names = names[offset:]
+    if limit is not None:
+        names = names[:limit]
+    return names
 
 
-def list_distinct_repo_patterns(session: Session, *, domain: str | None = None) -> list[str]:
+def count_distinct_apps(session: Session, *, domain: str | None = None) -> int:
+    """AppRule 스트림 수(앱 카드 총 개수). 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(AppRuleVersion.app_name)))
+    df = _domain_filter(AppRuleVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
+
+
+def list_distinct_repo_patterns(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(RepoRuleVersion.pattern).distinct()
     df = _domain_filter(RepoRuleVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted(
+    patterns = sorted(
         {r for r in rows if r is not None},
         key=lambda p: (0 if (p or "").strip() else 1, (p or "").lower()),
     )
+    if offset:
+        patterns = patterns[offset:]
+    if limit is not None:
+        patterns = patterns[:limit]
+    return patterns
+
+
+def count_distinct_repo_patterns(session: Session, *, domain: str | None = None) -> int:
+    """RepoRule 스트림 수(패턴 카드 총 개수). 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(RepoRuleVersion.pattern)))
+    df = _domain_filter(RepoRuleVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
 
 
 def get_latest_app_rules(

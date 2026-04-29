@@ -20,6 +20,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.workflow_models import AppWorkflowVersion, GlobalWorkflowVersion, RepoWorkflowVersion
+from app.workflow.service import make_default_workflow_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +71,6 @@ def _try_index_workflow(
 ) -> None:
     """Best-effort workflow indexing after publish. Failure is logged, not raised."""
     try:
-        from app.workflow.service import make_default_workflow_service
-
         svc = make_default_workflow_service(session)
         svc.index_workflow(
             workflow_type=workflow_type,
@@ -177,13 +176,33 @@ def delete_global_workflow_section(session: Session, section_name: str) -> int:
 # ── App workflows ─────────────────────────────────────────────────────────
 
 
-def list_distinct_apps_with_workflows(session: Session, *, domain: str | None = None) -> list[str]:
+def list_distinct_apps_with_workflows(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(AppWorkflowVersion.app_name).distinct()
     df = _domain_filter(AppWorkflowVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted({r for r in rows if r})
+    names = sorted({r for r in rows if r})
+    if offset:
+        names = names[offset:]
+    if limit is not None:
+        names = names[:limit]
+    return names
+
+
+def count_distinct_apps_with_workflows(session: Session, *, domain: str | None = None) -> int:
+    """AppWorkflow 스트림 수. 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(AppWorkflowVersion.app_name)))
+    df = _domain_filter(AppWorkflowVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
 
 
 def list_sections_for_app_workflow(session: Session, app_name: str) -> list[str]:
@@ -311,13 +330,33 @@ def repo_workflow_pattern_card_display(pattern: str) -> str:
     return "(default)" if not (pattern or "").strip() else pattern
 
 
-def list_distinct_repo_patterns_with_workflows(session: Session, *, domain: str | None = None) -> list[str]:
+def list_distinct_repo_patterns_with_workflows(
+    session: Session,
+    *,
+    domain: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[str]:
     q = select(RepoWorkflowVersion.pattern).distinct()
     df = _domain_filter(RepoWorkflowVersion.domain, domain)
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    return sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    patterns = sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    if offset:
+        patterns = patterns[offset:]
+    if limit is not None:
+        patterns = patterns[:limit]
+    return patterns
+
+
+def count_distinct_repo_patterns_with_workflows(session: Session, *, domain: str | None = None) -> int:
+    """RepoWorkflow 스트림 수. 페이지네이션 UI 용."""
+    q = select(func.count(func.distinct(RepoWorkflowVersion.pattern)))
+    df = _domain_filter(RepoWorkflowVersion.domain, domain)
+    if df is not None:
+        q = q.where(df)
+    return int(session.scalar(q) or 0)
 
 
 def list_sections_for_repo_workflow(session: Session, pattern: str) -> list[str]:
