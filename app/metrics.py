@@ -124,8 +124,11 @@ def _collect_celery_metrics() -> None:
         broker = (settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or "").strip()
         if not broker:
             return
-        import redis
-        r = redis.from_url(broker, socket_connect_timeout=1, socket_timeout=1)
+        # redis_pool 싱글톤 재사용 — 메트릭 스크레이프마다 새 연결 생성을 피한다.
+        from app.services.redis_pool import get_redis
+        r = get_redis()
+        if r is None:
+            return
         depth = int(r.llen("celery"))
         CELERY_QUEUE_DEPTH.labels(queue_name="celery").set(depth)
     except Exception:

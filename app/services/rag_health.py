@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from app.config import settings
+from app.services.redis_pool import get_redis
 
 
 def rag_health_payload() -> dict[str, Any]:
@@ -25,9 +26,11 @@ def rag_health_payload() -> dict[str, Any]:
         return out
 
     try:
-        import redis
-
-        r = redis.from_url(broker)
+        # redis_pool 싱글톤 재사용 — 매 호출 시 새 TCP 연결 생성을 피한다.
+        r = get_redis()
+        if r is None:
+            out["celery_error"] = "redis client unavailable"
+            return out
         r.ping()
         out["celery_broker_reachable"] = True
         # Celery 기본 큐 이름 (task_routes 미사용 시)
