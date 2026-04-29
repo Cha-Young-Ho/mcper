@@ -30,7 +30,8 @@ class AuthSettings(BaseModel):
     """JWT 기반 세션 인증 설정. MCPER_AUTH_ENABLED=true 시 활성화."""
 
     enabled: bool = False
-    secret_key: str = ""
+    # auth.enabled=true 일 때 반드시 값 설정. None 이면 main.py 검증에서 차단.
+    secret_key: str | None = None
     token_expire_minutes: int = 1440
     # OAuth (optional — 클라이언트 ID 설정 시 자동 활성화)
     google_client_id: str | None = None

@@ -37,8 +37,28 @@ basic_scheme = HTTPBasic(auto_error=False)
 
 
 def _admin_creds() -> tuple[str, str]:
+    """Admin Basic 인증 자격증명.
+
+    인증 활성 상태에서 ``ADMIN_PASSWORD`` 미설정/기본값(``"changeme"``) 이면
+    ``RuntimeError`` 로 차단한다. 인증 비활성(로컬 개발) 에서는 기본값 허용
+    + INFO 로그만 남긴다.
+    """
     user = os.environ.get("ADMIN_USER", "admin")
-    password = os.environ.get("ADMIN_PASSWORD", "changeme")
+    password = os.environ.get("ADMIN_PASSWORD", "")
+    if _auth_enabled:
+        if not password:
+            raise RuntimeError(
+                "ADMIN_PASSWORD 가 설정되지 않았습니다. 반드시 변경 후 시작하세요."
+            )
+        if password == "changeme":
+            raise RuntimeError(
+                "ADMIN_PASSWORD 가 기본값('changeme') 입니다. 반드시 변경 후 시작하세요."
+            )
+        return user, password
+    # auth 비활성: 로컬 개발 편의 — 기본값 허용 + INFO.
+    if not password:
+        logger.info("ADMIN_PASSWORD not set; using default 'changeme' (auth disabled).")
+        password = "changeme"
     return user, password
 
 

@@ -42,28 +42,41 @@ _MCP_AUTH_ENABLED = (
 
 
 def _validate_startup_config() -> None:
-    """중요 설정 누락 시 경고/에러 출력."""
+    """중요 설정 검증. 인증 활성 상태에서 보안 기본값 사용 시 startup 차단.
+
+    - ``MCPER_AUTH_ENABLED=true`` + ``ADMIN_PASSWORD`` 미설정/``"changeme"`` → RuntimeError
+    - ``MCPER_AUTH_ENABLED=true`` + ``AUTH_SECRET_KEY`` 미설정 → RuntimeError
+    - 인증 비활성(로컬 개발) 상태에서는 기본값 허용하고 INFO 로그만 남긴다.
+    """
     password = os.environ.get("ADMIN_PASSWORD", "")
-    if not password:
-        logger.warning(
-            "ADMIN_PASSWORD is not set. "
-            "Admin UI access requires ADMIN_PASSWORD to be configured."
-        )
-    elif password == "changeme":
-        logger.warning(
-            "ADMIN_PASSWORD is set to default 'changeme'. "
-            "Change this before exposing to any network."
-        )
-        if _AUTH_ENABLED:
-            logger.error(
-                "CRITICAL: MCPER_AUTH_ENABLED=true with default ADMIN_PASSWORD. "
-                "Set new ADMIN_PASSWORD in environment or change via /auth/change-password-forced"
+    secret_key = os.environ.get("AUTH_SECRET_KEY", "") or (settings.auth.secret_key or "")
+
+    if _AUTH_ENABLED:
+        if not password:
+            raise RuntimeError(
+                "MCPER_AUTH_ENABLED=true 이지만 ADMIN_PASSWORD 가 설정되지 않았습니다. "
+                "반드시 안전한 값으로 설정 후 시작하세요."
             )
-    if _AUTH_ENABLED and not os.environ.get("AUTH_SECRET_KEY", ""):
-        logger.error(
-            "MCPER_AUTH_ENABLED=true but AUTH_SECRET_KEY is not set. "
-            "JWT signing will fail. Please set AUTH_SECRET_KEY."
-        )
+        if password == "changeme":
+            raise RuntimeError(
+                "MCPER_AUTH_ENABLED=true 이지만 ADMIN_PASSWORD 가 기본값('changeme') 입니다. "
+                "반드시 변경 후 시작하세요."
+            )
+        if not secret_key:
+            raise RuntimeError(
+                "MCPER_AUTH_ENABLED=true 이지만 AUTH_SECRET_KEY(또는 auth.secret_key) 가 "
+                "설정되지 않았습니다. JWT/CSRF 서명을 위해 반드시 설정하세요."
+            )
+    else:
+        # 로컬 개발 편의: 인증 꺼진 상태에서는 INFO 로그만.
+        if not password:
+            logger.info(
+                "ADMIN_PASSWORD is not set (auth disabled; local dev mode)."
+            )
+        elif password == "changeme":
+            logger.info(
+                "ADMIN_PASSWORD is default 'changeme' (auth disabled; local dev mode)."
+            )
 
 
 def _get_allowed_origins() -> list[str]:
@@ -146,10 +159,25 @@ app.add_middleware(
 )
 
 # ── CSRF 미들웨어 등록 ────────────────────────────────────────────────
+# secret_key 는 _validate_startup_config() 에서 인증 활성 시 필수 검증됨.
+# 인증 비활성(로컬 개발) + admin 만 켜진 경우는 프로세스 단위 랜덤 키 자동 생성.
 if _AUTH_ENABLED or _ADMIN_ENABLED:
+    _csrf_secret = settings.auth.secret_key
+    if not _csrf_secret:
+        if _AUTH_ENABLED:
+            # 검증 함수를 통과했는데 여기 오면 안 됨 — 방어적 체크.
+            raise RuntimeError(
+                "auth.secret_key 가 비어 있습니다. AUTH_SECRET_KEY 를 설정하세요."
+            )
+        import secrets as _secrets
+        _csrf_secret = _secrets.token_urlsafe(32)
+        logger.info(
+            "auth.secret_key not configured; generated ephemeral CSRF key "
+            "(auth disabled, local dev mode)."
+        )
     app.add_middleware(
         CSRFMiddleware,
-        secret_key=settings.auth.secret_key or "default-csrf-key",
+        secret_key=_csrf_secret,
         cookie_secure=settings.security.secure_cookie,
     )
 
