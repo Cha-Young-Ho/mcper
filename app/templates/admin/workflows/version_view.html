@@ -15,7 +15,6 @@
   <button type="button"
           class="btn btn-ghost"
           id="btn-mermaid-view"
-          {% if not row.mermaid %}disabled title="아직 다이어그램이 없습니다. Claude Code 에 'workflow-to-mermaid' 스킬로 생성을 요청하세요."{% endif %}
           style="margin-left:0.5rem">한눈에 보기</button>
 </div>
 
@@ -84,10 +83,39 @@
   const modal = document.getElementById('mermaid-modal');
   const modalBody = document.getElementById('mermaid-modal-body');
   const closeBtn = document.getElementById('mermaid-modal-close');
-  if (!btn || !mermaidText) return;
+  if (!btn) return;
+
+  const EMPTY_STATE_HTML = `
+    <div style="max-width:640px; color:#374151; line-height:1.65;">
+      <div style="font-size:1.1rem; font-weight:600; margin-bottom:0.75rem;">
+        아직 다이어그램이 없습니다
+      </div>
+      <p style="margin:0 0 0.75rem;">
+        이 버전에는 Mermaid 다이어그램이 아직 등록되지 않았습니다.
+        Claude Code 에게 생성을 요청하세요.
+      </p>
+      <div style="background:#f3f4f6; border-radius:8px; padding:0.85rem 1rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:0.85rem; color:#1f2937; margin-bottom:0.75rem; white-space:pre-wrap;">이 워크플로우 다이어그램 그려줘
+— 또는 —
+workflow-to-mermaid 스킬로 이 버전 시각화해줘</div>
+      <p style="margin:0 0 0.25rem; font-size:0.88rem; color:#6b7280;">
+        Claude Code 가 본문을 읽고 Mermaid 로 변환한 뒤
+        <code style="background:#eef2ff; padding:0.1rem 0.35rem; border-radius:4px;">set_workflow_mermaid_tool</code>
+        로 이 버전에 저장합니다.
+      </p>
+      <p style="margin:0.5rem 0 0; font-size:0.88rem; color:#6b7280;">
+        저장 후 이 페이지를 새로고침하면 다이어그램이 표시됩니다.
+      </p>
+    </div>
+  `;
 
   function openModal() {
     modal.style.display = 'flex';
+
+    if (!mermaidText) {
+      modalBody.innerHTML = EMPTY_STATE_HTML;
+      return;
+    }
+
     modalBody.innerHTML = '<div style="color:#6b7280;">렌더링 중...</div>';
 
     const onReady = () => {
