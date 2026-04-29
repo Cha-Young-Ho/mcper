@@ -21,6 +21,7 @@ from app.services.versioned_workflows import (
     publish_global_workflow,
     publish_repo_workflow,
     search_workflows as _search_workflows,
+    set_workflow_mermaid,
     update_app_workflow,
 )
 
@@ -240,3 +241,57 @@ def register_workflow_tools(mcp: FastMCP) -> None:
             _, sn, nv = publish_repo_workflow(db, pattern.strip(), body, section_name)
             pat_display = pattern.strip() or "(default)"
             return f"Repo Workflow [{pat_display}/{sn}] v{nv} 발행 완료"
+
+    @mcp.tool()
+    def set_workflow_mermaid_tool(
+        scope: str,
+        section_name: str,
+        version: int,
+        mermaid: str,
+        app_name: str | None = None,
+        pattern: str | None = None,
+    ) -> str:
+        """
+        워크플로우 특정 버전에 Mermaid 다이어그램을 첨부/갱신한다.
+
+        이 도구는 새 워크플로우 버전을 만들지 않고, 기존 버전의 mermaid 필드만
+        업데이트한다. 어드민의 "한눈에 보기" 버튼은 이 필드가 채워진 버전에서만
+        활성화된다.
+
+        Mermaid 문법 권장:
+          flowchart TD
+            A[시작] --> B{조건}
+            B -->|Yes| C[작업]
+            B -->|No| D[종료]
+
+        Args:
+            scope: "global" | "app" | "repo"
+            section_name: 대상 섹션 이름 (예: "spec-implementation")
+            version: 대상 버전 번호
+            mermaid: Mermaid 다이어그램 텍스트 전체 (``` 울타리 없이 순수 문법만)
+            app_name: scope="app" 시 필수 (INI의 app_name)
+            pattern: scope="repo" 시 Repository URL 부분 문자열 (빈 문자열 = default)
+        """
+        record_mcp_tool_call("set_workflow_mermaid")
+        key = _normalize_app_name(app_name or "") or None
+        with SessionLocal() as db:
+            denied = check_write(db, app_name=key)
+            if denied:
+                return denied
+            ok = set_workflow_mermaid(
+                db,
+                scope=scope,
+                section_name=section_name,
+                version=version,
+                mermaid=mermaid,
+                app_name=key,
+                pattern=pattern,
+            )
+            if not ok:
+                return f"대상 워크플로우 버전을 찾지 못했습니다: scope={scope} section={section_name} v{version}"
+            target = f"[{scope}]"
+            if scope == "app" and key:
+                target = f"[{scope}/{key}]"
+            elif scope == "repo":
+                target = f"[{scope}/{(pattern or '').strip() or '(default)'}]"
+            return f"Mermaid 저장 완료: {target} {section_name} v{version}"

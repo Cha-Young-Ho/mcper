@@ -12,6 +12,11 @@
   <span class="category-badge">{{ section_display }}</span>
   <span class="ver-badge">v{{ row.version }}</span>
   <time class="muted">{{ row.created_at }}</time>
+  <button type="button"
+          class="btn btn-ghost"
+          id="btn-mermaid-view"
+          {% if not row.mermaid %}disabled title="아직 다이어그램이 없습니다. Claude Code 에 'workflow-to-mermaid' 스킬로 생성을 요청하세요."{% endif %}
+          style="margin-left:0.5rem">한눈에 보기</button>
 </div>
 
 <div class="split-editor split-editor--view-mode">
@@ -42,6 +47,22 @@
   {% endif %}
 </div>
 
+<!-- Mermaid 모달 -->
+<div id="mermaid-modal"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:1000; align-items:center; justify-content:center; padding:2rem;">
+  <div style="background:#fff; border-radius:12px; max-width:92vw; max-height:92vh; width:min(1100px,92vw); display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.9rem 1.25rem; border-bottom:1px solid #e5e7eb;">
+      <strong style="font-size:1rem;">한눈에 보기 — {{ section_display }} v{{ row.version }}</strong>
+      <button type="button" id="mermaid-modal-close"
+              style="background:none; border:0; font-size:1.4rem; cursor:pointer; line-height:1; color:#6b7280;">✕</button>
+    </div>
+    <div id="mermaid-modal-body"
+         style="padding:1.25rem; overflow:auto; flex:1; min-height:300px; display:flex; align-items:center; justify-content:center;">
+      <div class="mermaid" id="mermaid-render-target"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const body = {{ row.body | tojson }};
@@ -50,10 +71,60 @@
     preview.innerHTML = marked.parse(body);
   } else {
     const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    script.src = '/static/admin/vendor/marked/marked.min.js';
     script.onload = () => { preview.innerHTML = marked.parse(body); };
     document.head.appendChild(script);
   }
+})();
+
+// ── Mermaid "한눈에 보기" ─────────────────────────────────────
+(function () {
+  const mermaidText = {{ (row.mermaid or '') | tojson }};
+  const btn = document.getElementById('btn-mermaid-view');
+  const modal = document.getElementById('mermaid-modal');
+  const modalBody = document.getElementById('mermaid-modal-body');
+  const closeBtn = document.getElementById('mermaid-modal-close');
+  if (!btn || !mermaidText) return;
+
+  function openModal() {
+    modal.style.display = 'flex';
+    modalBody.innerHTML = '<div style="color:#6b7280;">렌더링 중...</div>';
+
+    const onReady = () => {
+      try {
+        const uid = 'mrm-' + Date.now();
+        window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' });
+        window.mermaid.render(uid, mermaidText).then(({ svg }) => {
+          modalBody.innerHTML = svg;
+        }).catch((err) => {
+          modalBody.innerHTML = '<pre style="color:#b91c1c; white-space:pre-wrap;">Mermaid 렌더 오류:\n' + String(err) + '</pre>';
+        });
+      } catch (err) {
+        modalBody.innerHTML = '<pre style="color:#b91c1c;">' + String(err) + '</pre>';
+      }
+    };
+
+    if (window.mermaid) {
+      onReady();
+    } else {
+      const s = document.createElement('script');
+      s.src = '/static/admin/vendor/mermaid/mermaid.min.js';
+      s.onload = onReady;
+      s.onerror = () => {
+        modalBody.innerHTML = '<div style="color:#b91c1c;">Mermaid.js 로드 실패</div>';
+      };
+      document.head.appendChild(s);
+    }
+  }
+
+  function closeModal() { modal.style.display = 'none'; }
+
+  btn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+  });
 })();
 </script>
 {% endblock %}

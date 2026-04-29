@@ -475,6 +475,17 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
+    # ── Workflow 버전 테이블에 mermaid 컬럼 추가 (idempotent) ──────────
+    connection.execute(
+        text(
+            """
+            ALTER TABLE global_workflow_versions ADD COLUMN IF NOT EXISTS mermaid TEXT NULL;
+            ALTER TABLE app_workflow_versions    ADD COLUMN IF NOT EXISTS mermaid TEXT NULL;
+            ALTER TABLE repo_workflow_versions   ADD COLUMN IF NOT EXISTS mermaid TEXT NULL;
+            """
+        )
+    )
+
 
     # ── doc_chunks 테이블 (일반 문서 벡터 검색용) ──────────────────────
     connection.execute(

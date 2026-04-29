@@ -687,3 +687,114 @@ def update_app_workflow(
 ) -> tuple[str, str, int]:
     """기존 워크플로우의 새 버전을 발행하여 업데이트한다."""
     return publish_app_workflow(session, app_name, body, section_name, domain=domain)
+
+
+# ── Mermaid 다이어그램 저장 (버전 단위, 제자리 업데이트) ────────────────
+
+
+def set_workflow_mermaid(
+    session: Session,
+    *,
+    scope: str,
+    section_name: str,
+    version: int,
+    mermaid: str,
+    app_name: str | None = None,
+    pattern: str | None = None,
+) -> bool:
+    """특정 워크플로우 버전의 `mermaid` 필드를 업데이트한다 (새 버전 발행 아님).
+
+    Args:
+        scope: "global" | "app" | "repo"
+        section_name: 섹션 이름
+        version: 대상 버전 번호
+        mermaid: Mermaid 다이어그램 텍스트 (예: ``flowchart TD\n  A --> B``)
+        app_name: scope="app" 시 필수
+        pattern: scope="repo" 시 사용 (빈 문자열 = default 스트림)
+
+    Returns:
+        업데이트 성공 시 True, 대상 행 없으면 False.
+    """
+    mermaid = (mermaid or "").strip() or None
+    scope = (scope or "").lower().strip()
+
+    if scope == "global":
+        row = _global_workflow_latest(session, section_name)
+        if row is None or row.version != version:
+            row = session.scalars(
+                select(GlobalWorkflowVersion).where(
+                    GlobalWorkflowVersion.section_name == section_name,
+                    GlobalWorkflowVersion.version == version,
+                )
+            ).first()
+    elif scope == "app":
+        if not app_name:
+            return False
+        key = (app_name or "").lower().strip()
+        row = session.scalars(
+            select(AppWorkflowVersion).where(
+                AppWorkflowVersion.app_name == key,
+                AppWorkflowVersion.section_name == section_name,
+                AppWorkflowVersion.version == version,
+            )
+        ).first()
+    elif scope == "repo":
+        pat = (pattern or "").strip()
+        row = session.scalars(
+            select(RepoWorkflowVersion).where(
+                RepoWorkflowVersion.pattern == pat,
+                RepoWorkflowVersion.section_name == section_name,
+                RepoWorkflowVersion.version == version,
+            )
+        ).first()
+    else:
+        return False
+
+    if row is None:
+        return False
+    row.mermaid = mermaid
+    session.commit()
+    return True
+
+
+def get_workflow_mermaid(
+    session: Session,
+    *,
+    scope: str,
+    section_name: str,
+    version: int,
+    app_name: str | None = None,
+    pattern: str | None = None,
+) -> str | None:
+    """특정 워크플로우 버전의 `mermaid` 필드를 조회."""
+    scope = (scope or "").lower().strip()
+    if scope == "global":
+        row = session.scalars(
+            select(GlobalWorkflowVersion).where(
+                GlobalWorkflowVersion.section_name == section_name,
+                GlobalWorkflowVersion.version == version,
+            )
+        ).first()
+    elif scope == "app":
+        if not app_name:
+            return None
+        key = (app_name or "").lower().strip()
+        row = session.scalars(
+            select(AppWorkflowVersion).where(
+                AppWorkflowVersion.app_name == key,
+                AppWorkflowVersion.section_name == section_name,
+                AppWorkflowVersion.version == version,
+            )
+        ).first()
+    elif scope == "repo":
+        pat = (pattern or "").strip()
+        row = session.scalars(
+            select(RepoWorkflowVersion).where(
+                RepoWorkflowVersion.pattern == pat,
+                RepoWorkflowVersion.section_name == section_name,
+                RepoWorkflowVersion.version == version,
+            )
+        ).first()
+    else:
+        return None
+    return row.mermaid if row else None

@@ -2,6 +2,42 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-04-29: 워크플로우 Mermaid "한눈에 보기" 기능
+
+### 작업 내용
+
+워크플로우 버전마다 Mermaid 다이어그램을 첨부해 어드민에서 시각화하는 기능.
+
+**DB 스키마**
+- `global/app/repo_workflow_versions` 에 `mermaid TEXT NULL` 컬럼 추가
+- `app/db/database.py` — `ALTER TABLE ... ADD COLUMN IF NOT EXISTS mermaid` idempotent
+
+**서비스**
+- `app/services/versioned_workflows.py` — `set_workflow_mermaid`, `get_workflow_mermaid`
+
+**MCP 도구**
+- `set_workflow_mermaid_tool(scope, section_name, version, mermaid, app_name, pattern)` — Claude Code가 Mermaid 생성 후 버전 단위로 업로드
+
+**어드민 UI**
+- `app/templates/admin/workflows/version_view.html` — "한눈에 보기" 버튼 + 모달
+- 버튼은 `row.mermaid` 가 null 이면 disabled (안내 tooltip)
+- 모달은 self-host Mermaid.js로 렌더 (ESC/바깥 클릭으로 닫힘)
+
+**Mermaid.js self-host**
+- `app/static/admin/vendor/mermaid/mermaid.min.js` (v11, 3.16MB) — CDN 없이 로컬 서빙
+
+**스킬 발행**
+- `global_skill_versions`에 `workflow-to-mermaid` v1 추가 (domain=development)
+- 내용: 워크플로우 본문 → Mermaid flowchart 변환 규칙 + set_workflow_mermaid_tool 호출 가이드
+- `skill_chunks`에 벡터 인덱싱 완료
+
+### 검증
+- `spec-mcp-web-1` 재기동으로 컬럼/도구 반영 확인
+- `adventure/spec-implementation/v1`에 샘플 Mermaid 주입 → HTML 응답에 버튼·모달·mermaidText 변수 주입 확인
+- `/static/admin/vendor/mermaid/mermaid.min.js` HTTP 200 OK
+
+---
+
 ## 2026-04-29: Docs 컨텐츠 타입 풀 복제 (Workflows 기반)
 
 ### 작업 내용
