@@ -20,16 +20,26 @@ def register_data_tools(mcp) -> None:
             dict with 'records' list and 'count'.
         """
         from app.services.datasources.registry import get
+        # Hold the session open across the authz check AND the data fetch so
+        # that no TOCTOU window exists between "may this caller read?" and
+        # the actual query. (Audit S05)
         with SessionLocal() as db:
             denied = check_read(db)
             if denied:
                 return {"error": denied}
-        try:
-            backend = get(source)
-            records = backend.fetch(query, limit=limit)
-            return {"source": source, "count": len(records), "records": records}
-        except KeyError:
-            return {"error": f"Data source '{source}' not found.", "available": []}
+            try:
+                backend = get(source)
+                records = backend.fetch(query, limit=limit)
+                return {
+                    "source": source,
+                    "count": len(records),
+                    "records": records,
+                }
+            except KeyError:
+                return {
+                    "error": f"Data source '{source}' not found.",
+                    "available": [],
+                }
 
     @mcp.tool()
     def list_data_sources() -> dict:
