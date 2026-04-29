@@ -41,11 +41,17 @@ def _resolve_database_url() -> str:
 
 DATABASE_URL = _resolve_database_url()
 
+# Phase 3 (L06): PgBouncer 도입 대비 풀 파라미터 환경변수화.
+# 기본값은 현재 운영값 유지(5/10). PgBouncer 앞단 활성화 시 .env 에서
+# DB_POOL_SIZE=2, DB_MAX_OVERFLOW=3 정도로 낮춰 실제 풀 관리를 PgBouncer 에 위임.
+_POOL_SIZE = int(os.environ.get("DB_POOL_SIZE", "5"))
+_MAX_OVERFLOW = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
+
 engine: Engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=_POOL_SIZE,
+    max_overflow=_MAX_OVERFLOW,
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, class_=Session)

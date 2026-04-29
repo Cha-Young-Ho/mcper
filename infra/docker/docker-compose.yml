@@ -101,6 +101,41 @@ services:
       retries: 15
       start_period: 10s
 
+  # Phase 3 (L06): PgBouncer 커넥션 풀러.
+  # 기본 기동에서 제외(profile: pgbouncer). 활성화: docker compose --profile pgbouncer up -d pgbouncer
+  # 시작은 session 모드(안전). transaction 모드는 설계 문서 참고 후 별도 전환.
+  # 설계: docs/design-docs/pgbouncer-setup.md
+  pgbouncer:
+    profiles: ["pgbouncer"]
+    image: edoburu/pgbouncer:v1.23.1-p3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 연결 대상 Postgres (compose 내부 네트워크)
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-user}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-mcpdb}
+      # session 으로 시작(안전). 환경변수로 transaction 전환 가능.
+      - POOL_MODE=${PGBOUNCER_POOL_MODE:-session}
+      - MAX_CLIENT_CONN=${PGBOUNCER_MAX_CLIENT_CONN:-200}
+      - DEFAULT_POOL_SIZE=${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+      - MIN_POOL_SIZE=${PGBOUNCER_MIN_POOL_SIZE:-5}
+      - RESERVE_POOL_SIZE=${PGBOUNCER_RESERVE_POOL_SIZE:-5}
+      - SERVER_RESET_QUERY=DISCARD ALL
+      - AUTH_TYPE=md5
+    # 호스트 노출은 선택 사항(디버그용). 기본은 내부 네트워크에서만 접근.
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:${PGBOUNCER_HOST_PORT:-6433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USER:-user} -d ${DB_NAME:-mcpdb}"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   redis:
     image: redis:7.4.2-alpine
     ports:

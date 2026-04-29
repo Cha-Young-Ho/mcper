@@ -188,3 +188,39 @@ services:
   (임베딩 백필 등) 에서 단일 트랜잭션이 수 분 지속하면 transaction 모드에서 DB
   커넥션을 그만큼 점유하므로 풀 사이즈 재산정 필요.
 - pgvector HNSW `CREATE INDEX` 같은 장시간 DDL 은 직결 경로로 실행할 것.
+
+---
+
+## 실구현 완료 (2026-04-29)
+
+- `infra/docker/docker-compose.yml` 에 `pgbouncer` 서비스 추가
+  (profile: `pgbouncer` — 기본 기동에서 제외)
+- 이미지는 `edoburu/pgbouncer:v1.23.1-p3` (태그 `1.23.1` 이 registry 에
+  없어 p3 패치 태그로 고정. 환경변수 스킴은 설계 문서와 동일).
+- 기본 `pool_mode=session` (안전). transaction 은 향후.
+- `app/db/database.py` 의 `pool_size` / `max_overflow` 를 `DB_POOL_SIZE` /
+  `DB_MAX_OVERFLOW` 환경변수화 (기본값은 기존과 동일: 5/10).
+- `infra/docker/.env.example` 에 PgBouncer 및 풀 파라미터 토글 문서화.
+
+### 활성화 순서
+
+1. `docker compose --profile pgbouncer up -d pgbouncer`
+2. `.env.local` 에서 `DATABASE_URL` 을 pgbouncer 로 전환:
+   `DATABASE_URL=postgresql://user:password@pgbouncer:5432/mcpdb`
+3. 선택: `DB_POOL_SIZE=2`, `DB_MAX_OVERFLOW=3` 으로 앱 풀 축소.
+4. `docker compose up -d --force-recreate web worker`
+
+### 롤백
+
+- `DATABASE_URL` 을 원래 `db:5432` 로 되돌림.
+- `docker compose --profile pgbouncer down pgbouncer`
+- 필요 시 `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` 도 원복.
+
+### transaction 모드 전환 (향후)
+
+- `PGBOUNCER_POOL_MODE=transaction` 으로 변경 후 pgbouncer 재기동.
+- SQLAlchemy 컴파일 캐시·prepared statement 관련 이슈 모니터링
+  (`prepared statement "..." does not exist` 로그 확인).
+- 문제 발생 시 `PGBOUNCER_POOL_MODE=session` 으로 즉시 롤백.
+- pgvector HNSW `CREATE INDEX` 등 장시간 DDL 은 pgbouncer 경유하지 말고
+  Postgres 직결(5432) 로 실행.
