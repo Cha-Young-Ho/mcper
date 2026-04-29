@@ -3,7 +3,12 @@
 import os
 
 from app.config import EmbeddingSettings
-from .backends import BedrockBackend, LocalSentenceTransformerBackend, OpenAICompatibleBackend
+from .backends import (
+    BedrockBackend,
+    LocalSentenceTransformerBackend,
+    OpenAICompatibleBackend,
+    SidecarEmbeddingBackend,
+)
 from .interface import EmbeddingBackend
 
 
@@ -45,4 +50,11 @@ def build_embedding_backend(cfg: EmbeddingSettings) -> EmbeddingBackend:
         )
     if p == "bedrock":
         return BedrockBackend(cfg)
+    if p == "sidecar":
+        url = (
+            os.environ.get("EMBEDDING_SIDECAR_URL")
+            or cfg.sidecar_url
+            or "http://embed:8000"
+        ).strip()
+        return SidecarEmbeddingBackend(url)
     raise RuntimeError(f"알 수 없는 embedding.provider: {p}")

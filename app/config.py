@@ -23,7 +23,7 @@ import yaml
 from pydantic import AliasChoices, BaseModel, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-EmbeddingProvider = Literal["local", "openai", "localhost", "bedrock"]
+EmbeddingProvider = Literal["local", "openai", "localhost", "bedrock", "sidecar"]
 
 
 class AuthSettings(BaseModel):
@@ -91,6 +91,9 @@ class EmbeddingSettings(BaseModel):
     #: Bedrock ``bedrock-runtime`` (``AWS_REGION`` 이 비어 있으면 ``bedrock_region`` 필수)
     bedrock_region: str | None = None
     bedrock_model_id: str = "amazon.titan-embed-text-v2:0"
+    #: ``provider == sidecar`` — 독립 컨테이너의 FastAPI `/embed` 엔드포인트 base URL
+    #: (예: ``http://embed:8000``). 미설정 시 팩토리가 기본값 사용.
+    sidecar_url: str | None = None
 
 
 class AppSettings(BaseModel):
@@ -179,6 +182,9 @@ class EnvBootstrapSettings(BaseSettings):
     )
     localhost_embedding_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("LOCALHOST_EMBEDDING_API_KEY")
+    )
+    embedding_sidecar_url: str | None = Field(
+        default=None, validation_alias=AliasChoices("EMBEDDING_SIDECAR_URL")
     )
     # Auth bootstrap
     mcper_auth_enabled: str | None = Field(
@@ -324,7 +330,7 @@ def load_settings() -> AppSettings:
 
     if env.embedding_provider:
         p = env.embedding_provider.strip().lower()
-        if p in ("local", "openai", "localhost", "bedrock"):
+        if p in ("local", "openai", "localhost", "bedrock", "sidecar"):
             cfg.embedding = cfg.embedding.model_copy(update={"provider": p})
     if env.embedding_dim is not None:
         cfg.embedding.dim = env.embedding_dim
@@ -346,6 +352,8 @@ def load_settings() -> AppSettings:
         cfg.embedding.localhost_model = env.localhost_embedding_model.strip()
     if env.localhost_embedding_api_key:
         cfg.embedding.localhost_api_key = env.localhost_embedding_api_key.strip()
+    if env.embedding_sidecar_url:
+        cfg.embedding.sidecar_url = env.embedding_sidecar_url.strip()
 
     # Auth settings override
     if env.mcper_auth_enabled is not None:

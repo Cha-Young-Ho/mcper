@@ -3,9 +3,11 @@
 from .bedrock import BedrockBackend
 from .local import LocalSentenceTransformerBackend
 from .openai import OpenAICompatibleBackend
+from .sidecar import SidecarEmbeddingBackend
 
 __all__ = [
     "LocalSentenceTransformerBackend",
     "OpenAICompatibleBackend",
     "BedrockBackend",
+    "SidecarEmbeddingBackend",
 ]
