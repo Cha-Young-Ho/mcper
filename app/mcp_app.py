@@ -249,7 +249,10 @@ mcp = FastMCP(
     ),
     json_response=True,
     streamable_http_path="/",
-    stateless_http=True,
+    # stateless_http=True: 로드밸런서 친화적이지만 일부 MCP 클라이언트(Claude Code 등)
+    # 가 OAuth 통과 후 POST initialize 없이 GET SSE 만 열고 대기하는 문제.
+    # False 로 전환해 stateful 세션(Mcp-Session-Id 헤더) 으로 전환 — 단일 프로세스라 문제없음.
+    stateless_http=False,
     **_mcp_auth_kwargs,
 )
 
