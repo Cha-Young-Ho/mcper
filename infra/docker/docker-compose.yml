@@ -127,6 +127,30 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  # Phase 3 (C안): sentence-transformers 를 별도 컨테이너로 격리.
+  # 각 웹 인스턴스가 500MB 모델을 중복 로드하던 문제 해결 → 384d 유지 (pgvector/HNSW 호환).
+  # 선택 기동: docker compose --profile sidecar-embed up -d embed
+  # 본체에서 EMBEDDING_PROVIDER=sidecar + EMBEDDING_SIDECAR_URL=http://embed:8000 으로 사용.
+  embed:
+    profiles:
+      - sidecar-embed
+    build:
+      context: embed-sidecar
+      dockerfile: Dockerfile
+    image: spec-mcp-embed:local
+    environment:
+      - EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBED_NORMALIZE=true
+    ports:
+      - "${MCPER_HOST_BIND:-127.0.0.1}:${EMBED_SIDECAR_PORT:-8002}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
