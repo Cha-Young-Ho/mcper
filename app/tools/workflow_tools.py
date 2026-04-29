@@ -12,6 +12,7 @@ from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.tools._auth_check import check_read, check_write
 from app.services.versioned_workflows import (
     DEFAULT_SECTION,
+    get_workflow_mermaid,
     get_workflows_markdown,
     list_sections_for_app_workflow,
     list_sections_for_global_workflow,
@@ -295,3 +296,59 @@ def register_workflow_tools(mcp: FastMCP) -> None:
             elif scope == "repo":
                 target = f"[{scope}/{(pattern or '').strip() or '(default)'}]"
             return f"Mermaid 저장 완료: {target} {section_name} v{version}"
+
+    @mcp.tool()
+    def get_workflow_mermaid_tool(
+        scope: str,
+        section_name: str,
+        version: int,
+        app_name: str | None = None,
+        pattern: str | None = None,
+    ) -> str:
+        """
+        워크플로우 특정 버전에 저장된 Mermaid 다이어그램을 조회한다.
+
+        어드민의 "한눈에 보기" 모달이 렌더하는 것과 동일한 텍스트.
+        없으면 안내 문자열 반환.
+
+        활용:
+        - Claude Code 에서 워크플로우 구조를 텍스트로 빠르게 확인
+        - 기존 다이어그램을 참고해 수정본 작성 후 set_workflow_mermaid_tool 로 재업로드
+        - 다이어그램 미존재 확인 후 workflow-to-mermaid 스킬로 생성
+
+        Args:
+            scope: "global" | "app" | "repo"
+            section_name: 대상 섹션 이름 (예: "spec-implementation")
+            version: 대상 버전 번호
+            app_name: scope="app" 시 필수 (INI의 app_name)
+            pattern: scope="repo" 시 Repository URL 부분 문자열 (빈 문자열 = default)
+
+        Returns:
+            Mermaid 문법 텍스트 (코드펜스 없음). 미존재 시 안내 메시지.
+        """
+        record_mcp_tool_call("get_workflow_mermaid")
+        key = _normalize_app_name(app_name or "") or None
+        with SessionLocal() as db:
+            denied = check_read(db, app_name=key)
+            if denied:
+                return denied
+            mmd = get_workflow_mermaid(
+                db,
+                scope=scope,
+                section_name=section_name,
+                version=version,
+                app_name=key,
+                pattern=pattern,
+            )
+            if not mmd:
+                target = scope
+                if scope == "app" and key:
+                    target = f"{scope}/{key}"
+                elif scope == "repo":
+                    target = f"{scope}/{(pattern or '').strip() or '(default)'}"
+                return (
+                    f"[{target}] {section_name} v{version} 에 Mermaid 다이어그램이 없습니다.\n"
+                    f"생성하려면 'workflow-to-mermaid' 스킬을 사용해 "
+                    f"set_workflow_mermaid_tool 로 업로드하세요."
+                )
+            return mmd

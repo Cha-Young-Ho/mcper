@@ -124,10 +124,13 @@ workflow-to-mermaid 스킬로 이 버전 시각화해줘</div>
         window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' });
         window.mermaid.render(uid, mermaidText).then(({ svg }) => {
           modalBody.innerHTML = '<div style="display:flex; justify-content:center;">' + svg + '</div>';
-          // 렌더 후 SVG 에 자연 크기 허용 (세로가 길면 모달 body 가 스크롤)
+          // 렌더 후 SVG 크기 조정 (가로 70%, 세로 자연 크기)
           const rendered = modalBody.querySelector('svg');
           if (rendered) {
-            rendered.style.maxWidth = '100%';
+            rendered.removeAttribute('width');
+            rendered.removeAttribute('height');
+            rendered.style.width = '42%';
+            rendered.style.maxWidth = '440px';
             rendered.style.height = 'auto';
           }
           modalBody.scrollTop = 0;
