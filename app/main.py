@@ -132,7 +132,10 @@ async def lifespan(_app: FastAPI):
     finally:
         db.close()
     async with mcp.session_manager.run():
+        # lifespan 이 yield 지나면 startup 완료 — K8s startup probe 판정용
+        _app.state.startup_done = True
         yield
+        _app.state.startup_done = False
 
 
 app = FastAPI(
@@ -294,16 +297,58 @@ if _MCP_ENABLED:
 
 
 # ── Health Endpoints (항상 활성) ────────────────────────────────────
+# K8s/LB probe 표준 3단계 분리 (L09):
+#   /health/live    — 프로세스 응답성만 (의존 없음) — liveness
+#   /health/ready   — DB + Redis + 임베딩 준비 확인 — readiness
+#   /health/startup — lifespan 완료 여부 — startup
+# /health 는 기존 호환 alias (deprecated), /health/rag 는 관측용 그대로 유지.
+
+from fastapi import Request as _HealthReq
+from app.services.health import (
+    liveness_payload as _liveness_payload,
+    readiness_payload as _readiness_payload,
+    startup_payload as _startup_payload,
+)
+
+
+def _startup_done(request: _HealthReq) -> bool:
+    return bool(getattr(request.app.state, "startup_done", False))
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe — 프로세스 이벤트 루프 응답성만 확인."""
+    return await _liveness_payload()
+
+
+@app.get("/health/ready")
+async def health_ready(request: _HealthReq):
+    """Readiness probe — DB + Redis + 임베딩 backend 준비 확인."""
+    payload, status = await _readiness_payload(startup_done=_startup_done(request))
+    if status != 200:
+        return JSONResponse(status_code=status, content=payload)
+    return payload
+
+
+@app.get("/health/startup")
+async def health_startup(request: _HealthReq):
+    """Startup probe — lifespan 완료 여부. 완료 후 readiness 동일."""
+    payload, status = await _startup_payload(_startup_done(request))
+    if status != 200:
+        return JSONResponse(status_code=status, content=payload)
+    return payload
+
 
 @app.get("/health")
-def health():
-    """Liveness/readiness: returns 503 if DB is unreachable."""
-    if not check_db_connection():
-        return JSONResponse(
-            status_code=503,
-            content={"status": "unhealthy", "database": "down"},
-        )
-    return {"status": "ok", "database": "up"}
+async def health(request: _HealthReq):
+    """Deprecated: 기존 클라이언트 호환용. 신규는 /health/ready 사용.
+
+    응답은 /health/ready 로직 복제 — 503 조건 동일.
+    """
+    payload, status = await _readiness_payload(startup_done=_startup_done(request))
+    if status != 200:
+        return JSONResponse(status_code=status, content=payload)
+    return payload
 
 
 @app.get("/health/rag")
