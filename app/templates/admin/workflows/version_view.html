@@ -56,8 +56,8 @@
               style="background:none; border:0; font-size:1.4rem; cursor:pointer; line-height:1; color:#6b7280;">✕</button>
     </div>
     <div id="mermaid-modal-body"
-         style="padding:1.25rem; overflow:auto; flex:1; min-height:300px; display:flex; align-items:center; justify-content:center;">
-      <div class="mermaid" id="mermaid-render-target"></div>
+         style="padding:1.25rem; overflow:auto; flex:1 1 auto; min-height:0;">
+      <div class="mermaid" id="mermaid-render-target" style="display:flex; justify-content:center;"></div>
     </div>
   </div>
 </div>
@@ -123,7 +123,14 @@ workflow-to-mermaid 스킬로 이 버전 시각화해줘</div>
         const uid = 'mrm-' + Date.now();
         window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' });
         window.mermaid.render(uid, mermaidText).then(({ svg }) => {
-          modalBody.innerHTML = svg;
+          modalBody.innerHTML = '<div style="display:flex; justify-content:center;">' + svg + '</div>';
+          // 렌더 후 SVG 에 자연 크기 허용 (세로가 길면 모달 body 가 스크롤)
+          const rendered = modalBody.querySelector('svg');
+          if (rendered) {
+            rendered.style.maxWidth = '100%';
+            rendered.style.height = 'auto';
+          }
+          modalBody.scrollTop = 0;
         }).catch((err) => {
           modalBody.innerHTML = '<pre style="color:#b91c1c; white-space:pre-wrap;">Mermaid 렌더 오류:\n' + String(err) + '</pre>';
         });
