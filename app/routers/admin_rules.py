@@ -20,7 +20,6 @@ from app.db.rule_models import (
     RepoRuleVersion,
 )
 from app.routers.admin_base import DOMAIN_CONFIG, _count, templates
-from app.routers.admin_common import _sort_app_names, _sort_repo_patterns
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -485,6 +484,17 @@ def global_rule_save_as_new_legacy(
 # ----- App rules: card index + search -----
 
 
+def _sort_app_names(names: list[str]) -> list[str]:
+    """`__default__` 카드가 그리드 왼쪽 상단에 오도록 먼저 정렬."""
+
+    def key(n: str) -> tuple[int, str]:
+        if n.lower() == "__default__":
+            return (0, "")
+        return (1, n.lower())
+
+    return sorted(names, key=key)
+
+
 @router.get("/app-rules")
 def app_rules_cards(
     request: Request,
@@ -500,14 +510,15 @@ def app_rules_cards(
     if qn:
         names = [n for n in names if qn in n.lower()]
 
+    # N+1 방지: 앱당 최신 행을 2 쿼리(집계 + 조인)로 일괄 조회 후 dict 룩업.
+    latest_by_app = {
+        row.app_name: row
+        for row in vr.get_latest_app_rules(db, domain=domain_filter)
+    }
+
     cards: list[dict] = []
     for name in names:
-        latest = db.scalars(
-            select(AppRuleVersion)
-            .where(AppRuleVersion.app_name == name)
-            .order_by(AppRuleVersion.version.desc())
-            .limit(1)
-        ).first()
+        latest = latest_by_app.get(name)
         if latest is None:
             continue
         disp = vr.app_rule_card_display_name(name)
@@ -1088,6 +1099,17 @@ def app_rule_section_version_delete(
 # ----- Repository rules (URL 패턴별) -----
 
 
+def _sort_repo_patterns(patterns: list[str]) -> list[str]:
+    """빈 패턴(default) 카드가 먼저 오도록 정렬."""
+
+    def key(p: str) -> tuple[int, str]:
+        if not (p or "").strip():
+            return (0, "")
+        return (1, (p or "").lower())
+
+    return sorted(patterns, key=key)
+
+
 @router.post("/repo-rules/pat/{pat_segment}/include-repo-default-toggle")
 def repo_pattern_include_repo_default_toggle(
     pat_segment: str,
@@ -1129,14 +1151,15 @@ def repo_rules_cards(
 
         patterns = [p for p in patterns if _repo_pattern_matches_query(p)]
 
+    # N+1 방지: 패턴당 최신 행을 2 쿼리로 일괄 조회.
+    latest_by_pat = {
+        row.pattern: row
+        for row in vr.get_latest_repo_rules(db, domain=domain_filter)
+    }
+
     cards: list[dict] = []
     for pat in patterns:
-        latest = db.scalars(
-            select(RepoRuleVersion)
-            .where(RepoRuleVersion.pattern == pat)
-            .order_by(RepoRuleVersion.version.desc())
-            .limit(1)
-        ).first()
+        latest = latest_by_pat.get(pat)
         if latest is None:
             continue
         seg = vr.repo_pat_href_segment(pat)

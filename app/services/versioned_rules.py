@@ -1386,3 +1386,75 @@ def list_distinct_repo_patterns(session: Session, *, domain: str | None = None) 
         {r for r in rows if r is not None},
         key=lambda p: (0 if (p or "").strip() else 1, (p or "").lower()),
     )
+
+
+def get_latest_app_rules(
+    session: Session, *, domain: str | None = None
+) -> list[AppRuleVersion]:
+    """
+    앱별 최신(가장 큰 version) 행 목록을 2-쿼리로 일괄 조회.
+
+    - 1 쿼리: `GROUP BY app_name` 으로 (app_name, max_version) 쌍 수집.
+    - 2 쿼리: 조인으로 해당 쌍들 한 번에 fetch.
+
+    기존 /admin/app-rules 카드 목록의 N+1 을 제거하기 위한 헬퍼.
+    같은 `(app_name, version)` 에 여러 섹션 행이 존재할 수 있으므로
+    앱당 `id` 가 가장 큰 1건(최근 insert) 만 반환 — 원래 `order_by(version.desc()).limit(1)`
+    동등. `domain` 은 집계·조인 양쪽에 동일 필터로 적용.
+    반환 순서는 보장하지 않으므로 호출 측에서 `_sort_app_names` 등으로 정렬.
+    """
+    base = select(
+        AppRuleVersion.app_name.label("an"),
+        func.max(AppRuleVersion.version).label("mv"),
+    )
+    df = _domain_filter(AppRuleVersion.domain, domain)
+    if df is not None:
+        base = base.where(df)
+    subq = base.group_by(AppRuleVersion.app_name).subquery()
+    q = select(AppRuleVersion).join(
+        subq,
+        (AppRuleVersion.app_name == subq.c.an)
+        & (AppRuleVersion.version == subq.c.mv),
+    )
+    if df is not None:
+        q = q.where(_domain_filter(AppRuleVersion.domain, domain))
+    rows = list(session.scalars(q).all())
+    # (app_name, version) 튜플에 복수 섹션이 존재 시 id 최대(=가장 최근) 1건만 유지.
+    by_app: dict[str, AppRuleVersion] = {}
+    for r in rows:
+        cur = by_app.get(r.app_name)
+        if cur is None or (r.id or 0) > (cur.id or 0):
+            by_app[r.app_name] = r
+    return list(by_app.values())
+
+
+def get_latest_repo_rules(
+    session: Session, *, domain: str | None = None
+) -> list[RepoRuleVersion]:
+    """
+    레포 패턴별 최신(가장 큰 version) 행 목록을 2-쿼리로 일괄 조회.
+
+    /admin/repo-rules 카드 목록의 N+1 제거용. 동작 의미는 `get_latest_app_rules` 와 동일.
+    """
+    base = select(
+        RepoRuleVersion.pattern.label("pt"),
+        func.max(RepoRuleVersion.version).label("mv"),
+    )
+    df = _domain_filter(RepoRuleVersion.domain, domain)
+    if df is not None:
+        base = base.where(df)
+    subq = base.group_by(RepoRuleVersion.pattern).subquery()
+    q = select(RepoRuleVersion).join(
+        subq,
+        (RepoRuleVersion.pattern == subq.c.pt)
+        & (RepoRuleVersion.version == subq.c.mv),
+    )
+    if df is not None:
+        q = q.where(_domain_filter(RepoRuleVersion.domain, domain))
+    rows = list(session.scalars(q).all())
+    by_pat: dict[str, RepoRuleVersion] = {}
+    for r in rows:
+        cur = by_pat.get(r.pattern)
+        if cur is None or (r.id or 0) > (cur.id or 0):
+            by_pat[r.pattern] = r
+    return list(by_pat.values())
