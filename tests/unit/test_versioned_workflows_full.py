@@ -90,18 +90,19 @@ class TestRepoHelpers:
 class TestGlobalWorkflows:
     def test_list_sections_returns_sorted_default_first(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = ["z", "main", "a", None]
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        # DB now returns (section_name, rank) tuples already ordered (main first).
+        result_mock.all.return_value = [("main", 0), ("a", 1), ("z", 1)]
+        db.execute.return_value = result_mock
         result = vw.list_sections_for_global_workflow(db)
         assert result[0] == "main"
         assert "a" in result and "z" in result
 
     def test_list_sections_empty_returns_default(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = []
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        result_mock.all.return_value = []
+        db.execute.return_value = result_mock
         assert vw.list_sections_for_global_workflow(db) == [vw.DEFAULT_SECTION]
 
     def test_all_sections_latest_without_domain(self):
@@ -194,17 +195,17 @@ class TestAppWorkflows:
 
     def test_list_sections_for_app(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = ["s1", "main"]
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        result_mock.all.return_value = [("main", 0), ("s1", 1)]
+        db.execute.return_value = result_mock
         result = vw.list_sections_for_app_workflow(db, "myapp")
         assert result[0] == "main"
 
     def test_list_sections_for_app_empty(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = []
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        result_mock.all.return_value = []
+        db.execute.return_value = result_mock
         assert vw.list_sections_for_app_workflow(db, "myapp") == [vw.DEFAULT_SECTION]
 
     def test_app_all_sections_latest(self):
@@ -290,17 +291,17 @@ class TestRepoWorkflows:
 
     def test_list_sections_for_repo(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = ["s"]
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        result_mock.all.return_value = [("s", 1)]
+        db.execute.return_value = result_mock
         result = vw.list_sections_for_repo_workflow(db, "p")
         assert "s" in result
 
     def test_list_sections_for_repo_empty(self):
         db = MagicMock()
-        scalars = MagicMock()
-        scalars.all.return_value = []
-        db.scalars.return_value = scalars
+        result_mock = MagicMock()
+        result_mock.all.return_value = []
+        db.execute.return_value = result_mock
         assert vw.list_sections_for_repo_workflow(db, "p") == [vw.DEFAULT_SECTION]
 
     def test_repo_all_sections_latest(self):

@@ -13,7 +13,7 @@ import re
 from typing import Any
 from urllib.parse import quote
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.db.rule_models import (
@@ -324,36 +324,40 @@ def set_mcp_include_repo_default(session: Session, value: bool) -> None:
 
 
 def list_sections_for_global(session: Session) -> list[str]:
-    """글로벌 룰의 모든 섹션 이름 (알파벳 순, 'main' 우선)."""
-    rows = session.scalars(
-        select(GlobalRuleVersion.section_name).distinct()
+    """글로벌 룰의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
+    rank = case((GlobalRuleVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(GlobalRuleVersion.section_name, rank)
+        .distinct()
+        .order_by(rank, GlobalRuleVersion.section_name)
     ).all()
-    sections = sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s))
-    return sections or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def list_sections_for_app(session: Session, app_name: str) -> list[str]:
-    """앱의 모든 섹션 이름 (알파벳 순, 'main' 우선)."""
+    """앱의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (app_name or "").lower().strip()
-    rows = session.scalars(
-        select(AppRuleVersion.section_name)
+    rank = case((AppRuleVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(AppRuleVersion.section_name, rank)
         .where(AppRuleVersion.app_name == key)
         .distinct()
+        .order_by(rank, AppRuleVersion.section_name)
     ).all()
-    sections = sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s))
-    return sections or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def list_sections_for_repo(session: Session, pattern: str) -> list[str]:
-    """레포지토리 패턴의 모든 섹션 이름 (알파벳 순, 'main' 우선)."""
+    """레포지토리 패턴의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (pattern or "").strip()
-    rows = session.scalars(
-        select(RepoRuleVersion.section_name)
+    rank = case((RepoRuleVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(RepoRuleVersion.section_name, rank)
         .where(RepoRuleVersion.pattern == key)
         .distinct()
+        .order_by(rank, RepoRuleVersion.section_name)
     ).all()
-    sections = sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s))
-    return sections or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _global_latest(

@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.workflow_models import AppWorkflowVersion, GlobalWorkflowVersion, RepoWorkflowVersion
@@ -92,8 +92,14 @@ def _try_index_workflow(
 
 
 def list_sections_for_global_workflow(session: Session) -> list[str]:
-    rows = session.scalars(select(GlobalWorkflowVersion.section_name).distinct()).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    """글로벌 워크플로의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
+    rank = case((GlobalWorkflowVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(GlobalWorkflowVersion.section_name, rank)
+        .distinct()
+        .order_by(rank, GlobalWorkflowVersion.section_name)
+    ).all()
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _global_workflow_all_sections_latest(
@@ -206,13 +212,16 @@ def count_distinct_apps_with_workflows(session: Session, *, domain: str | None =
 
 
 def list_sections_for_app_workflow(session: Session, app_name: str) -> list[str]:
+    """앱 워크플로의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (app_name or "").lower().strip()
-    rows = session.scalars(
-        select(AppWorkflowVersion.section_name)
+    rank = case((AppWorkflowVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(AppWorkflowVersion.section_name, rank)
         .where(AppWorkflowVersion.app_name == key)
         .distinct()
+        .order_by(rank, AppWorkflowVersion.section_name)
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _app_workflow_all_sections_latest(session: Session, app_name: str) -> list[AppWorkflowVersion]:
@@ -360,13 +369,16 @@ def count_distinct_repo_patterns_with_workflows(session: Session, *, domain: str
 
 
 def list_sections_for_repo_workflow(session: Session, pattern: str) -> list[str]:
+    """레포 워크플로의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (pattern or "").strip()
-    rows = session.scalars(
-        select(RepoWorkflowVersion.section_name)
+    rank = case((RepoWorkflowVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(RepoWorkflowVersion.section_name, rank)
         .where(RepoWorkflowVersion.pattern == key)
         .distinct()
+        .order_by(rank, RepoWorkflowVersion.section_name)
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _repo_workflow_all_sections_latest(session: Session, pattern: str) -> list[RepoWorkflowVersion]:

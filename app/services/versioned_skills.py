@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion
@@ -53,8 +53,14 @@ def _repo_skill_save_path(pattern: str, section_name: str) -> str:
 
 
 def list_sections_for_global_skill(session: Session) -> list[str]:
-    rows = session.scalars(select(GlobalSkillVersion.section_name).distinct()).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    """글로벌 스킬의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
+    rank = case((GlobalSkillVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(GlobalSkillVersion.section_name, rank)
+        .distinct()
+        .order_by(rank, GlobalSkillVersion.section_name)
+    ).all()
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _domain_filter(col, domain: str | None):
@@ -198,13 +204,16 @@ def count_distinct_apps_with_skills(session: Session, *, domain: str | None = No
 
 
 def list_sections_for_app_skill(session: Session, app_name: str) -> list[str]:
+    """앱 스킬의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (app_name or "").lower().strip()
-    rows = session.scalars(
-        select(AppSkillVersion.section_name)
+    rank = case((AppSkillVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(AppSkillVersion.section_name, rank)
         .where(AppSkillVersion.app_name == key)
         .distinct()
+        .order_by(rank, AppSkillVersion.section_name)
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _app_skill_all_sections_latest(session: Session, app_name: str) -> list[AppSkillVersion]:
@@ -349,13 +358,16 @@ def count_distinct_repo_patterns_with_skills(session: Session, *, domain: str | 
 
 
 def list_sections_for_repo_skill(session: Session, pattern: str) -> list[str]:
+    """레포 스킬의 모든 섹션 이름 (알파벳 순, 'main' 우선). DB 측에서 DISTINCT + ORDER BY 처리."""
     key = (pattern or "").strip()
-    rows = session.scalars(
-        select(RepoSkillVersion.section_name)
+    rank = case((RepoSkillVersion.section_name == DEFAULT_SECTION, 0), else_=1)
+    rows = session.execute(
+        select(RepoSkillVersion.section_name, rank)
         .where(RepoSkillVersion.pattern == key)
         .distinct()
+        .order_by(rank, RepoSkillVersion.section_name)
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
 def _repo_skill_all_sections_latest(session: Session, pattern: str) -> list[RepoSkillVersion]:
