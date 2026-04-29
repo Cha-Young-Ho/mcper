@@ -13,6 +13,7 @@ from app.tools.data_tools import register_data_tools
 from app.tools.skill_tools import register_skill_tools
 from app.tools.harness_tools import register_harness_tools
 from app.tools.workflow_tools import register_workflow_tools
+from app.tools.doc_tools import register_doc_tools
 
 # ── MCP OAuth 인증 설정 ────────────────────────────────────────────
 # MCPER_AUTH_ENABLED: Admin UI auth (로그인 페이지/세션)
@@ -239,6 +240,11 @@ mcp = FastMCP(
         "get_global_workflow(app_name, origin_url) 로 워크플로우 로드. list_workflow_sections 로 카테고리 확인. "
         "search_workflows(query, app_name, scope, top_n) 로 워크플로우 키워드 검색. "
         "update_workflow(app_name, section_name, body) 로 앱 워크플로우 수정 (새 버전 발행). "
+        "get_global_doc(app_name, origin_url) 로 일반 문서(Docs) 로드. list_doc_sections 로 카테고리 확인. "
+        "search_docs(query, app_name, scope, top_n) 로 문서 벡터+FTS 하이브리드 검색. "
+        "publish_global_doc_tool / publish_app_doc_tool / publish_repo_doc_tool 로 문서 발행. "
+        "update_doc(app_name, section_name, body) 로 앱 문서 수정. "
+        "Docs = 일반 문서(레퍼런스, 가이드, 메모 등 자유 형식). "
 
         "[권한] 인증이 활성화된 서버에서는 MCP 도구 호출 시 자동으로 권한이 검증된다. "
         "권한 에러('Permission denied') 발생 시 사용자에게 관리자 권한 요청을 안내한다. "
@@ -263,3 +269,4 @@ register_skill_tools(mcp)
 register_data_tools(mcp)
 register_harness_tools(mcp)
 register_workflow_tools(mcp)
+register_doc_tools(mcp)

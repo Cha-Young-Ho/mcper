@@ -22,6 +22,7 @@ import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
 import app.db.rbac_models  # noqa: F401 — mcper_domains, mcper_user_permissions, mcper_content_restrictions
 import app.db.celery_models  # noqa: F401 — failed_tasks, celery_task_stats
 import app.db.workflow_models  # noqa: F401 — register workflow_* tables on Base.metadata
+import app.db.doc_models  # noqa: F401 — register doc_* tables on Base.metadata
 
 
 def _resolve_database_url() -> str:
@@ -474,6 +475,87 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
+
+    # ── doc_chunks 테이블 (일반 문서 벡터 검색용) ──────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS doc_chunks (
+                id SERIAL PRIMARY KEY,
+                doc_type VARCHAR(16) NOT NULL,
+                doc_entity_id INTEGER NOT NULL,
+                app_name VARCHAR(128),
+                pattern VARCHAR(256),
+                domain VARCHAR(64),
+                section_name VARCHAR(128) NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                metadata JSONB NOT NULL DEFAULT '{}',
+                chunk_type VARCHAR(16) NOT NULL DEFAULT 'child',
+                parent_chunk_id INTEGER REFERENCES doc_chunks(id) ON DELETE SET NULL,
+                CONSTRAINT uq_doc_chunks_type_entity_idx UNIQUE (doc_type, doc_entity_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_doc_type ON doc_chunks (doc_type);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_entity_id ON doc_chunks (doc_entity_id);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_app_name ON doc_chunks (app_name);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_pattern ON doc_chunks (pattern);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_domain ON doc_chunks (domain);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_chunk_type ON doc_chunks (chunk_type);
+            CREATE INDEX IF NOT EXISTS ix_doc_chunks_parent ON doc_chunks (parent_chunk_id) WHERE parent_chunk_id IS NOT NULL;
+            """
+        )
+    )
+
+
+    # ── Docs 테이블 생성 (Workflows 미러) ──────────────────────────────
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS global_doc_versions (
+                id SERIAL PRIMARY KEY,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_global_doc_versions_section_version UNIQUE (section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_global_doc_versions_section_name ON global_doc_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_global_doc_versions_domain ON global_doc_versions (domain);
+
+            CREATE TABLE IF NOT EXISTS app_doc_versions (
+                id SERIAL PRIMARY KEY,
+                app_name VARCHAR(128) NOT NULL,
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_app_doc_versions_app_section_version UNIQUE (app_name, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_app_doc_versions_app_name ON app_doc_versions (app_name);
+            CREATE INDEX IF NOT EXISTS ix_app_doc_versions_section_name ON app_doc_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_app_doc_versions_domain ON app_doc_versions (domain);
+
+            CREATE TABLE IF NOT EXISTS repo_doc_versions (
+                id SERIAL PRIMARY KEY,
+                pattern VARCHAR(256) NOT NULL DEFAULT '',
+                section_name VARCHAR(128) NOT NULL DEFAULT 'main',
+                sort_order INTEGER NOT NULL DEFAULT 100,
+                version INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                domain VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_repo_doc_versions_pattern_section_version UNIQUE (pattern, section_name, version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_repo_doc_versions_pattern ON repo_doc_versions (pattern);
+            CREATE INDEX IF NOT EXISTS ix_repo_doc_versions_section_name ON repo_doc_versions (section_name);
+            CREATE INDEX IF NOT EXISTS ix_repo_doc_versions_domain ON repo_doc_versions (domain);
+            """
+        )
+    )
+
     # ── 데이터 마이그레이션: skill → workflow 이동 (idempotent) ─────────
     connection.execute(
         text(
@@ -733,6 +815,46 @@ def _apply_rag_indexes(connection) -> None:
                 EXECUTE $idx$
                   CREATE INDEX IF NOT EXISTS workflow_chunks_embedding_hnsw_idx
                   ON workflow_chunks USING hnsw (embedding vector_cosine_ops)
+                  WITH (m = 16, ef_construction = 64);
+                $idx$;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    # ── doc_chunks: FTS generated column + GIN + HNSW ─────────────────────
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.doc_chunks') IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'doc_chunks'
+                    AND column_name = 'content_tsv'
+                ) THEN
+                  ALTER TABLE doc_chunks ADD COLUMN content_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED;
+                END IF;
+              END IF;
+            END $$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+              IF to_regclass('public.doc_chunks') IS NOT NULL THEN
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS doc_chunks_content_tsv_idx
+                  ON doc_chunks USING GIN (content_tsv);
+                $idx$;
+                EXECUTE $idx$
+                  CREATE INDEX IF NOT EXISTS doc_chunks_embedding_hnsw_idx
+                  ON doc_chunks USING hnsw (embedding vector_cosine_ops)
                   WITH (m = 16, ef_construction = 64);
                 $idx$;
               END IF;

@@ -2,6 +2,47 @@
 
 에이전트 작업 완료 시 및 `.claude/settings.json` Stop 훅에 따라 아래에 항목이 추가된다.
 
+## 2026-04-29: Docs 컨텐츠 타입 풀 복제 (Workflows 기반)
+
+### 작업 내용
+
+Workflows 시스템을 1:1 미러하여 `Docs` (일반 문서) 컨텐츠 타입 추가.
+
+**DB 모델**
+- `app/db/doc_models.py` — `GlobalDocVersion`, `AppDocVersion`, `RepoDocVersion`
+- `app/db/rag_models.py` — `DocChunk` 추가 (pgvector + FTS)
+- `app/db/database.py` — `import app.db.doc_models` 등록
+
+**RAG 인덱싱**
+- `app/doc/service.py`, `app/doc/repository.py`
+
+**서비스 레이어**
+- `app/services/versioned_docs.py` — publish/delete/list/get + `get_docs_markdown`
+- `app/services/search_docs.py` — `hybrid_doc_search`
+
+**MCP 도구**
+- `app/tools/doc_tools.py` — `get_global_doc`, `list_doc_sections`, `publish_*_doc_tool`, `search_docs`, `update_doc`
+- `app/mcp_app.py` — `register_doc_tools` 등록, instructions 업데이트
+
+**어드민 UI**
+- `app/routers/admin_docs.py` — `/admin/global-docs`, `/admin/app-docs`, `/admin/repo-docs`, `/admin/docs-dev`
+- `app/templates/admin/docs_hub.html` + `app/templates/admin/docs/` 11개
+- `app/templates/admin/base.html` — "문서 (Docs)" 탭 (기획/분석/개발)
+- `app/main.py` — `admin_docs` 라우터 등록
+
+**운영**
+- `scripts/reindex_all_docs.py`
+
+### 복제 방식
+Workflows 시스템을 `sed 's/workflow/doc/g; s/Workflow/Doc/g; s/워크플로우/문서/g'` 기계 치환 후 의미 다른 주석만 수동 수정.
+
+### 검증
+- `Base.metadata`: `global_doc_versions`, `app_doc_versions`, `repo_doc_versions`, `doc_chunks` 등록
+- FastAPI Docs 라우트 40개
+- MCP 도구 7개
+
+---
+
 ## 2026-04-15: 도메인 기반 RBAC + 스킬 벡터 검색 구축
 
 ### 작업 내용

@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block head %}
+<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
+{% endblock %}
+{% block body %}
+<p class="muted" style="margin-top:0"><a href="/admin/app-docs">← 앱 목록</a></p>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/admin/app-docs/new">
+  <div class="form-group" style="max-width:400px; margin-bottom:1.5rem">
+    <label class="form-label" for="app_name">앱 이름</label>
+    <input type="text" id="app_name" name="app_name"
+           class="input" required autocomplete="off"
+           placeholder="예: my-app, my-api" />
+  </div>
+
+  <div class="split-editor" style="margin-bottom:1.5rem">
+    <div class="split-editor__pane">
+      <label class="form-label">초기 내용 (Markdown) — 기본 카테고리</label>
+      <textarea id="body" name="body" class="input split-editor__source"
+                placeholder="앱의 문서 / 시스템 이해를 입력하세요."
+                spellcheck="false"></textarea>
+    </div>
+    <div class="split-editor__pane split-editor__preview-pane">
+      <label class="form-label">미리보기</label>
+      <div id="preview" class="split-editor__preview markdown-body"></div>
+    </div>
+  </div>
+
+  <div class="page-actions">
+    <button type="submit" class="btn btn-primary">앱 생성</button>
+    <a href="/admin/app-docs" class="btn btn-secondary">취소</a>
+  </div>
+</form>
+
+<script src="/static/admin/markdown-preview.js?v=3"></script>
+{% endblock %}
