@@ -10,22 +10,28 @@ _pending_auth_requests, _code_user_map, _access_tokens)를 이 모듈의
 SessionStore Protocol 로 추상화한다.
 
 InMemorySessionStore — 프로세스 메모리 기반 (기본). 단일 인스턴스 운영.
+RedisSessionStore    — Redis 기반. LB 뒤 다중 인스턴스 운영.
+
+선택: ``MCPER_SESSION_STORE=memory|redis`` (기본 memory, 하위 호환).
+Redis 미설정/미접속 시 InMemory 로 폴백.
 
 값은 JSON 직렬화 가능한 dict 로 가정한다. pydantic 모델은 provider
 레이어에서 `.model_dump(mode='json')` / `.model_validate()` 로 변환한 뒤
 이 스토어에 넣는다.
-
-후속 PR 에서 RedisSessionStore 를 추가해 ``MCPER_SESSION_STORE=redis``
-로 스위칭 가능하게 한다.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
+
+# Redis key prefix — 운영 모니터링/격리 용도
+_REDIS_PREFIX = "mcper:oauth:"
 
 # 기본 TTL (초). 호출 측에서 override 가능.
 DEFAULT_AUTH_CODE_TTL = 600          # OAuth authorization code
@@ -69,7 +75,7 @@ class SessionStore(Protocol):
 
     # ── 운영 ──────────────────────────────────────────────────────────
     def access_token_count(self) -> int:
-        """디버깅/로깅용. 외부 스토어는 추산치(-1) 반환 가능."""
+        """디버깅/로깅용. Redis 는 추산치(-1) 반환 가능."""
         ...
 
 
@@ -185,6 +191,137 @@ class InMemorySessionStore:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# Redis 구현
+# ══════════════════════════════════════════════════════════════════════
+
+
+class RedisSessionStore:
+    """Redis 기반 SessionStore. LB 뒤 다중 인스턴스 공유용.
+
+    모든 값은 JSON 직렬화. 키는 ``mcper:oauth:<domain>:<id>`` 형식.
+    TTL 은 Redis ``SET EX`` 로 강제. pop 은 ``GETDEL`` (Redis 6.2+).
+    """
+
+    _K_CODE = _REDIS_PREFIX + "code:"
+    _K_CLIENT = _REDIS_PREFIX + "client:"
+    _K_REFRESH = _REDIS_PREFIX + "refresh:"
+    _K_ACCESS = _REDIS_PREFIX + "access:"
+    _K_PENDING = _REDIS_PREFIX + "pending:"
+    _K_CODE_USER = _REDIS_PREFIX + "code_user:"
+
+    def __init__(self, client: Any) -> None:
+        self._r = client
+
+    # ── 내부 helpers ──────────────────────────────────────────────────
+    def _set_json(self, key: str, data: dict, ttl: Optional[int]) -> None:
+        payload = json.dumps(data, ensure_ascii=False, default=str)
+        if ttl is not None:
+            self._r.set(key, payload, ex=ttl)
+        else:
+            self._r.set(key, payload)
+
+    def _get_json(self, key: str) -> Optional[dict]:
+        raw = self._r.get(key)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except (TypeError, ValueError):
+            logger.warning("RedisSessionStore: corrupt JSON at %s", key)
+            return None
+
+    def _getdel_json(self, key: str) -> Optional[dict]:
+        raw = None
+        # Redis 6.2+ GETDEL. 구버전 호환: GET + DELETE fallback.
+        try:
+            raw = self._r.getdel(key)
+        except Exception:  # noqa: BLE001 — 구버전 redis-py 또는 서버 미지원
+            try:
+                raw = self._r.get(key)
+                if raw is not None:
+                    self._r.delete(key)
+            except Exception:
+                logger.exception("RedisSessionStore: getdel fallback failed for %s", key)
+                return None
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except (TypeError, ValueError):
+            logger.warning("RedisSessionStore: corrupt JSON at %s", key)
+            return None
+
+    # ── auth code ────────────────────────────────────────────────────
+    def save_auth_code(self, code: str, data: dict, ttl: int) -> None:
+        self._set_json(self._K_CODE + code, data, ttl)
+
+    def get_auth_code(self, code: str) -> Optional[dict]:
+        return self._get_json(self._K_CODE + code)
+
+    def pop_auth_code(self, code: str) -> Optional[dict]:
+        return self._getdel_json(self._K_CODE + code)
+
+    # ── client ───────────────────────────────────────────────────────
+    def save_client(self, client_id: str, data: dict, ttl: Optional[int] = None) -> None:
+        self._set_json(self._K_CLIENT + client_id, data, ttl)
+
+    def get_client(self, client_id: str) -> Optional[dict]:
+        return self._get_json(self._K_CLIENT + client_id)
+
+    # ── refresh ──────────────────────────────────────────────────────
+    def save_refresh_token(self, token: str, data: dict, ttl: int) -> None:
+        self._set_json(self._K_REFRESH + token, data, ttl)
+
+    def pop_refresh_token(self, token: str) -> Optional[dict]:
+        return self._getdel_json(self._K_REFRESH + token)
+
+    def get_refresh_token(self, token: str) -> Optional[dict]:
+        return self._get_json(self._K_REFRESH + token)
+
+    # ── access ───────────────────────────────────────────────────────
+    def save_access_token(self, token: str, data: dict, ttl: int) -> None:
+        self._set_json(self._K_ACCESS + token, data, ttl)
+
+    def get_access_token(self, token: str) -> Optional[dict]:
+        return self._get_json(self._K_ACCESS + token)
+
+    def delete_access_token(self, token: str) -> None:
+        try:
+            self._r.delete(self._K_ACCESS + token)
+        except Exception:
+            logger.exception("RedisSessionStore: delete_access_token failed")
+
+    # ── pending auth ─────────────────────────────────────────────────
+    def save_pending_auth(self, request_id: str, data: dict, ttl: int) -> None:
+        self._set_json(self._K_PENDING + request_id, data, ttl)
+
+    def pop_pending_auth(self, request_id: str) -> Optional[dict]:
+        return self._getdel_json(self._K_PENDING + request_id)
+
+    # ── code → user ──────────────────────────────────────────────────
+    def save_code_user(self, code: str, user_id: str, ttl: int) -> None:
+        # 단일 문자열. JSON 으로 감싸 일관성 유지 (파싱 간편).
+        self._r.set(self._K_CODE_USER + code, str(user_id), ex=ttl)
+
+    def get_code_user(self, code: str) -> Optional[str]:
+        v = self._r.get(self._K_CODE_USER + code)
+        return v if v is None else str(v)
+
+    def pop_code_user(self, code: str) -> Optional[str]:
+        try:
+            v = self._r.getdel(self._K_CODE_USER + code)
+        except Exception:  # noqa: BLE001
+            v = self._r.get(self._K_CODE_USER + code)
+            if v is not None:
+                self._r.delete(self._K_CODE_USER + code)
+        return v if v is None else str(v)
+
+    def access_token_count(self) -> int:
+        # 전체 스캔은 비싸므로 -1 (미상) 반환. 운영 시 keyspace 로 모니터링.
+        return -1
+
+
+# ══════════════════════════════════════════════════════════════════════
 # 팩토리
 # ══════════════════════════════════════════════════════════════════════
 
@@ -195,8 +332,8 @@ _factory_lock = threading.Lock()
 def get_session_store() -> SessionStore:
     """프로세스 수명 동안 단일 SessionStore 를 반환.
 
-    현재는 InMemorySessionStore 만 지원. 후속 PR 에서
-    ``MCPER_SESSION_STORE=redis`` 스위치로 RedisSessionStore 선택 가능.
+    MCPER_SESSION_STORE=redis 이면 RedisSessionStore, 그 외/미설정이면
+    InMemorySessionStore. Redis 미설치/미접속 시 경고 후 InMemory 폴백.
     """
     global _instance
     if _instance is not None:
@@ -204,8 +341,26 @@ def get_session_store() -> SessionStore:
     with _factory_lock:
         if _instance is not None:
             return _instance
-        logger.info("SessionStore: using InMemorySessionStore")
-        _instance = InMemorySessionStore()
+        mode = os.environ.get("MCPER_SESSION_STORE", "memory").lower().strip()
+        if mode == "redis":
+            try:
+                from app.services.redis_pool import get_redis
+                client = get_redis()
+            except Exception:  # noqa: BLE001
+                logger.exception("get_session_store: redis_pool import failed")
+                client = None
+            if client is None:
+                logger.warning(
+                    "MCPER_SESSION_STORE=redis but no Redis configured "
+                    "(REDIS_URL / CELERY_BROKER_URL) — falling back to memory"
+                )
+                _instance = InMemorySessionStore()
+            else:
+                logger.info("SessionStore: using RedisSessionStore")
+                _instance = RedisSessionStore(client)
+        else:
+            logger.info("SessionStore: using InMemorySessionStore")
+            _instance = InMemorySessionStore()
     return _instance
 
 
@@ -219,6 +374,7 @@ def reset_session_store() -> None:
 __all__ = [
     "SessionStore",
     "InMemorySessionStore",
+    "RedisSessionStore",
     "get_session_store",
     "reset_session_store",
     "DEFAULT_AUTH_CODE_TTL",
