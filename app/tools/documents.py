@@ -7,7 +7,6 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from sqlalchemy import cast, or_, select
-from sqlalchemy.orm import Session
 from sqlalchemy.types import String
 
 from app.db.database import SessionLocal
@@ -54,13 +53,10 @@ def upload_document_impl(
 ) -> str:
     """Insert one document row. Returns JSON message with new id."""
     record_mcp_tool_call("upload_document")
-    db: Session = SessionLocal()
-    try:
+    with SessionLocal() as db:
         denied = check_write(db)
         if denied:
             return denied
-    finally:
-        db.close()
     paths = _normalize_related_files(related_files)
     t = (title or "").strip() or None
     row = Spec(
@@ -70,101 +66,97 @@ def upload_document_impl(
         base_branch=base_branch,
         related_files=paths,
     )
-    db: Session = SessionLocal()
-    try:
-        db.add(row)
-        db.commit()
-        db.refresh(row)
-        queued = enqueue_index_spec(row.id)
-        return json.dumps(
-            {
-                "ok": True,
-                "id": row.id,
-                "message": "inserted",
-                "chunk_index_queued": queued,
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        db.rollback()
-        return error_json(str(exc))
-    finally:
-        db.close()
+    with SessionLocal() as db:
+        try:
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            queued = enqueue_index_spec(row.id)
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": row.id,
+                    "message": "inserted",
+                    "chunk_index_queued": queued,
+                },
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            db.rollback()
+            return error_json(str(exc))
 
 
 def search_documents_impl(query: str, app_target: str) -> str:
     """Hybrid vector + FTS (RRF) when document chunks exist; else legacy ILIKE on documents."""
     record_mcp_tool_call("search_documents")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        chunks, mode = hybrid_spec_search(
-            db, query=query, app_target=app_target, top_n=15
-        )
-        if mode == "hybrid_ok" and chunks:
+    with SessionLocal() as db:
+        try:
+            denied = check_read(db)
+            if denied:
+                return denied
+            chunks, mode = hybrid_spec_search(
+                db, query=query, app_target=app_target, top_n=15
+            )
+            if mode == "hybrid_ok" and chunks:
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "search_mode": "hybrid_rrf",
+                        "count": len(chunks),
+                        "chunks": chunks,
+                    },
+                    ensure_ascii=False,
+                )
+
+            pattern = _ilike_pattern(query)
+            json_text = cast(Spec.related_files, String)
+            stmt = (
+                select(Spec)
+                .where(Spec.app_target == app_target)
+                .where(
+                    or_(
+                        Spec.content.ilike(pattern, escape="\\"),
+                        json_text.ilike(pattern, escape="\\"),
+                    )
+                )
+                .order_by(Spec.id.desc())
+                .limit(50)
+            )
+            rows = list(db.scalars(stmt).all())
+            legacy = [
+                {
+                    "id": r.id,
+                    "title": r.title,
+                    "content": r.content,
+                    "related_files": r.related_files,
+                    "base_branch": r.base_branch,
+                }
+                for r in rows
+            ]
+            if mode == "indexed_no_match":
+                sm = "legacy_ilike_supplement"
+            else:
+                sm = "legacy_ilike"
             return json.dumps(
                 {
                     "ok": True,
-                    "search_mode": "hybrid_rrf",
-                    "count": len(chunks),
-                    "chunks": chunks,
+                    "search_mode": sm,
+                    "count": len(legacy),
+                    "results": legacy,
+                    "chunks": [],
+                    "hybrid_note": mode,
                 },
                 ensure_ascii=False,
             )
-
-        pattern = _ilike_pattern(query)
-        json_text = cast(Spec.related_files, String)
-        stmt = (
-            select(Spec)
-            .where(Spec.app_target == app_target)
-            .where(
-                or_(
-                    Spec.content.ilike(pattern, escape="\\"),
-                    json_text.ilike(pattern, escape="\\"),
-                )
+        except Exception as exc:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "action_required": "check DB, EMBEDDING_DIM vs LOCAL_EMBEDDING_MODEL, sentence-transformers",
+                },
+                ensure_ascii=False,
             )
-            .order_by(Spec.id.desc())
-            .limit(50)
-        )
-        rows = list(db.scalars(stmt).all())
-        legacy = [
-            {
-                "id": r.id,
-                "title": r.title,
-                "content": r.content,
-                "related_files": r.related_files,
-                "base_branch": r.base_branch,
-            }
-            for r in rows
-        ]
-        if mode == "indexed_no_match":
-            sm = "legacy_ilike_supplement"
-        else:
-            sm = "legacy_ilike"
-        return json.dumps(
-            {
-                "ok": True,
-                "search_mode": sm,
-                "count": len(legacy),
-                "results": legacy,
-                "chunks": [],
-                "hybrid_note": mode,
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        return json.dumps(
-            {
-                "ok": False,
-                "error": str(exc),
-                "action_required": "check DB, EMBEDDING_DIM vs LOCAL_EMBEDDING_MODEL, sentence-transformers",
-            },
-            ensure_ascii=False,
-        )
-    finally:
-        db.close()
 
 
 def register_document_tools(mcp: FastMCP) -> None:

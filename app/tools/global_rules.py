@@ -48,8 +48,7 @@ def get_global_rule_impl(
     v = normalize_read_version(version)
     rr = (repo_root or "").strip() or None
     ou = (origin_url or "").strip() or None
-    db = SessionLocal()
-    try:
+    with SessionLocal() as db:
         denied = check_read(db, app_name=trimmed if trimmed else None)
         if denied:
             return denied
@@ -60,8 +59,6 @@ def get_global_rule_impl(
             repo_root=rr,
             origin_url=ou,
         )
-    finally:
-        db.close()
 
 
 def register_global_rule_tool(mcp: FastMCP) -> None:
@@ -121,8 +118,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         trimmed = _normalize_app_name(app_name or "")
         rr = (repo_root or "").strip() or None
         ou = (origin_url or "").strip() or None
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_read(db, app_name=trimmed if trimmed else None)
             if denied:
                 return denied
@@ -133,8 +129,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 repo_root=rr,
             )
             return json.dumps(snap, ensure_ascii=False)
-        finally:
-            db.close()
 
     @mcp.tool()
     def publish_global_rule(body: str) -> str:
@@ -144,15 +138,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         반환: JSON `{ "scope": "global", "version": N }` (방금 생성된 N).
         """
         record_mcp_tool_call("publish_global_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db)
             if denied:
                 return denied
             v = publish_global(db, body)
             return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
-        finally:
-            db.close()
 
     @mcp.tool()
     def publish_app_rule(
@@ -174,8 +165,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("publish_app_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db, app_name=key)
             if denied:
                 return denied
@@ -189,8 +179,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 },
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def append_to_app_rule(
@@ -209,26 +197,24 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("append_to_app_rule")
-        db = SessionLocal()
-        try:
-            denied = check_write(db, app_name=key)
-            if denied:
-                return denied
-            name, sn_out, v = append_app_rule_body(db, key, append_markdown, sn)
-            return json.dumps(
-                {
-                    "scope": "app",
-                    "app_name": name,
-                    "section_name": sn_out,
-                    "version": v,
-                    "appended": True,
-                },
-                ensure_ascii=False,
-            )
-        except ValueError as e:
-            return error_json(str(e))
-        finally:
-            db.close()
+        with SessionLocal() as db:
+            try:
+                denied = check_write(db, app_name=key)
+                if denied:
+                    return denied
+                name, sn_out, v = append_app_rule_body(db, key, append_markdown, sn)
+                return json.dumps(
+                    {
+                        "scope": "app",
+                        "app_name": name,
+                        "section_name": sn_out,
+                        "version": v,
+                        "appended": True,
+                    },
+                    ensure_ascii=False,
+                )
+            except ValueError as e:
+                return error_json(str(e))
 
     @mcp.tool()
     def publish_repo_rule(
@@ -245,8 +231,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("publish_repo_rule")
         key = (pattern or "").strip()
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db)
             if denied:
                 return denied
@@ -255,8 +240,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def list_rule_sections(
@@ -283,8 +266,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         ```
         """
         record_mcp_tool_call("list_rule_sections")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_read(
                 db, app_name=_normalize_app_name(app_name or "") or None
             )
@@ -327,8 +309,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 {"scope": "global", "sections": sections},
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def publish_section_rule(
@@ -355,8 +335,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         if not sn:
             return error_json("section_name is required")
         record_mcp_tool_call("publish_section_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db, app_name=key)
             if denied:
                 return denied
@@ -370,8 +349,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 },
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def patch_global_rule_tool(patch_markdown: str) -> str:
@@ -381,15 +358,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         반환: JSON `{ "scope": "global", "version": N }`.
         """
         record_mcp_tool_call("patch_global_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db)
             if denied:
                 return denied
             scope, v = patch_global_rule(db, patch_markdown)
             return json.dumps({"scope": scope, "version": v}, ensure_ascii=False)
-        finally:
-            db.close()
 
     @mcp.tool()
     def patch_app_rule_tool(
@@ -407,8 +381,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("patch_app_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db, app_name=key)
             if denied:
                 return denied
@@ -422,8 +395,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 },
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def patch_repo_rule_tool(
@@ -438,8 +409,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("patch_repo_rule")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_write(db)
             if denied:
                 return denied
@@ -448,8 +418,6 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 {"scope": "repo", "pattern": p, "section_name": sn_out, "version": v},
                 ensure_ascii=False,
             )
-        finally:
-            db.close()
 
     @mcp.tool()
     def rollback_global_rule_tool(target_version: int) -> str:
@@ -459,17 +427,15 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         반환: JSON `{ "scope": "global", "version": N }`.
         """
         record_mcp_tool_call("rollback_global_rule")
-        db = SessionLocal()
-        try:
-            denied = check_write(db)
-            if denied:
-                return denied
-            v = rollback_global_rule(db, target_version)
-            return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
-        except ValueError as e:
-            return error_json(str(e))
-        finally:
-            db.close()
+        with SessionLocal() as db:
+            try:
+                denied = check_write(db)
+                if denied:
+                    return denied
+                v = rollback_global_rule(db, target_version)
+                return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
+            except ValueError as e:
+                return error_json(str(e))
 
     @mcp.tool()
     def rollback_app_rule_tool(
@@ -487,25 +453,23 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("rollback_app_rule")
-        db = SessionLocal()
-        try:
-            denied = check_write(db, app_name=key)
-            if denied:
-                return denied
-            name, sn_out, v = rollback_app_rule(db, key, target_version, sn)
-            return json.dumps(
-                {
-                    "scope": "app",
-                    "app_name": name,
-                    "section_name": sn_out,
-                    "version": v,
-                },
-                ensure_ascii=False,
-            )
-        except ValueError as e:
-            return error_json(str(e))
-        finally:
-            db.close()
+        with SessionLocal() as db:
+            try:
+                denied = check_write(db, app_name=key)
+                if denied:
+                    return denied
+                name, sn_out, v = rollback_app_rule(db, key, target_version, sn)
+                return json.dumps(
+                    {
+                        "scope": "app",
+                        "app_name": name,
+                        "section_name": sn_out,
+                        "version": v,
+                    },
+                    ensure_ascii=False,
+                )
+            except ValueError as e:
+                return error_json(str(e))
 
     @mcp.tool()
     def export_rules(format: str = "markdown") -> str:
@@ -515,16 +479,13 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         반환: 마크다운 문자열 또는 JSON 문자열.
         """
         record_mcp_tool_call("export_rules")
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             denied = check_read(db)
             if denied:
                 return denied
             if format.lower() == "json":
                 return json.dumps(export_rules_json(db), ensure_ascii=False)
             return export_rules_markdown(db)
-        finally:
-            db.close()
 
     @mcp.tool()
     def search_rules(

@@ -7,7 +7,6 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from app.db.database import SessionLocal
 from app.db.models import Spec
@@ -84,40 +83,40 @@ def push_code_index_impl(
 
 def analyze_code_impact_impl(query: str, app_target: str) -> str:
     record_mcp_tool_call("analyze_code_impact")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        seeds = hybrid_code_seed_ids(db, query=query, app_target=app_target, top_n=5)
-        if not seeds:
+    with SessionLocal() as db:
+        try:
+            denied = check_read(db)
+            if denied:
+                return denied
+            seeds = hybrid_code_seed_ids(
+                db, query=query, app_target=app_target, top_n=5
+            )
+            if not seeds:
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "message": "no code nodes indexed for this app (use push_code_index first)",
+                        "graph": None,
+                    },
+                    ensure_ascii=False,
+                )
+            graph = traverse_code_graph(
+                db,
+                app_target=app_target,
+                seed_ids=seeds,
+            )
+            return json.dumps(
+                {"ok": True, "seed_ids": seeds, "graph": graph}, ensure_ascii=False
+            )
+        except Exception as exc:
             return json.dumps(
                 {
-                    "ok": True,
-                    "message": "no code nodes indexed for this app (use push_code_index first)",
-                    "graph": None,
+                    "ok": False,
+                    "error": str(exc),
+                    "action_required": "check embedding.dim / provider, code index",
                 },
                 ensure_ascii=False,
             )
-        graph = traverse_code_graph(
-            db,
-            app_target=app_target,
-            seed_ids=seeds,
-        )
-        return json.dumps(
-            {"ok": True, "seed_ids": seeds, "graph": graph}, ensure_ascii=False
-        )
-    except Exception as exc:
-        return json.dumps(
-            {
-                "ok": False,
-                "error": str(exc),
-                "action_required": "check embedding.dim / provider, code index",
-            },
-            ensure_ascii=False,
-        )
-    finally:
-        db.close()
 
 
 def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str:
@@ -156,93 +155,90 @@ def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str
             {"ok": False, "error": "chunks must be a JSON array"},
             ensure_ascii=False,
         )
-    db: Session = SessionLocal()
-    try:
-        return json.dumps(
-            insert_spec_chunks_with_embeddings(db, spec_id, data),
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        db.rollback()
-        return error_json(str(exc))
-    finally:
-        db.close()
+    with SessionLocal() as db:
+        try:
+            return json.dumps(
+                insert_spec_chunks_with_embeddings(db, spec_id, data),
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            db.rollback()
+            return error_json(str(exc))
 
 
 def find_historical_reference_impl(
     new_spec_text: str, app_target: str, top_n: int = 5
 ) -> str:
     record_mcp_tool_call("find_historical_reference")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        snippet = (new_spec_text or "")[:8000]
-        if not snippet.strip():
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": "new_spec_text empty",
-                    "action_required": "pass spec body",
-                },
-                ensure_ascii=False,
-            )
+    with SessionLocal() as db:
         try:
-            qvec = embed_query(snippet)
+            denied = check_read(db)
+            if denied:
+                return denied
+            snippet = (new_spec_text or "")[:8000]
+            if not snippet.strip():
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "new_spec_text empty",
+                        "action_required": "pass spec body",
+                    },
+                    ensure_ascii=False,
+                )
+            try:
+                qvec = embed_query(snippet)
+            except Exception as exc:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"embed failed: {exc}",
+                        "action_required": (
+                            "config.yaml embedding.provider(local|openai|localhost|bedrock) 및 "
+                            "embedding.dim·API 키·모델을 맞출 것"
+                        ),
+                    },
+                    ensure_ascii=False,
+                )
+            v_ids = spec_chunk_vector_ids(
+                db, app_target=app_target, query_embedding=qvec, limit=30
+            )
+            ranked = v_ids[:top_n]
+            if not ranked:
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "message": "no similar chunks (index specs with Celery worker first)",
+                        "matches": [],
+                    },
+                    ensure_ascii=False,
+                )
+            chunks = db.scalars(select(SpecChunk).where(SpecChunk.id.in_(ranked))).all()
+            by_id = {c.id: c for c in chunks}
+            spec_ids = {c.spec_id for c in chunks}
+            specs = {
+                s.id: s
+                for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()
+            }
+            matches: list[dict[str, Any]] = []
+            for cid in ranked:
+                ch = by_id.get(cid)
+                if not ch:
+                    continue
+                sp = specs.get(ch.spec_id)
+                matches.append(
+                    {
+                        "chunk_id": ch.id,
+                        "spec_id": ch.spec_id,
+                        "chunk_excerpt": ch.content[:2000],
+                        "metadata": ch.chunk_metadata,
+                        "spec_title": sp.title if sp else None,
+                        "related_files": sp.related_files if sp else [],
+                        "base_branch": sp.base_branch if sp else None,
+                    }
+                )
+            return json.dumps({"ok": True, "matches": matches}, ensure_ascii=False)
         except Exception as exc:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": f"embed failed: {exc}",
-                    "action_required": (
-                        "config.yaml embedding.provider(local|openai|localhost|bedrock) 및 "
-                        "embedding.dim·API 키·모델을 맞출 것"
-                    ),
-                },
-                ensure_ascii=False,
-            )
-        v_ids = spec_chunk_vector_ids(
-            db, app_target=app_target, query_embedding=qvec, limit=30
-        )
-        ranked = v_ids[:top_n]
-        if not ranked:
-            return json.dumps(
-                {
-                    "ok": True,
-                    "message": "no similar chunks (index specs with Celery worker first)",
-                    "matches": [],
-                },
-                ensure_ascii=False,
-            )
-        chunks = db.scalars(select(SpecChunk).where(SpecChunk.id.in_(ranked))).all()
-        by_id = {c.id: c for c in chunks}
-        spec_ids = {c.spec_id for c in chunks}
-        specs = {
-            s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()
-        }
-        matches: list[dict[str, Any]] = []
-        for cid in ranked:
-            ch = by_id.get(cid)
-            if not ch:
-                continue
-            sp = specs.get(ch.spec_id)
-            matches.append(
-                {
-                    "chunk_id": ch.id,
-                    "spec_id": ch.spec_id,
-                    "chunk_excerpt": ch.content[:2000],
-                    "metadata": ch.chunk_metadata,
-                    "spec_title": sp.title if sp else None,
-                    "related_files": sp.related_files if sp else [],
-                    "base_branch": sp.base_branch if sp else None,
-                }
-            )
-        return json.dumps({"ok": True, "matches": matches}, ensure_ascii=False)
-    except Exception as exc:
-        return error_json(str(exc))
-    finally:
-        db.close()
+            return error_json(str(exc))
 
 
 def register_rag_tools(mcp: FastMCP) -> None:

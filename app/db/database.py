@@ -13,16 +13,29 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import Base
 
-import app.db.rule_models  # noqa: F401 — register rule_* tables on Base.metadata
-import app.db.skill_models  # noqa: F401 — register skill_* tables on Base.metadata
-import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
-import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
-import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
-import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
-import app.db.rbac_models  # noqa: F401 — mcper_domains, mcper_user_permissions, mcper_content_restrictions
-import app.db.celery_models  # noqa: F401 — failed_tasks, celery_task_stats
-import app.db.workflow_models  # noqa: F401 — register workflow_* tables on Base.metadata
-import app.db.doc_models  # noqa: F401 — register doc_* tables on Base.metadata
+
+def register_all_models() -> None:
+    """SQLAlchemy Base.metadata 에 모든 모델 테이블을 등록한다.
+
+    각 모델 모듈을 명시적으로 import 해 모듈 레벨 `Base.subclass` 선언을
+    실행시키는 역할. 사이드이펙트 import 를 함수 안으로 모아 호출 시점을
+    명시적으로 보이게 만든다. `create_all` / 마이그레이션 생성 전, 그리고
+    앱 부팅 시점(아래 모듈 로드 직후) 에 1회 호출하면 된다.
+    """
+    import app.db.auth_models  # noqa: F401 — mcper_users, mcper_api_keys
+    import app.db.celery_models  # noqa: F401 — failed_tasks, celery_task_stats
+    import app.db.doc_models  # noqa: F401 — doc_* tables
+    import app.db.mcp_security  # noqa: F401 — mcp_allowed_hosts
+    import app.db.mcp_tool_stats  # noqa: F401 — mcp_tool_call_stats
+    import app.db.rag_models  # noqa: F401 — spec_chunks, code_nodes, code_edges
+    import app.db.rbac_models  # noqa: F401 — mcper_domains, permissions, restrictions
+    import app.db.rule_models  # noqa: F401 — rule_* tables
+    import app.db.skill_models  # noqa: F401 — skill_* tables
+    import app.db.workflow_models  # noqa: F401 — workflow_* tables
+
+
+# 부팅 시점에 메타데이터 등록 1회 수행 (명시적 호출).
+register_all_models()
 
 
 def _resolve_database_url() -> str:

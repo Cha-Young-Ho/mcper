@@ -134,205 +134,203 @@ def sync_harness_docs_impl() -> str:
         denied = check_write(_db)
         if denied:
             return denied
-    db: Session = SessionLocal()
     inserted = 0
     updated = 0
     unchanged = 0
     errors: list[str] = []
-    try:
-        existing = _load_harness_specs(db)
+    with SessionLocal() as db:
+        try:
+            existing = _load_harness_specs(db)
 
-        for entry in HARNESS_REGISTRY:
-            filepath = _REPO_ROOT / entry["path"]
-            if not filepath.is_file():
-                errors.append(f"file not found: {entry['path']}")
-                continue
-
-            content = filepath.read_text(encoding="utf-8").replace("\r\n", "\n")
-            tags = _tags_for_entry(entry)
-            title = entry["name"].removesuffix(".md")
-
-            spec = existing.get(entry["path"])
-            if spec is not None:
-                if spec.content == content:
-                    unchanged += 1
+            for entry in HARNESS_REGISTRY:
+                filepath = _REPO_ROOT / entry["path"]
+                if not filepath.is_file():
+                    errors.append(f"file not found: {entry['path']}")
                     continue
-                # Content changed — update
-                spec.content = content
-                spec.title = title
-                spec.related_files = tags
-                db.commit()
-                enqueue_or_index_sync(spec.id)
-                updated += 1
-                logger.info("harness updated: %s (id=%s)", entry["path"], spec.id)
-            else:
-                # New entry — insert
-                row = Spec(
-                    title=title,
-                    content=content,
-                    app_target=HARNESS_APP_TARGET,
-                    base_branch=HARNESS_BASE_BRANCH,
-                    related_files=tags,
-                )
-                db.add(row)
-                db.commit()
-                db.refresh(row)
-                enqueue_or_index_sync(row.id)
-                inserted += 1
-                logger.info("harness inserted: %s (id=%s)", entry["path"], row.id)
 
-        return json.dumps(
-            {
-                "ok": True,
-                "inserted": inserted,
-                "updated": updated,
-                "unchanged": unchanged,
-                "errors": errors,
-                "total_registry": len(HARNESS_REGISTRY),
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        db.rollback()
-        return error_json(str(exc))
-    finally:
-        db.close()
+                content = filepath.read_text(encoding="utf-8").replace("\r\n", "\n")
+                tags = _tags_for_entry(entry)
+                title = entry["name"].removesuffix(".md")
+
+                spec = existing.get(entry["path"])
+                if spec is not None:
+                    if spec.content == content:
+                        unchanged += 1
+                        continue
+                    # Content changed — update
+                    spec.content = content
+                    spec.title = title
+                    spec.related_files = tags
+                    db.commit()
+                    enqueue_or_index_sync(spec.id)
+                    updated += 1
+                    logger.info("harness updated: %s (id=%s)", entry["path"], spec.id)
+                else:
+                    # New entry — insert
+                    row = Spec(
+                        title=title,
+                        content=content,
+                        app_target=HARNESS_APP_TARGET,
+                        base_branch=HARNESS_BASE_BRANCH,
+                        related_files=tags,
+                    )
+                    db.add(row)
+                    db.commit()
+                    db.refresh(row)
+                    enqueue_or_index_sync(row.id)
+                    inserted += 1
+                    logger.info("harness inserted: %s (id=%s)", entry["path"], row.id)
+
+            return json.dumps(
+                {
+                    "ok": True,
+                    "inserted": inserted,
+                    "updated": updated,
+                    "unchanged": unchanged,
+                    "errors": errors,
+                    "total_registry": len(HARNESS_REGISTRY),
+                },
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            db.rollback()
+            return error_json(str(exc))
 
 
 def search_harness_docs_impl(query: str, scope: str | None = None) -> str:
     """Hybrid search over harness docs with optional scope filter."""
     record_mcp_tool_call("search_harness_docs")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        top_n = 20 if scope else 10
-        chunks, mode = hybrid_spec_search(
-            db, query=query, app_target=HARNESS_APP_TARGET, top_n=top_n
-        )
+    with SessionLocal() as db:
+        try:
+            denied = check_read(db)
+            if denied:
+                return denied
+            top_n = 20 if scope else 10
+            chunks, mode = hybrid_spec_search(
+                db, query=query, app_target=HARNESS_APP_TARGET, top_n=top_n
+            )
 
-        if mode == "hybrid_ok" and chunks:
+            if mode == "hybrid_ok" and chunks:
+                if scope:
+                    scope_tag = f"scope:{scope}"
+                    chunks = [
+                        c for c in chunks if scope_tag in (c.get("related_files") or [])
+                    ]
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "search_mode": "hybrid_rrf",
+                        "count": len(chunks),
+                        "chunks": chunks,
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Fallback: ILIKE on harness specs
+            pattern = _ilike_pattern(query)
+            json_text = cast(Spec.related_files, String)
+            stmt = (
+                select(Spec)
+                .where(Spec.app_target == HARNESS_APP_TARGET)
+                .where(
+                    or_(
+                        Spec.content.ilike(pattern, escape="\\"),
+                        Spec.title.ilike(pattern, escape="\\"),
+                        json_text.ilike(pattern, escape="\\"),
+                    )
+                )
+                .order_by(Spec.id.desc())
+                .limit(30)
+            )
+            rows = list(db.scalars(stmt).all())
+
             if scope:
                 scope_tag = f"scope:{scope}"
-                chunks = [
-                    c for c in chunks if scope_tag in (c.get("related_files") or [])
-                ]
+                rows = [r for r in rows if scope_tag in (r.related_files or [])]
+
+            results = [
+                {
+                    "id": r.id,
+                    "title": r.title,
+                    "scope": _extract_tag(r.related_files or [], "scope:"),
+                    "path": _extract_tag(r.related_files or [], "path:"),
+                    "content": r.content[:500],
+                    "content_length": len(r.content),
+                }
+                for r in rows
+            ]
+            sm = (
+                "legacy_ilike_supplement"
+                if mode == "indexed_no_match"
+                else "legacy_ilike"
+            )
             return json.dumps(
                 {
                     "ok": True,
-                    "search_mode": "hybrid_rrf",
-                    "count": len(chunks),
-                    "chunks": chunks,
+                    "search_mode": sm,
+                    "count": len(results),
+                    "results": results,
+                    "chunks": [],
+                    "hybrid_note": mode,
                 },
                 ensure_ascii=False,
             )
-
-        # Fallback: ILIKE on harness specs
-        pattern = _ilike_pattern(query)
-        json_text = cast(Spec.related_files, String)
-        stmt = (
-            select(Spec)
-            .where(Spec.app_target == HARNESS_APP_TARGET)
-            .where(
-                or_(
-                    Spec.content.ilike(pattern, escape="\\"),
-                    Spec.title.ilike(pattern, escape="\\"),
-                    json_text.ilike(pattern, escape="\\"),
-                )
-            )
-            .order_by(Spec.id.desc())
-            .limit(30)
-        )
-        rows = list(db.scalars(stmt).all())
-
-        if scope:
-            scope_tag = f"scope:{scope}"
-            rows = [r for r in rows if scope_tag in (r.related_files or [])]
-
-        results = [
-            {
-                "id": r.id,
-                "title": r.title,
-                "scope": _extract_tag(r.related_files or [], "scope:"),
-                "path": _extract_tag(r.related_files or [], "path:"),
-                "content": r.content[:500],
-                "content_length": len(r.content),
-            }
-            for r in rows
-        ]
-        sm = "legacy_ilike_supplement" if mode == "indexed_no_match" else "legacy_ilike"
-        return json.dumps(
-            {
-                "ok": True,
-                "search_mode": sm,
-                "count": len(results),
-                "results": results,
-                "chunks": [],
-                "hybrid_note": mode,
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        return error_json(str(exc))
-    finally:
-        db.close()
+        except Exception as exc:
+            return error_json(str(exc))
 
 
 def get_harness_config_impl(target: str) -> str:
     """Retrieve full content of a specific harness doc by name."""
     record_mcp_tool_call("get_harness_config")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        stmt = select(Spec).where(Spec.app_target == HARNESS_APP_TARGET)
-        rows = list(db.scalars(stmt).all())
+    with SessionLocal() as db:
+        try:
+            denied = check_read(db)
+            if denied:
+                return denied
+            stmt = select(Spec).where(Spec.app_target == HARNESS_APP_TARGET)
+            rows = list(db.scalars(stmt).all())
 
-        if not rows:
+            if not rows:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "no harness docs registered — run sync_harness_docs first",
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Normalize target
+            t = target.strip().removesuffix(".md").lower()
+
+            # 1st: exact title match (case-insensitive)
+            for row in rows:
+                if (row.title or "").lower() == t:
+                    return _harness_config_response(row)
+
+            # 2nd: path stem match
+            for row in rows:
+                path = _extract_tag(row.related_files or [], "path:")
+                if path:
+                    stem = Path(path).stem.lower()
+                    if stem == t:
+                        return _harness_config_response(row)
+
+            # 3rd: partial match on title
+            for row in rows:
+                if t in (row.title or "").lower():
+                    return _harness_config_response(row)
+
+            available = sorted({row.title or "?" for row in rows})
             return json.dumps(
                 {
                     "ok": False,
-                    "error": "no harness docs registered — run sync_harness_docs first",
+                    "error": f"harness doc '{target}' not found",
+                    "available": available,
                 },
                 ensure_ascii=False,
             )
-
-        # Normalize target
-        t = target.strip().removesuffix(".md").lower()
-
-        # 1st: exact title match (case-insensitive)
-        for row in rows:
-            if (row.title or "").lower() == t:
-                return _harness_config_response(row)
-
-        # 2nd: path stem match
-        for row in rows:
-            path = _extract_tag(row.related_files or [], "path:")
-            if path:
-                stem = Path(path).stem.lower()
-                if stem == t:
-                    return _harness_config_response(row)
-
-        # 3rd: partial match on title
-        for row in rows:
-            if t in (row.title or "").lower():
-                return _harness_config_response(row)
-
-        available = sorted({row.title or "?" for row in rows})
-        return json.dumps(
-            {
-                "ok": False,
-                "error": f"harness doc '{target}' not found",
-                "available": available,
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        return error_json(str(exc))
-    finally:
-        db.close()
+        except Exception as exc:
+            return error_json(str(exc))
 
 
 def _harness_config_response(row: Spec) -> str:
@@ -354,35 +352,35 @@ def _harness_config_response(row: Spec) -> str:
 def list_harness_docs_impl() -> str:
     """List all registered harness docs."""
     record_mcp_tool_call("list_harness_docs")
-    db: Session = SessionLocal()
-    try:
-        denied = check_read(db)
-        if denied:
-            return denied
-        stmt = (
-            select(Spec).where(Spec.app_target == HARNESS_APP_TARGET).order_by(Spec.id)
-        )
-        rows = list(db.scalars(stmt).all())
-        docs = []
-        for row in rows:
-            tags = row.related_files or []
-            docs.append(
-                {
-                    "id": row.id,
-                    "title": row.title,
-                    "scope": _extract_tag(tags, "scope:"),
-                    "path": _extract_tag(tags, "path:"),
-                    "content_length": len(row.content),
-                }
+    with SessionLocal() as db:
+        try:
+            denied = check_read(db)
+            if denied:
+                return denied
+            stmt = (
+                select(Spec)
+                .where(Spec.app_target == HARNESS_APP_TARGET)
+                .order_by(Spec.id)
             )
-        return json.dumps(
-            {"ok": True, "count": len(docs), "docs": docs},
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        return error_json(str(exc))
-    finally:
-        db.close()
+            rows = list(db.scalars(stmt).all())
+            docs = []
+            for row in rows:
+                tags = row.related_files or []
+                docs.append(
+                    {
+                        "id": row.id,
+                        "title": row.title,
+                        "scope": _extract_tag(tags, "scope:"),
+                        "path": _extract_tag(tags, "path:"),
+                        "content_length": len(row.content),
+                    }
+                )
+            return json.dumps(
+                {"ok": True, "count": len(docs), "docs": docs},
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            return error_json(str(exc))
 
 
 def upload_harness_impl(
@@ -400,126 +398,123 @@ def upload_harness_impl(
       - section_name: skill/rule section name (default: derived from path)
     """
     record_mcp_tool_call("upload_harness")
-    db: Session = SessionLocal()
     results: list[dict[str, Any]] = []
     errors: list[str] = []
 
-    try:
-        app_key = app_name.strip().lower()
-        denied = check_write(db, app_name=app_key or None)
-        if denied:
-            return denied
-        if not app_key:
+    with SessionLocal() as db:
+        try:
+            app_key = app_name.strip().lower()
+            denied = check_write(db, app_name=app_key or None)
+            if denied:
+                return denied
+            if not app_key:
+                return error_json("app_name is required")
+
+            # Derive repo pattern from origin_url if provided
+            repo_pattern = ""
+            if origin_url:
+                url = origin_url.strip()
+                # Extract repo name: git@github.com:org/repo.git -> repo
+                for sep in ["/", ":"]:
+                    if sep in url:
+                        candidate = url.rsplit(sep, 1)[-1]
+                        candidate = candidate.removesuffix(".git").strip()
+                        if candidate:
+                            repo_pattern = candidate
+                            break
+
+            for i, f in enumerate(files):
+                try:
+                    path = f.get("path", f"file_{i}")
+                    content = f.get("content", "")
+                    file_type = f.get("type", "skill")
+                    scope = f.get("scope", "app")
+                    section_name = f.get("section_name", "")
+
+                    if not content.strip():
+                        errors.append(f"empty content: {path}")
+                        continue
+
+                    # Derive section_name from path if not provided
+                    if not section_name:
+                        stem = Path(path).stem.lower()
+                        # Remove common prefixes
+                        for prefix in ("skill", "rule"):
+                            stem = stem.removeprefix(prefix).strip("-_")
+                        section_name = stem or "main"
+
+                    if file_type == "rule":
+                        if scope == "repo" and repo_pattern:
+                            _, sn, v = publish_repo_rule_entry(
+                                db, repo_pattern, content, section_name
+                            )
+                            results.append(
+                                {
+                                    "path": path,
+                                    "type": "rule",
+                                    "scope": "repo",
+                                    "pattern": repo_pattern,
+                                    "section": sn,
+                                    "version": v,
+                                }
+                            )
+                        else:
+                            _, sn, v = publish_app(db, app_key, content, section_name)
+                            results.append(
+                                {
+                                    "path": path,
+                                    "type": "rule",
+                                    "scope": "app",
+                                    "app_name": app_key,
+                                    "section": sn,
+                                    "version": v,
+                                }
+                            )
+                    else:  # skill
+                        if scope == "repo" and repo_pattern:
+                            _, sn, v = publish_repo_skill(
+                                db, repo_pattern, content, section_name
+                            )
+                            results.append(
+                                {
+                                    "path": path,
+                                    "type": "skill",
+                                    "scope": "repo",
+                                    "pattern": repo_pattern,
+                                    "section": sn,
+                                    "version": v,
+                                }
+                            )
+                        else:
+                            _, sn, v = publish_app_skill(
+                                db, app_key, content, section_name
+                            )
+                            results.append(
+                                {
+                                    "path": path,
+                                    "type": "skill",
+                                    "scope": "app",
+                                    "app_name": app_key,
+                                    "section": sn,
+                                    "version": v,
+                                }
+                            )
+
+                except Exception as exc:
+                    errors.append(f"{path}: {exc}")
+
             return json.dumps(
-                {"ok": False, "error": "app_name is required"},
+                {
+                    "ok": True,
+                    "uploaded": len(results),
+                    "errors": errors,
+                    "results": results,
+                },
                 ensure_ascii=False,
             )
-
-        # Derive repo pattern from origin_url if provided
-        repo_pattern = ""
-        if origin_url:
-            url = origin_url.strip()
-            # Extract repo name: git@github.com:org/repo.git -> repo
-            for sep in ["/", ":"]:
-                if sep in url:
-                    candidate = url.rsplit(sep, 1)[-1]
-                    candidate = candidate.removesuffix(".git").strip()
-                    if candidate:
-                        repo_pattern = candidate
-                        break
-
-        for i, f in enumerate(files):
-            try:
-                path = f.get("path", f"file_{i}")
-                content = f.get("content", "")
-                file_type = f.get("type", "skill")
-                scope = f.get("scope", "app")
-                section_name = f.get("section_name", "")
-
-                if not content.strip():
-                    errors.append(f"empty content: {path}")
-                    continue
-
-                # Derive section_name from path if not provided
-                if not section_name:
-                    stem = Path(path).stem.lower()
-                    # Remove common prefixes
-                    for prefix in ("skill", "rule"):
-                        stem = stem.removeprefix(prefix).strip("-_")
-                    section_name = stem or "main"
-
-                if file_type == "rule":
-                    if scope == "repo" and repo_pattern:
-                        _, sn, v = publish_repo_rule_entry(
-                            db, repo_pattern, content, section_name
-                        )
-                        results.append(
-                            {
-                                "path": path,
-                                "type": "rule",
-                                "scope": "repo",
-                                "pattern": repo_pattern,
-                                "section": sn,
-                                "version": v,
-                            }
-                        )
-                    else:
-                        _, sn, v = publish_app(db, app_key, content, section_name)
-                        results.append(
-                            {
-                                "path": path,
-                                "type": "rule",
-                                "scope": "app",
-                                "app_name": app_key,
-                                "section": sn,
-                                "version": v,
-                            }
-                        )
-                else:  # skill
-                    if scope == "repo" and repo_pattern:
-                        _, sn, v = publish_repo_skill(
-                            db, repo_pattern, content, section_name
-                        )
-                        results.append(
-                            {
-                                "path": path,
-                                "type": "skill",
-                                "scope": "repo",
-                                "pattern": repo_pattern,
-                                "section": sn,
-                                "version": v,
-                            }
-                        )
-                    else:
-                        _, sn, v = publish_app_skill(db, app_key, content, section_name)
-                        results.append(
-                            {
-                                "path": path,
-                                "type": "skill",
-                                "scope": "app",
-                                "app_name": app_key,
-                                "section": sn,
-                                "version": v,
-                            }
-                        )
-
-            except Exception as exc:
-                errors.append(f"{path}: {exc}")
-
-        return json.dumps(
-            {
-                "ok": True,
-                "uploaded": len(results),
-                "errors": errors,
-                "results": results,
-            },
-            ensure_ascii=False,
-        )
-    except Exception as exc:
-        db.rollback()
-        return error_json(str(exc))
-    finally:
-        db.close()
+        except Exception as exc:
+            db.rollback()
+            return error_json(str(exc))
 
 
 def publish_repo_rule_entry(
