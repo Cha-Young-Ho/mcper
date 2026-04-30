@@ -75,11 +75,12 @@ _MCP_AUTH_ENABLED = (
 
 
 def _validate_startup_config() -> None:
-    """중요 설정 검증. 인증 활성 상태에서 보안 기본값 사용 시 startup 차단.
+    """중요 설정 검증. 인증 활성 상태에서 보안 필수값 누락 시 startup 차단.
 
-    - ``MCPER_AUTH_ENABLED=true`` + ``ADMIN_PASSWORD`` 미설정/``"changeme"`` → RuntimeError
+    - ``MCPER_AUTH_ENABLED=true`` + ``ADMIN_PASSWORD`` 미설정 → RuntimeError
     - ``MCPER_AUTH_ENABLED=true`` + ``AUTH_SECRET_KEY`` 미설정 → RuntimeError
-    - 인증 비활성(로컬 개발) 상태에서는 기본값 허용하고 INFO 로그만 남긴다.
+    - ``ADMIN_PASSWORD="changeme"`` 는 마스터 단일 계정 운용 정책에 따라 허용
+      (WARNING 로그만). 실제 운영에서는 변경 권장.
     """
     password = os.environ.get("ADMIN_PASSWORD", "")
     secret_key = os.environ.get("AUTH_SECRET_KEY", "") or (
@@ -93,9 +94,9 @@ def _validate_startup_config() -> None:
                 "반드시 안전한 값으로 설정 후 시작하세요."
             )
         if password == "changeme":
-            raise RuntimeError(
-                "MCPER_AUTH_ENABLED=true 이지만 ADMIN_PASSWORD 가 기본값('changeme') 입니다. "
-                "반드시 변경 후 시작하세요."
+            logger.warning(
+                "ADMIN_PASSWORD='changeme' — 마스터 단일 계정 운용 정책에 따라 허용. "
+                "운영 배포 전 반드시 변경하세요."
             )
         if not secret_key:
             raise RuntimeError(
