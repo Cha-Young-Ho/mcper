@@ -11,6 +11,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
@@ -20,6 +23,20 @@ from app.db.rule_models import (
     McpAppPullOption,
     RepoRuleVersion,
 )
+
+
+# 카드 미리보기용 경량 레코드 — 카드 UI 에서 필요한 최소 필드만. 본문(body)
+# TEXT 전체 로드를 피하기 위해 SQL SUBSTRING 으로 잘라 가져온다.
+_PREVIEW_CHARS = 200
+_PREVIEW_FETCH = _PREVIEW_CHARS + 1  # 잘림 여부 판정용 +1
+
+
+@dataclass(frozen=True)
+class SectionPreview:
+    section_name: str
+    version: int
+    preview: str
+    created_at: datetime
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -295,6 +312,134 @@ def delete_repo_category_version(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# 카드 미리보기 전용 경량 조회 (P11: body 전체 로드 회피)
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _preview_string(head: str) -> str:
+    """SQL SUBSTRING 결과를 preview 문자열로 가공 — `_PREVIEW_CHARS` 초과분은 `…` 로 표시."""
+    if head is None:
+        return ""
+    if len(head) > _PREVIEW_CHARS:
+        return head[:_PREVIEW_CHARS] + "…"
+    return head
+
+
+def list_global_section_previews(
+    db: Session, *, domain: str | None = None
+) -> list[SectionPreview]:
+    """모든 섹션의 최신 global 룰을 카드용 필드만 추려 가져온다."""
+    base = select(
+        GlobalRuleVersion.section_name.label("sn"),
+        func.max(GlobalRuleVersion.version).label("mv"),
+    )
+    if domain is not None:
+        base = base.where(GlobalRuleVersion.domain == domain)
+    subq = base.group_by(GlobalRuleVersion.section_name).subquery()
+
+    body_head = func.substring(GlobalRuleVersion.body, 1, _PREVIEW_FETCH)
+    q = select(
+        GlobalRuleVersion.section_name,
+        GlobalRuleVersion.version,
+        body_head.label("body_head"),
+        GlobalRuleVersion.created_at,
+    ).join(
+        subq,
+        (GlobalRuleVersion.section_name == subq.c.sn)
+        & (GlobalRuleVersion.version == subq.c.mv),
+    )
+    if domain is not None:
+        q = q.where(GlobalRuleVersion.domain == domain)
+
+    rows = db.execute(q).all()
+    out = [
+        SectionPreview(
+            section_name=sn,
+            version=v,
+            preview=_preview_string(head),
+            created_at=ca,
+        )
+        for sn, v, head, ca in rows
+    ]
+    out.sort(key=lambda r: "" if r.section_name == "main" else r.section_name)
+    return out
+
+
+def list_app_section_previews(db: Session, app_name: str) -> list[SectionPreview]:
+    """앱 규칙 섹션 보드 카드용 경량 조회."""
+    base = (
+        select(
+            AppRuleVersion.section_name.label("sn"),
+            func.max(AppRuleVersion.version).label("mv"),
+        )
+        .where(AppRuleVersion.app_name == app_name)
+        .group_by(AppRuleVersion.section_name)
+    ).subquery()
+
+    body_head = func.substring(AppRuleVersion.body, 1, _PREVIEW_FETCH)
+    q = select(
+        AppRuleVersion.section_name,
+        AppRuleVersion.version,
+        body_head.label("body_head"),
+        AppRuleVersion.created_at,
+    ).join(
+        base,
+        (AppRuleVersion.app_name == app_name)
+        & (AppRuleVersion.section_name == base.c.sn)
+        & (AppRuleVersion.version == base.c.mv),
+    )
+    rows = db.execute(q).all()
+    out = [
+        SectionPreview(
+            section_name=sn,
+            version=v,
+            preview=_preview_string(head),
+            created_at=ca,
+        )
+        for sn, v, head, ca in rows
+    ]
+    out.sort(key=lambda r: "" if r.section_name == "main" else r.section_name)
+    return out
+
+
+def list_repo_section_previews(db: Session, pattern: str) -> list[SectionPreview]:
+    """레포 규칙 패턴별 카드용 경량 조회."""
+    base = (
+        select(
+            RepoRuleVersion.section_name.label("sn"),
+            func.max(RepoRuleVersion.version).label("mv"),
+        )
+        .where(RepoRuleVersion.pattern == pattern)
+        .group_by(RepoRuleVersion.section_name)
+    ).subquery()
+
+    body_head = func.substring(RepoRuleVersion.body, 1, _PREVIEW_FETCH)
+    q = select(
+        RepoRuleVersion.section_name,
+        RepoRuleVersion.version,
+        body_head.label("body_head"),
+        RepoRuleVersion.created_at,
+    ).join(
+        base,
+        (RepoRuleVersion.pattern == pattern)
+        & (RepoRuleVersion.section_name == base.c.sn)
+        & (RepoRuleVersion.version == base.c.mv),
+    )
+    rows = db.execute(q).all()
+    out = [
+        SectionPreview(
+            section_name=sn,
+            version=v,
+            preview=_preview_string(head),
+            created_at=ca,
+        )
+        for sn, v, head, ca in rows
+    ]
+    out.sort(key=lambda r: "" if r.section_name == "main" else r.section_name)
+    return out
+
+
+# ──────────────────────────────────────────────────────────────────────
 # 공통 — diff / rollback / export / import 에서 사용
 # ──────────────────────────────────────────────────────────────────────
 
@@ -322,6 +467,10 @@ __all__ = [
     "get_repo_category_version",
     "list_app_section_versions",
     "list_global_category_versions",
+    "list_app_section_previews",
+    "list_global_section_previews",
     "list_repo_category_versions",
+    "list_repo_section_previews",
     "repo_pattern_exists",
+    "SectionPreview",
 ]

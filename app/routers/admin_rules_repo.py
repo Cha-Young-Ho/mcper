@@ -191,19 +191,17 @@ def repo_rule_board(
     display = vr.repo_pattern_card_display(key)
     can_delete_stream = (key or "").strip() != ""
 
-    section_rows = vr._repo_all_sections_latest_for_pattern(db, key)
-    sections = []
-    for r in section_rows:
-        sn_url = quote(r.section_name, safe="")
-        sections.append(
-            {
-                "section_name": r.section_name,
-                "version": r.version,
-                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-                "created_at": r.created_at,
-                "url": f"/admin/repo-rules/pat/{pat_url}/s/{sn_url}",
-            }
-        )
+    section_rows = svc.list_repo_section_previews(db, key)
+    sections = [
+        {
+            "section_name": r.section_name,
+            "version": r.version,
+            "preview": r.preview,
+            "created_at": r.created_at,
+            "url": f"/admin/repo-rules/pat/{pat_url}/s/{quote(r.section_name, safe='')}",
+        }
+        for r in section_rows
+    ]
 
     return templates.TemplateResponse(
         request,

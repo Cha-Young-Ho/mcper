@@ -163,19 +163,18 @@ def app_rule_board(
     if not svc.app_exists(db, key):
         raise HTTPException(404, "Unknown app")
 
-    # 모든 섹션의 최신 버전 행
-    section_rows = vr._app_all_sections_latest(db, key)
-    sections = []
-    for r in section_rows:
-        sections.append(
-            {
-                "section_name": r.section_name,
-                "version": r.version,
-                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-                "created_at": r.created_at,
-                "url": f"/admin/app-rules/app/{quote(key, safe='')}/s/{quote(r.section_name, safe='')}",
-            }
-        )
+    # 모든 섹션의 최신 버전 — 카드용 preview 필드만 (body TEXT 전체 로드 회피)
+    section_rows = svc.list_app_section_previews(db, key)
+    sections = [
+        {
+            "section_name": r.section_name,
+            "version": r.version,
+            "preview": r.preview,
+            "created_at": r.created_at,
+            "url": f"/admin/app-rules/app/{quote(key, safe='')}/s/{quote(r.section_name, safe='')}",
+        }
+        for r in section_rows
+    ]
 
     can_delete_stream = key != "__default__"
     show_pull_default_toggle = key != "__default__"

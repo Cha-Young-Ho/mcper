@@ -26,18 +26,17 @@ def global_rules_board(
 ):
     """글로벌 규칙 카테고리 오버뷰."""
     domain_filter = domain.strip() or None
-    section_rows = vr._global_all_sections_latest(db, domain=domain_filter)
-    sections = []
-    for r in section_rows:
-        sections.append(
-            {
-                "section_name": r.section_name,
-                "version": r.version,
-                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-                "created_at": r.created_at,
-                "url": f"/admin/global-rules/s/{quote(r.section_name, safe='')}",
-            }
-        )
+    section_rows = svc.list_global_section_previews(db, domain=domain_filter)
+    sections = [
+        {
+            "section_name": r.section_name,
+            "version": r.version,
+            "preview": r.preview,
+            "created_at": r.created_at,
+            "url": f"/admin/global-rules/s/{quote(r.section_name, safe='')}",
+        }
+        for r in section_rows
+    ]
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
