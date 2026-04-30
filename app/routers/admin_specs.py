@@ -17,7 +17,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
@@ -211,6 +211,77 @@ def plan_delete(
     db.delete(row)
     db.commit()
     return RedirectResponse(f"/admin/plans/app/{app_enc}", status_code=303)
+
+
+# ── 앱 단위 관리 (카드 뷰에서 호출) ───────────────────────────────────
+
+
+@router.post("/plans/app/{app_name}/delete")
+def plan_app_delete(
+    app_name: str,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """해당 앱의 모든 기획서 일괄 삭제."""
+    key = app_name.strip()
+    if not key:
+        raise HTTPException(400, "app_name 필수")
+    res = db.execute(delete(Spec).where(Spec.app_target == key))
+    db.commit()
+    if res.rowcount == 0:
+        raise HTTPException(404, f"삭제할 기획서가 없습니다: {key}")
+    return RedirectResponse("/admin/plans", status_code=303)
+
+
+@router.post("/plans/app/{app_name}/clear")
+def plan_app_clear(
+    app_name: str,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """해당 앱의 모든 기획서 `content` 만 비움 (앱 스트림/타이틀/메타는 유지)."""
+    key = app_name.strip()
+    if not key:
+        raise HTTPException(400, "app_name 필수")
+    rows = db.scalars(select(Spec).where(Spec.app_target == key)).all()
+    if not rows:
+        raise HTTPException(404, f"대상 앱 기획서가 없습니다: {key}")
+    for row in rows:
+        row.content = ""
+    db.commit()
+    return RedirectResponse(f"/admin/plans/app/{quote(key, safe='')}", status_code=303)
+
+
+@router.post("/plans/app/{app_name}/rename")
+def plan_app_rename(
+    app_name: str,
+    _user: str = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+    new_app_name: str = Form(...),
+) -> Response:
+    """해당 앱 소속 기획서들의 `app_target` 을 일괄 변경."""
+    old = app_name.strip()
+    new = new_app_name.strip()
+    if not old or not new:
+        raise HTTPException(400, "이름 필수")
+    if old == new:
+        return RedirectResponse(
+            f"/admin/plans/app/{quote(new, safe='')}", status_code=303
+        )
+    # 대상 존재 확인 + 신규 이름이 이미 사용중이면 거절.
+    target_exists = db.scalars(
+        select(Spec).where(Spec.app_target == old).limit(1)
+    ).first()
+    if target_exists is None:
+        raise HTTPException(404, f"대상 앱이 없습니다: {old}")
+    conflict = db.scalars(select(Spec).where(Spec.app_target == new).limit(1)).first()
+    if conflict is not None:
+        raise HTTPException(400, f"이미 존재하는 앱 이름입니다: {new}")
+    rows = db.scalars(select(Spec).where(Spec.app_target == old)).all()
+    for row in rows:
+        row.app_target = new
+    db.commit()
+    return RedirectResponse(f"/admin/plans/app/{quote(new, safe='')}", status_code=303)
 
 
 @router.get("/plans/bulk-upload")

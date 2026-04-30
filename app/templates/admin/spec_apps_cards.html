@@ -4,13 +4,45 @@
   {% if cards %}
     <div class="app-card-grid">
       {% for c in cards %}
-        <a class="app-card" href="/admin/{{ nav_base }}/app/{{ c.enc }}">
-          <div class="app-card__head">
-            <span class="app-card__name">{{ c.app }}</span>
-            <span class="ver-badge ver-badge--sm">{{ c.count }}건</span>
+        <div class="app-card" style="position:relative;display:flex;flex-direction:column;gap:.5rem">
+          <a href="/admin/{{ nav_base }}/app/{{ c.enc }}"
+             style="display:flex;flex-direction:column;gap:.35rem;text-decoration:none;color:inherit">
+            <div class="app-card__head">
+              <span class="app-card__name">{{ c.app }}</span>
+              <span class="ver-badge ver-badge--sm">{{ c.count }}건</span>
+            </div>
+            <span class="app-card__cta">기획서 목록 →</span>
+          </a>
+          <div class="app-card__actions"
+               style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem">
+            <button type="button"
+                    class="btn btn-secondary btn-sm"
+                    data-app="{{ c.app }}"
+                    data-action="rename">이름 수정</button>
+            <button type="button"
+                    class="btn btn-secondary btn-sm"
+                    data-app="{{ c.app }}"
+                    data-action="clear">내용 삭제</button>
+            <button type="button"
+                    class="btn btn-danger btn-sm"
+                    data-app="{{ c.app }}"
+                    data-action="delete">삭제</button>
           </div>
-          <span class="app-card__cta">기획서 목록 →</span>
-        </a>
+          <form class="js-app-delete-form"
+                method="post"
+                action="/admin/plans/app/{{ c.enc }}/delete"
+                style="display:none"></form>
+          <form class="js-app-clear-form"
+                method="post"
+                action="/admin/plans/app/{{ c.enc }}/clear"
+                style="display:none"></form>
+          <form class="js-app-rename-form"
+                method="post"
+                action="/admin/plans/app/{{ c.enc }}/rename"
+                style="display:none">
+            <input type="hidden" name="new_app_name" value="" />
+          </form>
+        </div>
       {% endfor %}
     </div>
   {% else %}
@@ -18,4 +50,38 @@
       저장된 기획서가 없습니다. MCP <code>upload_spec_to_db</code> 로 추가하거나 시드(첫 기동 시 예시 1건)를 확인하세요.
     </div>
   {% endif %}
+{% endblock %}
+{% block scripts %}
+  {{ super() }}
+  <script>
+  (function () {
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      var app = btn.getAttribute('data-app');
+      var action = btn.getAttribute('data-action');
+      var card = btn.closest('.app-card');
+      if (!card) return;
+
+      if (action === 'delete') {
+        if (!window.confirm('진짜 ' + app + '을 삭제하겠습니까?')) return;
+        var f = card.querySelector('.js-app-delete-form');
+        if (f) f.submit();
+      } else if (action === 'clear') {
+        if (!window.confirm(app + '의 모든 기획서 내용을 비우시겠습니까? (앱/메타는 유지)')) return;
+        var f = card.querySelector('.js-app-clear-form');
+        if (f) f.submit();
+      } else if (action === 'rename') {
+        var next = window.prompt('새 앱 이름을 입력하세요.', app);
+        if (next === null) return;
+        next = next.trim();
+        if (!next || next === app) return;
+        var f = card.querySelector('.js-app-rename-form');
+        if (!f) return;
+        f.querySelector('input[name="new_app_name"]').value = next;
+        f.submit();
+      }
+    });
+  })();
+  </script>
 {% endblock %}
