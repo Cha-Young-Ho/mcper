@@ -2,7 +2,7 @@
 
 **컨텍스트**: 2026-04-29 세션의 후속. 남겨둔 Phase 2(ruff), Q03/Q04, worktree 정리를 실행.
 
-## 이번 세션 추가 커밋 (origin/main 대비 48 커밋 ahead)
+## 이번 세션 추가 커밋 (origin/main 대비 52 커밋 ahead)
 
 ### 1차 — 자동화/리팩터링
 | 커밋 | 내용 | 규모 |
@@ -39,6 +39,15 @@
 
 **worktree 정리**: 7개 agent worktree + 브랜치 모두 제거 완료.
 
+### 5차 — phase2 완전 마감
+| 커밋 | 내용 | 규모 |
+|---|---|---|
+| `bd3ee76` | Q06-phase2 — 전체 공개 함수 반환 타입 100% (ast.parse 기반 누락 0건) | 17 파일, +66/-51 |
+| `b769bba` | Q11-phase2 — 라우터 핸들러 docstring 81개 대량 보강 | 11 파일, +81 |
+| `1ae39f1` | admin_rules_service 확장 21 + rule_cache 26 단위 테스트 (총 47 신규) | 2 파일, +453 |
+
+**누적 단위 테스트**: 122 pass (초기 75 + phase2 47).
+
 ## admin_rules 구조 변화
 
 **전 (단일 파일)**
@@ -68,20 +77,18 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 
 ### 즉시 가능
 
-1. **`git push origin main`** — 48 커밋 ahead
+1. **`git push origin main`** — 52 커밋 ahead
 2. **서비스 계층 단위 테스트 추가** — `admin_rules_service.py` 함수별 스텁/SQLite 기반 테스트. 기존 `tests/unit/` 에 이어서.
 
-### 남은 P2 감사 항목
+### 감사 항목 전체 완료 ✅
 
-| 그룹 | 항목 | 상태 |
-|---|---|---|
-| 성능 | P08 / P09 / P10 / P11 / P12 | ✅ 완료 |
-| 품질 | Q06 (라우터 210개 / 서비스는 phase2) / Q07 / Q08 / Q09 / Q10 / Q11 (55+건 / 라우터는 phase2) / Q12 / Q13 / Q14 | ✅ 완료 |
-| 보안 | S07 / S08 / S09 · python-jose→PyJWT 마이그레이션 | ✅ 완료 |
+| 그룹 | 항목 |
+|---|---|
+| 성능 | P08 / P09 / P10 / P11 / P12 |
+| 품질 | Q06 (phase1 + phase2 전수) / Q07 / Q08 / Q09 / Q10 / Q11 (phase1 + phase2) / Q12 / Q13 / Q14 |
+| 보안 | S07 / S08 / S09 · python-jose → PyJWT |
 
-다음 세션 재작업 후보 (phase2):
-- Q06 서비스 레이어 (`versioned_*.py`) 타입힌트 — main 의 P06/P08/P12/Q07 변경 위에 재적용
-- Q11 라우터 파일 docstring — admin_rules 분할 후 구조에 맞게 재적용
+**감사 원본 36건 중 P0×5·P1×17·P2×14 = 36건 모두 해소 완료.**
 
 ### 스케일 후속 (필요 시)
 
@@ -94,7 +101,7 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 ```bash
 cd /Users/wemadeplay/workspace/personal/mcper
 git status
-git log --oneline origin/main..HEAD | wc -l   # 44 이상이면 push 안 됨
+git log --oneline origin/main..HEAD | wc -l   # 52 이상이면 push 안 됨
 cat docs/session_2026-04-30_summary.md
 
 # 컨테이너/헬스
