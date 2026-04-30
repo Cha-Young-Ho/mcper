@@ -259,53 +259,59 @@ async def import_rules(
         results["global"] = {"new_version": new_gv}
 
     # apps (섹션별 import 지원: {"app_name": {"main": {"body": ...}, "admin_rules": {...}}})
+    # 기존 구현은 sections 을 2번 순회하며, 두 번째 순회에서 new_v 가 마지막 루프 값으로 고정되는
+    # 버그가 있었다. 1회 순회로 섹션별 new_v 를 정확히 기록한다.
     apps_imported: dict[str, object] = {}
     for app_name, info in (data.get("apps") or {}).items():
-        if isinstance(info, dict):
-            # new format: {section_name: {version, body}}
-            sections_in = {
-                k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")
-            }
-            if sections_in:
-                for sn, sinfo in sections_in.items():
-                    body = (sinfo.get("body") or "").strip()
-                    if body:
-                        _, _sn, new_v = vr.publish_app(db, app_name, body, sn)
-                apps_imported[app_name] = {
-                    sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")
-                }
-            else:
-                # legacy format: {body: ...}
-                body = (info.get("body") or "").strip()
+        if not isinstance(info, dict):
+            continue
+        # new format: {section_name: {version, body}}
+        section_entries = {
+            k: (v.get("body") or "").strip()
+            for k, v in info.items()
+            if isinstance(v, dict) and v.get("body")
+        }
+        if section_entries:
+            per_section: dict[str, int] = {}
+            for sn, body in section_entries.items():
                 if body:
-                    _, _sn, new_v = vr.publish_app(db, app_name, body)
-                    apps_imported[app_name] = new_v
+                    _, _sn, new_v = vr.publish_app(db, app_name, body, sn)
+                    per_section[sn] = new_v
+            if per_section:
+                apps_imported[app_name] = per_section
+        else:
+            # legacy format: {body: ...}
+            body = (info.get("body") or "").strip()
+            if body:
+                _, _sn, new_v = vr.publish_app(db, app_name, body)
+                apps_imported[app_name] = new_v
     if apps_imported:
         results["apps"] = apps_imported
 
     # repos (섹션별 import 지원)
     repos_imported: dict[str, object] = {}
     for pat_key, info in (data.get("repos") or {}).items():
+        if not isinstance(info, dict):
+            continue
         pattern = "" if pat_key == "__default__" else pat_key
-        if isinstance(info, dict):
-            sections_in = {
-                k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")
-            }
-            if sections_in:
-                for sn, sinfo in sections_in.items():
-                    body = (sinfo.get("body") or "").strip()
-                    if body:
-                        _, _sn, new_v = vr.publish_repo(
-                            db, pattern, body, section_name=sn
-                        )
-                repos_imported[pat_key] = {
-                    sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")
-                }
-            else:
-                body = (info.get("body") or "").strip()
+        section_entries = {
+            k: (v.get("body") or "").strip()
+            for k, v in info.items()
+            if isinstance(v, dict) and v.get("body")
+        }
+        if section_entries:
+            per_section: dict[str, int] = {}
+            for sn, body in section_entries.items():
                 if body:
-                    _, _sn, new_v = vr.publish_repo(db, pattern, body)
-                    repos_imported[pat_key] = new_v
+                    _, _sn, new_v = vr.publish_repo(db, pattern, body, section_name=sn)
+                    per_section[sn] = new_v
+            if per_section:
+                repos_imported[pat_key] = per_section
+        else:
+            body = (info.get("body") or "").strip()
+            if body:
+                _, _sn, new_v = vr.publish_repo(db, pattern, body)
+                repos_imported[pat_key] = new_v
     if repos_imported:
         results["repos"] = repos_imported
 

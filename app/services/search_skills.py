@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
 from app.db.rag_models import SkillChunk
@@ -138,9 +138,13 @@ def hybrid_skill_search(
     if not ranked:
         return [], "indexed_no_match"
 
-    rows = db.scalars(select(SkillChunk).where(SkillChunk.id.in_(ranked))).all()
-    by_id = {r.id: r for r in rows}
-    ordered = [by_id[i] for i in ranked if i in by_id]
+    # ORDER BY CASE 로 ranked 순서를 DB 레벨에서 유지 (P10).
+    order_case = case({rid: idx for idx, rid in enumerate(ranked)}, value=SkillChunk.id)
+    ordered = list(
+        db.scalars(
+            select(SkillChunk).where(SkillChunk.id.in_(ranked)).order_by(order_case)
+        ).all()
+    )
 
     # Fetch parents for context
     parent_ids = [

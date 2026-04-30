@@ -242,8 +242,13 @@ def set_mcp_include_repo_default_for_pattern(
     session.commit()
 
 
-def ensure_mcp_repo_pattern_pull_option(session: Session, pattern: str) -> None:
-    """새 repo 패턴 첫 버전 후 옵션 행이 없으면 전역 기본값으로 생성."""
+def ensure_mcp_repo_pattern_pull_option(
+    session: Session, pattern: str, *, commit: bool = True
+) -> None:
+    """새 repo 패턴 첫 버전 후 옵션 행이 없으면 전역 기본값으로 생성.
+
+    `commit=False` 로 호출하면 호출자가 commit 을 일괄 수행 (P08 배치 트랜잭션).
+    """
     key = pattern if pattern is not None else ""
     if session.get(McpRepoPatternPullOption, key) is not None:
         return
@@ -253,7 +258,8 @@ def ensure_mcp_repo_pattern_pull_option(session: Session, pattern: str) -> None:
             include_repo_default=get_mcp_include_repo_default(session),
         )
     )
-    session.commit()
+    if commit:
+        session.commit()
 
 
 def get_mcp_include_app_default_global(session: Session) -> bool:
@@ -1164,6 +1170,9 @@ def _try_index_rule(
             section_name=section_name,
         )
     except Exception:
+        # 인덱싱(임베딩/FTS) 실패가 publish 트랜잭션을 되돌리지 않도록 흡수.
+        # 가능한 예외 범위가 넓어(네트워크·DB·임베딩 모델 로딩 등) 특정 타입으로
+        # 좁히지 않는다. 스택은 `exc_info=True` 로 완전 보존된다.
         logger.warning(
             "rule indexing failed type=%s id=%s",
             rule_type,
@@ -1285,8 +1294,9 @@ def publish_repo(
         domain=domain,
     )
     session.add(row)
+    # 새 repo 패턴이면 pull-option 행까지 같은 트랜잭션에 묶어 1회 commit (P08).
+    ensure_mcp_repo_pattern_pull_option(session, key, commit=False)
     session.commit()
-    ensure_mcp_repo_pattern_pull_option(session, key)
     _try_index_rule(
         session, "repo", row.id, body, pattern=key, domain=domain, section_name=sn
     )
