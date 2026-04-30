@@ -1,37 +1,56 @@
 {% extends "admin/base.html" %}
 {% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  <a href="/admin/app-rules">← 목록</a>
-  &nbsp;/&nbsp;
-  <a href="/admin/app-rules/app/{{ app_url_encoded }}">{{ app_name }}</a>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin/app-rules">← 목록</a>
+    &nbsp;/&nbsp;
+    <a href="/admin/app-rules/app/{{ app_url_encoded }}">{{ app_name }}</a>
+    {% if section_name is defined and section_name %}
+      &nbsp;/&nbsp;
+      <a href="/admin/app-rules/app/{{ app_url_encoded }}/s/{{ section_url_encoded }}">
+        {% if section_name == 'main' %}
+          기본
+        {% else %}
+          {{ section_name }}
+        {% endif %}
+      </a>
+    {% endif %}
+  </p>
+  <p>
+    {% if section_name is defined and section_name %}
+      <span class="category-badge" style="margin-right:0.4rem">
+        {% if section_name == 'main' %}
+          기본
+        {% else %}
+          {{ section_name }}
+        {% endif %}
+      </span>
+    {% endif %}
+    다음으로 저장될 버전: <span class="ver-badge">{{ next_version }}</span>
+  </p>
   {% if section_name is defined and section_name %}
-  &nbsp;/&nbsp;
-  <a href="/admin/app-rules/app/{{ app_url_encoded }}/s/{{ section_url_encoded }}">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</a>
-  {% endif %}
-</p>
-<p>
-  {% if section_name is defined and section_name %}
-  <span class="category-badge" style="margin-right:0.4rem">{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</span>
-  {% endif %}
-  다음으로 저장될 버전: <span class="ver-badge">{{ next_version }}</span>
-</p>
-{% if section_name is defined and section_name %}
-<form class="form-stack" method="post" action="/admin/app-rules/app/{{ app_url_encoded }}/s/{{ section_url_encoded }}/publish">
-{% else %}
-<form class="form-stack" method="post" action="/admin/app-rules/app/{{ app_url_encoded }}/publish">
-{% endif %}
-  {% set md_label = "본문 (Markdown)" %}
-  {% set md_name = "body" %}
-  {% set md_id = "body" %}
-  {% set md_value = prefill_body if prefill_body is defined else "" %}
-  {% set md_required = true %}
-  {% set md_rows = 18 %}
-  {% set md_placeholder = "이 카테고리 전용 업무 지침 (Markdown)" %}
-  {% include "admin/partials/markdown_split_field.html" %}
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">최신 버전으로 저장</button>
-  </div>
-</form>
-{% endblock %}
-{% block scripts %}{% include "admin/partials/markdown_editor_assets.html" %}{{ super() }}{% endblock %}
+    <form class="form-stack"
+          method="post"
+          action="/admin/app-rules/app/{{ app_url_encoded }}/s/{{ section_url_encoded }}/publish">
+    {% else %}
+      <form class="form-stack"
+            method="post"
+            action="/admin/app-rules/app/{{ app_url_encoded }}/publish">
+      {% endif %}
+      {% set md_label = "본문 (Markdown)" %}
+      {% set md_name = "body" %}
+      {% set md_id = "body" %}
+      {% set md_value = prefill_body if prefill_body is defined else "" %}
+      {% set md_required = true %}
+      {% set md_rows = 18 %}
+      {% set md_placeholder = "이 카테고리 전용 업무 지침 (Markdown)" %}
+      {% include "admin/partials/markdown_split_field.html" %}
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">최신 버전으로 저장</button>
+      </div>
+    </form>
+  {% endblock %}
+  {% block scripts %}
+    {% include "admin/partials/markdown_editor_assets.html" %}
+    {{ super() }}
+  {% endblock %}

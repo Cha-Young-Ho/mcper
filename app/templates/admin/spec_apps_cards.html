@@ -1,19 +1,21 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0">{{ page_heading }}</p>
-{% if cards %}
-<div class="app-card-grid">
-  {% for c in cards %}
-  <a class="app-card" href="/admin/{{ nav_base }}/app/{{ c.enc }}">
-    <div class="app-card__head">
-      <span class="app-card__name">{{ c.app }}</span>
-      <span class="ver-badge ver-badge--sm">{{ c.count }}건</span>
+  <p class="muted" style="margin-top:0">{{ page_heading }}</p>
+  {% if cards %}
+    <div class="app-card-grid">
+      {% for c in cards %}
+        <a class="app-card" href="/admin/{{ nav_base }}/app/{{ c.enc }}">
+          <div class="app-card__head">
+            <span class="app-card__name">{{ c.app }}</span>
+            <span class="ver-badge ver-badge--sm">{{ c.count }}건</span>
+          </div>
+          <span class="app-card__cta">기획서 목록 →</span>
+        </a>
+      {% endfor %}
     </div>
-    <span class="app-card__cta">기획서 목록 →</span>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="empty-state">저장된 기획서가 없습니다. MCP <code>upload_spec_to_db</code> 로 추가하거나 시드(첫 기동 시 예시 1건)를 확인하세요.</div>
-{% endif %}
+  {% else %}
+    <div class="empty-state">
+      저장된 기획서가 없습니다. MCP <code>upload_spec_to_db</code> 로 추가하거나 시드(첫 기동 시 예시 1건)를 확인하세요.
+    </div>
+  {% endif %}
 {% endblock %}

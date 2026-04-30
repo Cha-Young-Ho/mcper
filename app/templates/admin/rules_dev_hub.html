@@ -1,26 +1,27 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin">&larr; 대시보드</a></p>
-<p style="margin-bottom:1.5rem">개발 도메인의 행동 지침을 관리합니다.</p>
-
-<div class="app-card-grid">
-  <a class="app-card" href="/admin/global-rules?domain=development">
-    <div class="app-card__head">
-      <span class="app-card__name">Global</span>
-    </div>
-    <span class="app-card__cta">열기 &rarr;</span>
-  </a>
-  <a class="app-card" href="/admin/repo-rules?domain=development">
-    <div class="app-card__head">
-      <span class="app-card__name">Repository</span>
-    </div>
-    <span class="app-card__cta">열기 &rarr;</span>
-  </a>
-  <a class="app-card" href="/admin/app-rules?domain=development">
-    <div class="app-card__head">
-      <span class="app-card__name">App</span>
-    </div>
-    <span class="app-card__cta">열기 &rarr;</span>
-  </a>
-</div>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin">&larr; 대시보드</a>
+  </p>
+  <p style="margin-bottom:1.5rem">개발 도메인의 행동 지침을 관리합니다.</p>
+  <div class="app-card-grid">
+    <a class="app-card" href="/admin/global-rules?domain=development">
+      <div class="app-card__head">
+        <span class="app-card__name">Global</span>
+      </div>
+      <span class="app-card__cta">열기 &rarr;</span>
+    </a>
+    <a class="app-card" href="/admin/repo-rules?domain=development">
+      <div class="app-card__head">
+        <span class="app-card__name">Repository</span>
+      </div>
+      <span class="app-card__cta">열기 &rarr;</span>
+    </a>
+    <a class="app-card" href="/admin/app-rules?domain=development">
+      <div class="app-card__head">
+        <span class="app-card__name">App</span>
+      </div>
+      <span class="app-card__cta">열기 &rarr;</span>
+    </a>
+  </div>
 {% endblock %}

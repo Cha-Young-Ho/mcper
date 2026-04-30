@@ -1,26 +1,32 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div data-card-container data-per-page="20">
-<div class="card-filter-bar">
-  <input type="search" class="input card-filter-bar__input" placeholder="앱 검색…" autocomplete="off" data-card-search value="{{ q }}" />
-  <span class="card-filter-bar__count" data-card-count></span>
-  <a href="/admin/app-skills/new{% if domain %}?domain={{ domain }}{% endif %}" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
-</div>
-
-<div class="app-card-grid" data-card-grid>
-  {% for c in cards %}
-  <a class="app-card" href="{{ c.url }}" data-card-label="{{ c.display }}">
-    <div class="app-card__head">
-      <span class="app-card__name">{{ c.display }}</span>
-      <span class="ver-badge ver-badge--sm">v{{ c.latest_version }}</span>
+  <div data-card-container data-per-page="20">
+    <div class="card-filter-bar">
+      <input type="search"
+             class="input card-filter-bar__input"
+             placeholder="앱 검색…"
+             autocomplete="off"
+             data-card-search
+             value="{{ q }}" />
+      <span class="card-filter-bar__count" data-card-count></span>
+      <a href="/admin/app-skills/new{% if domain %}?domain={{ domain }}{% endif %}"
+         class="btn btn-primary"
+         style="margin-left:auto">+ 새 앱</a>
     </div>
-    <span class="app-card__cta">내용 보기 →</span>
-  </a>
-  {% else %}
-  <div class="empty-state app-card-grid__empty">앱 스킬이 없습니다.</div>
-  {% endfor %}
-</div>
-<div class="pg-bar" data-card-pagination></div>
-{% include "admin/partials/server_pagination.html" %}
-</div>
+    <div class="app-card-grid" data-card-grid>
+      {% for c in cards %}
+        <a class="app-card" href="{{ c.url }}" data-card-label="{{ c.display }}">
+          <div class="app-card__head">
+            <span class="app-card__name">{{ c.display }}</span>
+            <span class="ver-badge ver-badge--sm">v{{ c.latest_version }}</span>
+          </div>
+          <span class="app-card__cta">내용 보기 →</span>
+        </a>
+      {% else %}
+        <div class="empty-state app-card-grid__empty">앱 스킬이 없습니다.</div>
+      {% endfor %}
+    </div>
+    <div class="pg-bar" data-card-pagination></div>
+    {% include "admin/partials/server_pagination.html" %}
+  </div>
 {% endblock %}

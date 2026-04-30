@@ -1,42 +1,63 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div data-card-container data-per-page="20">
-<div class="card-filter-bar">
-  <input type="search" class="input card-filter-bar__input" placeholder="패턴 검색…" autocomplete="off" data-card-search value="{{ q }}" />
-  <span class="card-filter-bar__count" data-card-count></span>
-  <a href="/admin/repo-rules/new" class="btn btn-primary" style="margin-left:auto">+ 새 패턴</a>
-</div>
-<p class="muted" style="margin-top:0;margin-bottom:0.75rem;font-size:0.875rem">패턴이 매칭될 때 <code>__default__</code> 스트림을 추가로 붙일지 각 카드에서 설정합니다.</p>
-
-<div class="app-card-grid" data-card-grid>
-  {% for c in cards %}
-  <div class="app-card app-card--compound" data-card-label="{{ c.display }}">
-    {% if c.is_default %}<div class="app-card-corner">default</div>{% endif %}
-    <a class="app-card__main" href="{{ c.url }}">
-      <div class="app-card__head">
-        <span class="app-card__name">{{ c.display }}</span>
-        <span class="ver-badge ver-badge--sm">{{ c.latest_version }}</span>
-      </div>
-      <span class="app-card__cta">열기 →</span>
-    </a>
-    <div class="app-card__foot app-card__foot--row">
-      <form method="post" action="/admin/repo-rules/pat/{{ c.pat_segment }}/include-repo-default-toggle" class="toolbar-flag toolbar-flag--compact">
-        <span class="toolbar-flag__label">default 포함</span>
-        <span class="toolbar-flag__state {% if c.include_repo_default %}is-on{% endif %}">{% if c.include_repo_default %}ON{% else %}OFF{% endif %}</span>
-        <button type="submit" class="btn btn-secondary btn-xs">전환</button>
-      </form>
-      {% if c.can_delete_stream %}
-      <form method="post" action="{{ c.url }}/delete" onsubmit="return confirm('이 패턴 스트림 전체를 삭제할까요?');">
-        <button type="submit" class="btn btn-danger btn-xs">삭제</button>
-      </form>
-      {% endif %}
+  <div data-card-container data-per-page="20">
+    <div class="card-filter-bar">
+      <input type="search"
+             class="input card-filter-bar__input"
+             placeholder="패턴 검색…"
+             autocomplete="off"
+             data-card-search
+             value="{{ q }}" />
+      <span class="card-filter-bar__count" data-card-count></span>
+      <a href="/admin/repo-rules/new"
+         class="btn btn-primary"
+         style="margin-left:auto">+ 새 패턴</a>
     </div>
+    <p class="muted"
+       style="margin-top:0;
+              margin-bottom:0.75rem;
+              font-size:0.875rem">
+      패턴이 매칭될 때 <code>__default__</code> 스트림을 추가로 붙일지 각 카드에서 설정합니다.
+    </p>
+    <div class="app-card-grid" data-card-grid>
+      {% for c in cards %}
+        <div class="app-card app-card--compound" data-card-label="{{ c.display }}">
+          {% if c.is_default %}<div class="app-card-corner">default</div>{% endif %}
+          <a class="app-card__main" href="{{ c.url }}">
+            <div class="app-card__head">
+              <span class="app-card__name">{{ c.display }}</span>
+              <span class="ver-badge ver-badge--sm">{{ c.latest_version }}</span>
+            </div>
+            <span class="app-card__cta">열기 →</span>
+          </a>
+          <div class="app-card__foot app-card__foot--row">
+            <form method="post"
+                  action="/admin/repo-rules/pat/{{ c.pat_segment }}/include-repo-default-toggle"
+                  class="toolbar-flag toolbar-flag--compact">
+              <span class="toolbar-flag__label">default 포함</span>
+              <span class="toolbar-flag__state {% if c.include_repo_default %}is-on{% endif %}">
+                {% if c.include_repo_default %}
+                  ON
+                {% else %}
+                  OFF
+                {% endif %}
+              </span>
+              <button type="submit" class="btn btn-secondary btn-xs">전환</button>
+            </form>
+            {% if c.can_delete_stream %}
+              <form method="post"
+                    action="{{ c.url }}/delete"
+                    onsubmit="return confirm('이 패턴 스트림 전체를 삭제할까요?');">
+                <button type="submit" class="btn btn-danger btn-xs">삭제</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state app-card-grid__empty">Repository 룰이 없습니다.</div>
+      {% endfor %}
+    </div>
+    <div class="pg-bar" data-card-pagination></div>
+    {% include "admin/partials/server_pagination.html" %}
   </div>
-  {% else %}
-  <div class="empty-state app-card-grid__empty">Repository 룰이 없습니다.</div>
-  {% endfor %}
-</div>
-<div class="pg-bar" data-card-pagination></div>
-{% include "admin/partials/server_pagination.html" %}
-</div>
 {% endblock %}

@@ -1,92 +1,122 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light" />
-  <title>{{ title }} — MCPER</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/admin/admin.css?v=6" />
-  {% block head %}{% endblock %}
-</head>
-<body>
-  <div class="admin-layout" id="admin-layout">
-    <aside class="admin-sidebar" aria-label="주 메뉴">
-      <div class="admin-sidebar__brand">
-        <a href="/admin">MCPER</a>
-        <small>기획서 · 룰 · Tools</small>
-      </div>
-      <nav class="admin-nav">
-        <a href="/admin" class="nav-link" data-nav="home"> 대시보드</a>
-        <details class="admin-nav-group" data-nav-plans-group>
-          <summary class="admin-nav-group__summary"> 기획서</summary>
-          <div class="admin-nav-group__sub">
-            <a href="/admin/plans" class="nav-link nav-link--sub" data-nav="plans">목록</a>
-            <a href="/admin/plans/bulk-upload" class="nav-link nav-link--sub" data-nav="bulk-upload">일괄 업로드</a>
-            <a href="/admin/plan-code" class="nav-link nav-link--sub" data-nav="plan-code">기획서–코드</a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{{ title }} — MCPER</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=6" />
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <div class="admin-layout" id="admin-layout">
+      <aside class="admin-sidebar" aria-label="주 메뉴">
+        <div class="admin-sidebar__brand">
+          <a href="/admin">MCPER</a>
+          <small>기획서 · 룰 · Tools</small>
+        </div>
+        <nav class="admin-nav">
+          <a href="/admin" class="nav-link" data-nav="home">대시보드</a>
+          <details class="admin-nav-group" data-nav-plans-group>
+            <summary class="admin-nav-group__summary">기획서</summary>
+            <div class="admin-nav-group__sub">
+              <a href="/admin/plans" class="nav-link nav-link--sub" data-nav="plans">목록</a>
+              <a href="/admin/plans/bulk-upload"
+                 class="nav-link nav-link--sub"
+                 data-nav="bulk-upload">일괄 업로드</a>
+              <a href="/admin/plan-code"
+                 class="nav-link nav-link--sub"
+                 data-nav="plan-code">기획서–코드</a>
+            </div>
+          </details>
+          <details class="admin-nav-group" data-nav-rules-group>
+            <summary class="admin-nav-group__summary">행동 지침 (Rules)</summary>
+            <div class="admin-nav-group__sub">
+              <a href="/admin/app-rules?domain=planning"
+                 class="nav-link nav-link--sub"
+                 data-nav="rules-planning">기획</a>
+              <a href="/admin/app-rules?domain=analysis"
+                 class="nav-link nav-link--sub"
+                 data-nav="rules-analysis">분석</a>
+              <a href="/admin/rules-dev"
+                 class="nav-link nav-link--sub"
+                 data-nav="rules-development">개발</a>
+            </div>
+          </details>
+          <details class="admin-nav-group" data-nav-skills-group>
+            <summary class="admin-nav-group__summary">스킬 (Skills)</summary>
+            <div class="admin-nav-group__sub">
+              <a href="/admin/app-skills?domain=planning"
+                 class="nav-link nav-link--sub"
+                 data-nav="skills-planning">기획</a>
+              <a href="/admin/app-skills?domain=analysis"
+                 class="nav-link nav-link--sub"
+                 data-nav="skills-analysis">분석</a>
+              <a href="/admin/skills-dev"
+                 class="nav-link nav-link--sub"
+                 data-nav="skills-development">개발</a>
+            </div>
+          </details>
+          <details class="admin-nav-group" data-nav-workflows-group>
+            <summary class="admin-nav-group__summary">워크플로우 (Workflows)</summary>
+            <div class="admin-nav-group__sub">
+              <a href="/admin/app-workflows?domain=planning"
+                 class="nav-link nav-link--sub"
+                 data-nav="workflows-planning">기획</a>
+              <a href="/admin/app-workflows?domain=analysis"
+                 class="nav-link nav-link--sub"
+                 data-nav="workflows-analysis">분석</a>
+              <a href="/admin/workflows-dev"
+                 class="nav-link nav-link--sub"
+                 data-nav="workflows-development">개발</a>
+            </div>
+          </details>
+          <details class="admin-nav-group" data-nav-docs-group>
+            <summary class="admin-nav-group__summary">문서 (Docs)</summary>
+            <div class="admin-nav-group__sub">
+              <a href="/admin/app-docs?domain=planning"
+                 class="nav-link nav-link--sub"
+                 data-nav="docs-planning">기획</a>
+              <a href="/admin/app-docs?domain=analysis"
+                 class="nav-link nav-link--sub"
+                 data-nav="docs-analysis">분석</a>
+              <a href="/admin/docs-dev"
+                 class="nav-link nav-link--sub"
+                 data-nav="docs-development">개발</a>
+            </div>
+          </details>
+          <a href="/admin/users" class="nav-link" data-nav="users">유저 관리</a>
+          <a href="/admin/api-keys" class="nav-link" data-nav="api-keys">API 키</a>
+          <a href="/admin/tools" class="nav-link" data-nav="tools">Tools</a>
+          <a href="/admin/celery" class="nav-link" data-nav="celery">Vector Monitoring</a>
+        </nav>
+        <div class="admin-sidebar__foot">
+          <a href="/health" target="_blank" rel="noopener">/health ↗</a>
+        </div>
+      </aside>
+      <div class="admin-backdrop" data-nav-backdrop aria-hidden="true"></div>
+      <div class="admin-main">
+        <header class="admin-topbar">
+          <button type="button"
+                  class="nav-toggle"
+                  data-nav-toggle
+                  aria-label="메뉴 열기"
+                  aria-expanded="false">☰</button>
+          <h1 class="admin-page-title">{{ title }}</h1>
+        </header>
+        <div class="admin-content">
+          <div class="card">
+            {% block body %}{% endblock %}
           </div>
-        </details>
-        <details class="admin-nav-group" data-nav-rules-group>
-          <summary class="admin-nav-group__summary"> 행동 지침 (Rules)</summary>
-          <div class="admin-nav-group__sub">
-            <a href="/admin/app-rules?domain=planning" class="nav-link nav-link--sub" data-nav="rules-planning">기획</a>
-            <a href="/admin/app-rules?domain=analysis" class="nav-link nav-link--sub" data-nav="rules-analysis">분석</a>
-            <a href="/admin/rules-dev" class="nav-link nav-link--sub" data-nav="rules-development">개발</a>
-          </div>
-        </details>
-        <details class="admin-nav-group" data-nav-skills-group>
-          <summary class="admin-nav-group__summary"> 스킬 (Skills)</summary>
-          <div class="admin-nav-group__sub">
-            <a href="/admin/app-skills?domain=planning" class="nav-link nav-link--sub" data-nav="skills-planning">기획</a>
-            <a href="/admin/app-skills?domain=analysis" class="nav-link nav-link--sub" data-nav="skills-analysis">분석</a>
-            <a href="/admin/skills-dev" class="nav-link nav-link--sub" data-nav="skills-development">개발</a>
-          </div>
-        </details>
-        <details class="admin-nav-group" data-nav-workflows-group>
-          <summary class="admin-nav-group__summary"> 워크플로우 (Workflows)</summary>
-          <div class="admin-nav-group__sub">
-            <a href="/admin/app-workflows?domain=planning" class="nav-link nav-link--sub" data-nav="workflows-planning">기획</a>
-            <a href="/admin/app-workflows?domain=analysis" class="nav-link nav-link--sub" data-nav="workflows-analysis">분석</a>
-            <a href="/admin/workflows-dev" class="nav-link nav-link--sub" data-nav="workflows-development">개발</a>
-          </div>
-        </details>
-        <details class="admin-nav-group" data-nav-docs-group>
-          <summary class="admin-nav-group__summary"> 문서 (Docs)</summary>
-          <div class="admin-nav-group__sub">
-            <a href="/admin/app-docs?domain=planning" class="nav-link nav-link--sub" data-nav="docs-planning">기획</a>
-            <a href="/admin/app-docs?domain=analysis" class="nav-link nav-link--sub" data-nav="docs-analysis">분석</a>
-            <a href="/admin/docs-dev" class="nav-link nav-link--sub" data-nav="docs-development">개발</a>
-          </div>
-        </details>
-        <a href="/admin/users" class="nav-link" data-nav="users"> 유저 관리</a>
-        <a href="/admin/api-keys" class="nav-link" data-nav="api-keys"> API 키</a>
-        <a href="/admin/tools" class="nav-link" data-nav="tools"> Tools</a>
-        <a href="/admin/celery" class="nav-link" data-nav="celery"> Vector Monitoring</a>
-      </nav>
-      <div class="admin-sidebar__foot">
-        <a href="/health" target="_blank" rel="noopener">/health ↗</a>
-      </div>
-    </aside>
-
-    <div class="admin-backdrop" data-nav-backdrop aria-hidden="true"></div>
-
-    <div class="admin-main">
-      <header class="admin-topbar">
-        <button type="button" class="nav-toggle" data-nav-toggle aria-label="메뉴 열기" aria-expanded="false">☰</button>
-        <h1 class="admin-page-title">{{ title }}</h1>
-      </header>
-
-      <div class="admin-content">
-        <div class="card">
-          {% block body %}{% endblock %}
         </div>
       </div>
     </div>
-  </div>
-  <script src="/static/admin/admin.js?v=4" defer></script>
-  <script>
+    <script src="/static/admin/admin.js?v=4" defer></script>
+    <script>
   // 모든 폼 제출을 fetch()로 가로채 X-CSRF-Token 헤더 전송
   // — body를 서버 미들웨어에서 소비하지 않아도 되며, multipart 업로드도 안전하게 처리
   (function () {
@@ -131,7 +161,8 @@
       });
     }, true);
   })();
-  </script>
-  {% block scripts %}{% endblock %}
-</body>
+    </script>
+    {% block scripts %}
+    {% endblock %}
+  </body>
 </html>

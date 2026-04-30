@@ -1,35 +1,46 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin">← 대시보드</a></p>
-
-<div class="page-actions page-actions--spread" style="margin-bottom:1.5rem">
-  <a href="/admin/global-workflows/s/new" class="btn btn-primary">+ 새로 추가하기</a>
-</div>
-
-<div data-card-container data-per-page="20">
-  <div class="card-filter-bar">
-    <input type="search" class="input card-filter-bar__input" placeholder="카테고리 검색…" autocomplete="off" data-card-search />
-    <span class="card-filter-bar__count" data-card-count></span>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin">← 대시보드</a>
+  </p>
+  <div class="page-actions page-actions--spread"
+       style="margin-bottom:1.5rem">
+    <a href="/admin/global-workflows/s/new" class="btn btn-primary">+ 새로 추가하기</a>
   </div>
-  <div class="board-list board-list--grid" data-card-grid>
-    {% for s in sections %}
-    <article class="board-item board-item--clickable"
-             data-card-label="{{ s.section_name }}"
-             onclick="location.href='{{ s.url }}'">
-      <div class="board-item__meta">
-        <span class="category-badge">{% if s.section_name == 'main' %}기본{% else %}{{ s.section_name }}{% endif %}</span>
-        <span class="muted" style="font-size:0.8rem">v{{ s.version }}</span>
-        <time class="muted board-item__time" style="margin-left:auto">{{ s.created_at | datefmt }}</time>
-      </div>
-      <div class="board-item__actions">
-        <a class="btn btn-ghost btn-sm" href="{{ s.url }}">내용 보기</a>
-        <a class="btn btn-primary btn-sm" href="{{ s.url }}/publish">+ 새 버전</a>
-      </div>
-    </article>
-    {% else %}
-    <div class="empty-state" style="grid-column:1/-1">카테고리 없음 — 위 버튼으로 추가하세요</div>
-    {% endfor %}
+  <div data-card-container data-per-page="20">
+    <div class="card-filter-bar">
+      <input type="search"
+             class="input card-filter-bar__input"
+             placeholder="카테고리 검색…"
+             autocomplete="off"
+             data-card-search />
+      <span class="card-filter-bar__count" data-card-count></span>
+    </div>
+    <div class="board-list board-list--grid" data-card-grid>
+      {% for s in sections %}
+        <article class="board-item board-item--clickable"
+                 data-card-label="{{ s.section_name }}"
+                 onclick="location.href='{{ s.url }}'">
+          <div class="board-item__meta">
+            <span class="category-badge">
+              {% if s.section_name == 'main' %}
+                기본
+              {% else %}
+                {{ s.section_name }}
+              {% endif %}
+            </span>
+            <span class="muted" style="font-size:0.8rem">v{{ s.version }}</span>
+            <time class="muted board-item__time" style="margin-left:auto">{{ s.created_at | datefmt }}</time>
+          </div>
+          <div class="board-item__actions">
+            <a class="btn btn-ghost btn-sm" href="{{ s.url }}">내용 보기</a>
+            <a class="btn btn-primary btn-sm" href="{{ s.url }}/publish">+ 새 버전</a>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state" style="grid-column:1/-1">카테고리 없음 — 위 버튼으로 추가하세요</div>
+      {% endfor %}
+    </div>
+    <div class="pg-bar" data-card-pagination></div>
   </div>
-  <div class="pg-bar" data-card-pagination></div>
-</div>
 {% endblock %}

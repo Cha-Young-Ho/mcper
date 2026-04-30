@@ -11,28 +11,51 @@
 {% if page_total is defined and page_total > page_limit %}
   {% set start_idx = page_offset + 1 %}
   {% set end_idx = page_offset + page_limit %}
-  {% if end_idx > page_total %}{% set end_idx = page_total %}{% endif %}
-  <nav class="pg-server" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
+  {% if end_idx > page_total %}
+    {% set end_idx = page_total %}
+  {% endif %}
+  <nav class="pg-server"
+       style="display:flex;
+              align-items:center;
+              justify-content:center;
+              gap:0.75rem;
+              margin-top:1rem;
+              flex-wrap:wrap">
     {% set _base = request.url.path %}
     {% set _keep = [] %}
-    {% if q %}{% set _ = _keep.append('q=' ~ (q|urlencode)) %}{% endif %}
-    {% if domain %}{% set _ = _keep.append('domain=' ~ (domain|urlencode)) %}{% endif %}
+    {% if q %}
+      {% set _ = _keep.append('q=' ~ (q|urlencode)) %}
+    {% endif %}
+    {% if domain %}
+      {% set _ = _keep.append('domain=' ~ (domain|urlencode)) %}
+    {% endif %}
     {% set _keep_str = (_keep | join('&')) %}
     {% set _prefix = '&' if _keep_str else '' %}
     {% if has_prev %}
-      <a class="btn btn-secondary btn-sm" href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ prev_offset }}">← 이전</a>
+      <a class="btn btn-secondary btn-sm"
+         href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ prev_offset }}">← 이전</a>
     {% else %}
-      <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:0.5;pointer-events:none">← 이전</span>
+      <span class="btn btn-secondary btn-sm"
+            aria-disabled="true"
+            style="opacity:0.5;
+                   pointer-events:none">← 이전</span>
     {% endif %}
     <span class="muted" style="font-size:0.875rem">
       {{ start_idx }}–{{ end_idx }} / <strong>{{ page_total }}</strong>
     </span>
     {% if has_next %}
-      <a class="btn btn-secondary btn-sm" href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ next_offset }}">다음 →</a>
+      <a class="btn btn-secondary btn-sm"
+         href="{{ _base }}?{{ _keep_str }}{{ _prefix }}limit={{ page_limit }}&offset={{ next_offset }}">다음 →</a>
     {% else %}
-      <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:0.5;pointer-events:none">다음 →</span>
+      <span class="btn btn-secondary btn-sm"
+            aria-disabled="true"
+            style="opacity:0.5;
+                   pointer-events:none">다음 →</span>
     {% endif %}
   </nav>
 {% elif page_total is defined and page_total > 0 %}
-  <p class="muted" style="text-align:center;margin-top:0.75rem;font-size:0.875rem">총 {{ page_total }}개</p>
+  <p class="muted"
+     style="text-align:center;
+            margin-top:0.75rem;
+            font-size:0.875rem">총 {{ page_total }}개</p>
 {% endif %}

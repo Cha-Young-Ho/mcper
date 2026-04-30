@@ -1,79 +1,85 @@
 {% extends "admin/base.html" %}
 {% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin">← 대시보드</a></p>
-{% if error %}<div class="alert alert--error" style="margin-bottom:1rem">{{ error }}</div>{% endif %}
-
-<form class="form-stack" id="app-wizard-form" novalidate>
-
-  <!-- ① Repository 섹션 -->
-  <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:1rem 1.25rem;margin-bottom:1.25rem">
-    <legend style="font-weight:600;padding:0 .4rem">Repository</legend>
-
-    <div style="display:flex;gap:1.5rem;margin-bottom:.85rem;flex-wrap:wrap">
-      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
-        <input type="radio" name="repo_mode" value="existing" checked id="repo-mode-existing" />
-        기존에서 선택
+  <p class="muted" style="margin-top:0">
+    <a href="/admin">← 대시보드</a>
+  </p>
+  {% if error %}<div class="alert alert--error" style="margin-bottom:1rem">{{ error }}</div>{% endif %}
+  <form class="form-stack" id="app-wizard-form" novalidate>
+    <!-- ① Repository 섹션 -->
+    <fieldset style="border:1px solid var(--border,#e0e0e0);
+                     border-radius:6px;
+                     padding:1rem 1.25rem;
+                     margin-bottom:1.25rem">
+      <legend style="font-weight:600;padding:0 .4rem">Repository</legend>
+      <div style="display:flex;gap:1.5rem;margin-bottom:.85rem;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <input type="radio"
+                 name="repo_mode"
+                 value="existing"
+                 checked
+                 id="repo-mode-existing" />
+          기존에서 선택
+        </label>
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <input type="radio" name="repo_mode" value="new" id="repo-mode-new" />
+          직접 입력
+        </label>
+      </div>
+      <!-- 기존 선택 드롭다운 -->
+      <div id="repo-existing-wrap">
+        <select name="repo_existing"
+                id="repo_existing"
+                class="input"
+                style="max-width:420px">
+          <option value="">— 선택 안 함 (레포 없이 앱만 추가) —</option>
+          {% for opt in repo_options %}<option value="{{ opt.pattern }}">{{ opt.display }}</option>{% endfor %}
+        </select>
+        <p class="field-hint">기존 Repository 패턴 중 이 앱이 속할 항목을 선택합니다.</p>
+      </div>
+      <!-- 직접 입력 -->
+      <div id="repo-new-wrap" style="display:none">
+        <input type="text"
+               name="repo_new_pattern"
+               id="repo_new_pattern"
+               class="input"
+               style="max-width:420px"
+               placeholder="예: github.com/org/repo  또는  api-server"
+               autocomplete="off" />
+        <p class="field-hint">URL에 포함된 문자열로 매칭됩니다. 해당 패턴이 없으면 자동으로 신규 생성됩니다.</p>
+      </div>
+    </fieldset>
+    <!-- ② 앱 이름 -->
+    <div class="field">
+      <label class="field-label" for="app_name">
+        앱 이름 <span style="color:#e74c3c">*</span>
       </label>
-      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
-        <input type="radio" name="repo_mode" value="new" id="repo-mode-new" />
-        직접 입력
-      </label>
+      <input class="input"
+             id="app_name"
+             name="app_name"
+             required
+             placeholder="예: your_app_name"
+             autocomplete="off"
+             style="max-width:420px" />
+      <p class="field-hint">소문자로 저장됩니다. 이미 존재하는 앱이면 저장되지 않습니다.</p>
     </div>
-
-    <!-- 기존 선택 드롭다운 -->
-    <div id="repo-existing-wrap">
-      <select name="repo_existing" id="repo_existing"
-              class="input" style="max-width:420px">
-        <option value="">— 선택 안 함 (레포 없이 앱만 추가) —</option>
-        {% for opt in repo_options %}
-        <option value="{{ opt.pattern }}">{{ opt.display }}</option>
-        {% endfor %}
-      </select>
-      <p class="field-hint">기존 Repository 패턴 중 이 앱이 속할 항목을 선택합니다.</p>
+    <!-- ③ 업무 지침 본문 -->
+    {% set md_label = "초기 업무 지침 본문 (Markdown)" %}
+    {% set md_name = "body" %}
+    {% set md_id = "body" %}
+    {% set md_value = "" %}
+    {% set md_required = true %}
+    {% set md_rows = 14 %}
+    {% include "admin/partials/markdown_split_field.html" %}
+    <div class="form-actions">
+      <button type="button" id="btn-submit" class="btn btn-primary">저장</button>
+      <a href="/admin" class="btn btn-secondary">취소</a>
     </div>
-
-    <!-- 직접 입력 -->
-    <div id="repo-new-wrap" style="display:none">
-      <input type="text" name="repo_new_pattern" id="repo_new_pattern"
-             class="input" style="max-width:420px"
-             placeholder="예: github.com/org/repo  또는  api-server"
-             autocomplete="off" />
-      <p class="field-hint">
-        URL에 포함된 문자열로 매칭됩니다. 해당 패턴이 없으면 자동으로 신규 생성됩니다.
-      </p>
-    </div>
-  </fieldset>
-
-  <!-- ② 앱 이름 -->
-  <div class="field">
-    <label class="field-label" for="app_name">앱 이름 <span style="color:#e74c3c">*</span></label>
-    <input class="input" id="app_name" name="app_name" required
-           placeholder="예: your_app_name"
-           autocomplete="off"
-           style="max-width:420px" />
-    <p class="field-hint">소문자로 저장됩니다. 이미 존재하는 앱이면 저장되지 않습니다.</p>
-  </div>
-
-  <!-- ③ 업무 지침 본문 -->
-  {% set md_label = "초기 업무 지침 본문 (Markdown)" %}
-  {% set md_name  = "body" %}
-  {% set md_id    = "body" %}
-  {% set md_value = "" %}
-  {% set md_required = true %}
-  {% set md_rows  = 14 %}
-  {% include "admin/partials/markdown_split_field.html" %}
-
-  <div class="form-actions">
-    <button type="button" id="btn-submit" class="btn btn-primary">저장</button>
-    <a href="/admin" class="btn btn-secondary">취소</a>
-  </div>
-</form>
+  </form>
 {% endblock %}
-
 {% block scripts %}
-{% include "admin/partials/markdown_editor_assets.html" %}
-<script>
+  {% include "admin/partials/markdown_editor_assets.html" %}
+  <script>
 (function () {
   var repoModeRadios = document.querySelectorAll('input[name="repo_mode"]');
   var existingWrap   = document.getElementById('repo-existing-wrap');
@@ -148,6 +154,6 @@
     }
   });
 })();
-</script>
-{{ super() }}
+  </script>
+  {{ super() }}
 {% endblock %}

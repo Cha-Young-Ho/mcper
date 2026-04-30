@@ -1,35 +1,53 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div class="page-actions page-actions--spread" style="margin-bottom:1.5rem">
-  <a href="/admin/users/new" class="btn btn-primary">+ 유저 생성</a>
-</div>
-
-<table class="admin-table" style="width:100%">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>사용자명</th>
-      <th>이메일</th>
-      <th>관리자</th>
-      <th>활성</th>
-      <th>생성일</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for u in users %}
-    <tr>
-      <td>{{ u.id }}</td>
-      <td><a href="/admin/users/{{ u.id }}">{{ u.username }}</a></td>
-      <td>{{ u.email or "-" }}</td>
-      <td>{% if u.is_admin %}<span class="ver-badge ver-badge--sm">admin</span>{% else %}-{% endif %}</td>
-      <td>{% if u.is_active %}<span style="color:var(--clr-success,green)">ON</span>{% else %}<span style="color:var(--clr-danger,red)">OFF</span>{% endif %}</td>
-      <td>{{ u.created_at | datefmt }}</td>
-      <td><a href="/admin/users/{{ u.id }}" class="btn btn-ghost btn-xs">상세</a></td>
-    </tr>
-    {% else %}
-    <tr><td colspan="7" class="empty-state">유저가 없습니다.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <div class="page-actions page-actions--spread"
+       style="margin-bottom:1.5rem">
+    <a href="/admin/users/new" class="btn btn-primary">+ 유저 생성</a>
+  </div>
+  <table class="admin-table" style="width:100%">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>사용자명</th>
+        <th>이메일</th>
+        <th>관리자</th>
+        <th>활성</th>
+        <th>생성일</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>
+            <a href="/admin/users/{{ u.id }}">{{ u.username }}</a>
+          </td>
+          <td>{{ u.email or "-" }}</td>
+          <td>
+            {% if u.is_admin %}
+              <span class="ver-badge ver-badge--sm">admin</span>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span style="color:var(--clr-success,green)">ON</span>
+            {% else %}
+              <span style="color:var(--clr-danger,red)">OFF</span>
+            {% endif %}
+          </td>
+          <td>{{ u.created_at | datefmt }}</td>
+          <td>
+            <a href="/admin/users/{{ u.id }}" class="btn btn-ghost btn-xs">상세</a>
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="7" class="empty-state">유저가 없습니다.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 {% endblock %}

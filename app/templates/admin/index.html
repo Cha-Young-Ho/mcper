@@ -1,45 +1,48 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div class="stats-grid">
-  <div class="stat-card stat-card--highlight">
-    <div class="stat-card__value">{{ mcp_calls_total }}</div>
-    <div class="stat-card__label">MCP 툴 호출 합계</div>
-    <a href="/admin/tools">도구 문서 · 예시 →</a>
+  <div class="stats-grid">
+    <div class="stat-card stat-card--highlight">
+      <div class="stat-card__value">{{ mcp_calls_total }}</div>
+      <div class="stat-card__label">MCP 툴 호출 합계</div>
+      <a href="/admin/tools">도구 문서 · 예시 →</a>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ global_versions_n }}</div>
+      <div class="stat-card__label">Global 버전 수</div>
+      <a href="/admin/global-rules">내용 보기 →</a>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ repo_patterns_n }}</div>
+      <div class="stat-card__label">Repository 패턴 수</div>
+      <a href="/admin/repo-rules">내용 보기 →</a>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ apps_n }}</div>
+      <div class="stat-card__label">앱 종류 수</div>
+      <a href="/admin/app-rules">내용 보기 →</a>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card__value">{{ global_versions_n }}</div>
-    <div class="stat-card__label">Global 버전 수</div>
-    <a href="/admin/global-rules">내용 보기 →</a>
+  <h3 style="margin:1.5rem 0 0.75rem;
+             font-size:0.95rem;
+             font-weight:600;
+             color:#6b7280;
+             text-transform:uppercase;
+             letter-spacing:.06em">스킬 (Skills)</h3>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-card__label">Global Skills</div>
+      <a href="/admin/global-skills">내용 보기 →</a>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__label">Repository Skills</div>
+      <a href="/admin/repo-skills">내용 보기 →</a>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__label">App Skills</div>
+      <a href="/admin/app-skills">내용 보기 →</a>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card__value">{{ repo_patterns_n }}</div>
-    <div class="stat-card__label">Repository 패턴 수</div>
-    <a href="/admin/repo-rules">내용 보기 →</a>
+  <div class="page-actions" style="margin-top:1.25rem;margin-bottom:0">
+    <a href="/admin/apps/new" class="btn btn-primary">+ 앱 추가</a>
   </div>
-  <div class="stat-card">
-    <div class="stat-card__value">{{ apps_n }}</div>
-    <div class="stat-card__label">앱 종류 수</div>
-    <a href="/admin/app-rules">내용 보기 →</a>
-  </div>
-</div>
-
-<h3 style="margin:1.5rem 0 0.75rem;font-size:0.95rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em">스킬 (Skills)</h3>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-card__label">Global Skills</div>
-    <a href="/admin/global-skills">내용 보기 →</a>
-  </div>
-  <div class="stat-card">
-    <div class="stat-card__label">Repository Skills</div>
-    <a href="/admin/repo-skills">내용 보기 →</a>
-  </div>
-  <div class="stat-card">
-    <div class="stat-card__label">App Skills</div>
-    <a href="/admin/app-skills">내용 보기 →</a>
-  </div>
-</div>
-
-<div class="page-actions" style="margin-top:1.25rem;margin-bottom:0">
-  <a href="/admin/apps/new" class="btn btn-primary">+ 앱 추가</a>
-</div>
 {% endblock %}

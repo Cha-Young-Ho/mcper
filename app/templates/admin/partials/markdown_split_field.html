@@ -5,15 +5,15 @@
     <div class="md-split__grid">
       <div class="md-split__editor-col">
         <div class="md-split__editor-mount" aria-label="마크다운 편집"></div>
-        <textarea
-          class="input md-split__fallback"
-          name="{{ md_name }}"
-          id="{{ md_id }}"
-          {% if md_required %}required{% endif %}
-          rows="{{ md_rows|default(18) }}"
-          style="min-height:12rem;font-family:var(--mono,monospace);font-size:0.88rem"
-          {% if md_placeholder is defined %}placeholder="{{ md_placeholder }}"{% endif %}
-        >{{ md_value }}</textarea>
+        <textarea class="input md-split__fallback"
+                  name="{{ md_name }}"
+                  id="{{ md_id }}"
+                  {% if md_required %}required{% endif %}
+                  rows="{{ md_rows|default(18) }}"
+                  style="min-height:12rem;
+                         font-family:var(--mono,monospace);
+                         font-size:0.88rem"
+                  {% if md_placeholder is defined %}placeholder="{{ md_placeholder }}"{% endif %}>{{ md_value }}</textarea>
       </div>
       <div class="md-split__preview md-prose" aria-label="미리보기"></div>
     </div>

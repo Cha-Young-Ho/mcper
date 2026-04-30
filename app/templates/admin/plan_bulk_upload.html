@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% block head %}
-<style>
+  <style>
 .upload-zone {
   border: 2px dashed var(--border, #d1d5db);
   border-radius: 8px;
@@ -32,111 +32,137 @@
 .summary-bar--ok   { background: #dcfce7; color: #166534; }
 .summary-bar--warn { background: #fef9c3; color: #854d0e; }
 .summary-bar--fail { background: #fee2e2; color: #991b1b; }
-</style>
+  </style>
 {% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="/admin/plans">← 기획서 목록</a></p>
-
-{% if results is defined %}
-  {% set fail_count = total - queued_count - ok_count %}
-  {% if fail_count == 0 %}
-    {% if queued_count > 0 %}
-      <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 Celery 큐에 등록됨 — <a href="/admin/celery" style="color:inherit">Celery 모니터</a>에서 진행 상황 확인</div>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin/plans">← 기획서 목록</a>
+  </p>
+  {% if results is defined %}
+    {% set fail_count = total - queued_count - ok_count %}
+    {% if fail_count == 0 %}
+      {% if queued_count > 0 %}
+        <div class="summary-bar summary-bar--ok">
+          {{ total }}개 파일 모두 Celery 큐에 등록됨 — <a href="/admin/celery" style="color:inherit">Celery 모니터</a>에서 진행 상황 확인
+        </div>
+      {% else %}
+        <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 처리 완료 (즉시 인덱싱)</div>
+      {% endif %}
+    {% elif queued_count + ok_count > 0 %}
+      <div class="summary-bar summary-bar--warn">{{ total }}개 중 {{ queued_count + ok_count }}개 접수, {{ fail_count }}개 실패</div>
     {% else %}
-      <div class="summary-bar summary-bar--ok">{{ total }}개 파일 모두 처리 완료 (즉시 인덱싱)</div>
+      <div class="summary-bar summary-bar--fail">전체 실패 ({{ total }}개)</div>
     {% endif %}
-  {% elif queued_count + ok_count > 0 %}
-    <div class="summary-bar summary-bar--warn">{{ total }}개 중 {{ queued_count + ok_count }}개 접수, {{ fail_count }}개 실패</div>
-  {% else %}
-    <div class="summary-bar summary-bar--fail">전체 실패 ({{ total }}개)</div>
-  {% endif %}
-
-  <table class="result-table">
-    <thead>
-      <tr>
-        <th>파일명</th>
-        <th>결과</th>
-        <th>상세</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in results %}
-      <tr>
-        <td>{{ r.file }}</td>
-        <td>
-          {% if r.get('queued') %}
-            <span class="badge-ok">큐 등록</span>
-          {% elif r.get('ok') %}
-            <span class="badge-ok">완료</span>
-          {% else %}
-            <span class="badge-fail">실패</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if r.get('queued') %}
-            Celery worker 처리 중 — <a href="/admin/celery">Celery 모니터</a>에서 확인
-          {% elif r.get('ok') %}
-            <a href="/admin/plans/{{ r.spec_id }}">#{{ r.spec_id }}</a> · 즉시 인덱싱 완료 ({{ r.get('chunks', 0) }}청크)
-          {% else %}
-            {{ r.error }}
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <div style="margin-top:1.5rem">
-    <a href="/admin/plans/app/{{ app_target }}" class="btn btn-primary">앱 목록으로</a>
-    <a href="/admin/plans/bulk-upload" class="btn btn-secondary" style="margin-left:0.5rem">다시 업로드</a>
-  </div>
-
-{% else %}
-
-<form class="form-stack" method="post" action="/admin/plans/bulk-upload" enctype="multipart/form-data" id="bulk-form">
-  <div class="field">
-    <label class="field-label" for="app_target">app_target <span style="color:#b91c1c">*</span></label>
-    {% if known_apps %}
-    <input class="input" list="known-apps-list" id="app_target" name="app_target" required placeholder="앱 이름 (예: my-app)" autocomplete="off" />
-    <datalist id="known-apps-list">
-      {% for a in known_apps %}<option value="{{ a }}">{% endfor %}
-    </datalist>
-    {% else %}
-    <input class="input" id="app_target" name="app_target" required placeholder="앱 이름 (예: my-app)" autocomplete="off" />
-    {% endif %}
-    <p class="field-hint">기획서를 묶을 앱 식별자. 기존 앱과 동일하게 입력하면 해당 앱에 추가됩니다.</p>
-  </div>
-
-  <div class="field">
-    <label class="field-label" for="base_branch">base_branch</label>
-    <input class="input" id="base_branch" name="base_branch" value="main" autocomplete="off" />
-  </div>
-
-  <div class="field">
-    <label class="field-label">파일 선택 (복수 선택 가능)</label>
-    <div class="upload-zone" id="upload-zone">
-      <input type="file" name="files" multiple accept=".txt,.md,.pdf,.docx" id="file-input" />
-      <div class="upload-zone__label">
-        <strong>파일을 드래그하거나 클릭해서 선택</strong>
-        <div class="upload-zone__hint">.txt · .md · .pdf · .docx · 파일당 최대 50 MB · 총 200 MB</div>
-      </div>
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>파일명</th>
+          <th>결과</th>
+          <th>상세</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+          <tr>
+            <td>{{ r.file }}</td>
+            <td>
+              {% if r.get('queued') %}
+                <span class="badge-ok">큐 등록</span>
+              {% elif r.get('ok') %}
+                <span class="badge-ok">완료</span>
+              {% else %}
+                <span class="badge-fail">실패</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.get('queued') %}
+                Celery worker 처리 중 — <a href="/admin/celery">Celery 모니터</a>에서 확인
+              {% elif r.get('ok') %}
+                <a href="/admin/plans/{{ r.spec_id }}">#{{ r.spec_id }}</a> · 즉시 인덱싱 완료 ({{ r.get('chunks', 0) }}청크)
+              {% else %}
+                {{ r.error }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:1.5rem">
+      <a href="/admin/plans/app/{{ app_target }}" class="btn btn-primary">앱 목록으로</a>
+      <a href="/admin/plans/bulk-upload"
+         class="btn btn-secondary"
+         style="margin-left:0.5rem">다시 업로드</a>
     </div>
-    <ul class="file-list" id="file-list"></ul>
-    <p id="size-error" style="color:#b91c1c;font-size:.85rem;margin-top:.4rem;display:none"></p>
-  </div>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary" id="submit-btn">업로드 및 청킹 시작</button>
-    <a href="/admin/plans" class="btn btn-secondary">취소</a>
-  </div>
-</form>
-
-{% endif %}
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script>
+  {% else %}
+    <form class="form-stack"
+          method="post"
+          action="/admin/plans/bulk-upload"
+          enctype="multipart/form-data"
+          id="bulk-form">
+      <div class="field">
+        <label class="field-label" for="app_target">
+          app_target <span style="color:#b91c1c">*</span>
+        </label>
+        {% if known_apps %}
+          <input class="input"
+                 list="known-apps-list"
+                 id="app_target"
+                 name="app_target"
+                 required
+                 placeholder="앱 이름 (예: my-app)"
+                 autocomplete="off" />
+          <datalist id="known-apps-list">
+            {% for a in known_apps %}<option value="{{ a }}">{% endfor %}
+            </datalist>
+          {% else %}
+            <input class="input"
+                   id="app_target"
+                   name="app_target"
+                   required
+                   placeholder="앱 이름 (예: my-app)"
+                   autocomplete="off" />
+          {% endif %}
+          <p class="field-hint">기획서를 묶을 앱 식별자. 기존 앱과 동일하게 입력하면 해당 앱에 추가됩니다.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="base_branch">base_branch</label>
+          <input class="input"
+                 id="base_branch"
+                 name="base_branch"
+                 value="main"
+                 autocomplete="off" />
+        </div>
+        <div class="field">
+          <label class="field-label">파일 선택 (복수 선택 가능)</label>
+          <div class="upload-zone" id="upload-zone">
+            <input type="file"
+                   name="files"
+                   multiple
+                   accept=".txt,.md,.pdf,.docx"
+                   id="file-input" />
+            <div class="upload-zone__label">
+              <strong>파일을 드래그하거나 클릭해서 선택</strong>
+              <div class="upload-zone__hint">.txt · .md · .pdf · .docx · 파일당 최대 50 MB · 총 200 MB</div>
+            </div>
+          </div>
+          <ul class="file-list" id="file-list">
+          </ul>
+          <p id="size-error"
+             style="color:#b91c1c;
+                    font-size:.85rem;
+                    margin-top:.4rem;
+                    display:none"></p>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="submit-btn">업로드 및 청킹 시작</button>
+          <a href="/admin/plans" class="btn btn-secondary">취소</a>
+        </div>
+      </form>
+    {% endif %}
+  {% endblock %}
+  {% block scripts %}
+    {{ super() }}
+    <script>
 (function () {
   const MAX_FILE_MB    = 50;
   const MAX_TOTAL_MB   = 200;
@@ -219,5 +245,5 @@
     if (btn) { btn.disabled = true; btn.textContent = '업로드 중…'; }
   });
 })();
-</script>
-{% endblock %}
+    </script>
+  {% endblock %}

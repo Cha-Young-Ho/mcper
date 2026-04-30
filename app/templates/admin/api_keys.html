@@ -1,19 +1,35 @@
 {% extends "admin/base.html" %}
 {% block body %}
-
-{# ── 새로 발급된 키 표시 (한 번만) ──────────────────────────────── #}
-{% if new_key %}
-<div class="alert alert--success" style="margin-bottom:1.5rem;padding:1rem 1.25rem;border:1px solid var(--clr-success,#22c55e);border-radius:8px;background:#f0fdf4">
-  <p style="margin:0 0 .5rem;font-weight:600;color:#15803d">API 키가 발급되었습니다</p>
-  <p style="margin:0 0 .75rem;font-size:.85rem;color:#666">이 키는 <strong>지금만</strong> 표시됩니다. 안전하게 복사해 두세요.</p>
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
-    <code id="raw-key" style="flex:1;padding:.6rem .75rem;background:#1e293b;color:#e2e8f0;border-radius:6px;font-size:.85rem;word-break:break-all;font-family:'JetBrains Mono',monospace">{{ new_key }}</code>
-    <button type="button" onclick="copyKey()" class="btn btn-primary btn-sm" style="white-space:nowrap">복사</button>
-  </div>
-
-  <details style="margin-top:.5rem">
-    <summary style="cursor:pointer;font-size:.85rem;font-weight:500;color:#374151">mcp.json 설정 예시</summary>
-    <pre id="mcp-json" style="margin-top:.5rem;padding:.75rem 1rem;background:#1e293b;color:#e2e8f0;border-radius:6px;font-size:.8rem;overflow-x:auto;font-family:'JetBrains Mono',monospace;line-height:1.5">{
+  {# ── 새로 발급된 키 표시 (한 번만) ──────────────────────────────── #}
+  {% if new_key %}
+    <div class="alert alert--success"
+         style="margin-bottom:1.5rem;
+                padding:1rem 1.25rem;
+                border:1px solid var(--clr-success,#22c55e);
+                border-radius:8px;
+                background:#f0fdf4">
+      <p style="margin:0 0 .5rem;font-weight:600;color:#15803d">API 키가 발급되었습니다</p>
+      <p style="margin:0 0 .75rem;font-size:.85rem;color:#666">
+        이 키는 <strong>지금만</strong> 표시됩니다. 안전하게 복사해 두세요.
+      </p>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+        <code id="raw-key"
+              style="flex:1;
+                     padding:.6rem .75rem;
+                     background:#1e293b;
+                     color:#e2e8f0;
+                     border-radius:6px;
+                     font-size:.85rem;
+                     word-break:break-all;
+                     font-family:'JetBrains Mono',monospace">{{ new_key }}</code>
+        <button type="button"
+                onclick="copyKey()"
+                class="btn btn-primary btn-sm"
+                style="white-space:nowrap">복사</button>
+      </div>
+      <details style="margin-top:.5rem">
+        <summary style="cursor:pointer;font-size:.85rem;font-weight:500;color:#374151">mcp.json 설정 예시</summary>
+        <pre id="mcp-json" style="margin-top:.5rem;padding:.75rem 1rem;background:#1e293b;color:#e2e8f0;border-radius:6px;font-size:.8rem;overflow-x:auto;font-family:'JetBrains Mono',monospace;line-height:1.5">{
   "mcpServers": {
     "mcper": {
       "url": "{{ server_url }}/mcp/",
@@ -23,58 +39,70 @@
     }
   }
 }</pre>
-    <button type="button" onclick="copyJson()" class="btn btn-ghost btn-sm" style="margin-top:.5rem">JSON 복사</button>
-  </details>
-</div>
-{% endif %}
-
-{# ── 키 발급 폼 ─────────────────────────────────────────────────── #}
-<section style="margin-bottom:2rem">
-  <h2 style="font-size:1.1rem;margin-bottom:1rem">새 API 키 발급</h2>
-  <form method="post" action="/admin/api-keys/new" style="display:flex;gap:.5rem;align-items:flex-end;max-width:480px">
-    <div style="flex:1">
-      <label style="display:block;font-size:.8rem;margin-bottom:.25rem">키 이름</label>
-      <input name="name" class="input" placeholder="예: Cursor, Claude Code" required style="width:100%" />
+        <button type="button"
+                onclick="copyJson()"
+                class="btn btn-ghost btn-sm"
+                style="margin-top:.5rem">JSON 복사</button>
+      </details>
     </div>
-    <button type="submit" class="btn btn-primary btn-sm">발급</button>
-  </form>
-</section>
-
-{# ── 기존 키 목록 ───────────────────────────────────────────────── #}
-<section>
-  <h2 style="font-size:1.1rem;margin-bottom:1rem">내 API 키</h2>
-  {% if keys %}
-  <table class="admin-table" style="width:100%;max-width:720px">
-    <thead>
-      <tr>
-        <th>이름</th>
-        <th>생성일</th>
-        <th>마지막 사용</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for k in keys %}
-      <tr>
-        <td><strong>{{ k.name }}</strong></td>
-        <td>{{ k.created_at | datefmt }}</td>
-        <td>{{ k.last_used_at | datefmt if k.last_used_at else "-" }}</td>
-        <td>
-          <form method="post" action="/admin/api-keys/{{ k.id }}/revoke"
-                onsubmit="return confirm('이 키를 삭제할까요? MCP 클라이언트에서 더 이상 사용할 수 없습니다.');">
-            <button type="submit" class="btn btn-danger btn-xs">삭제</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="muted">발급된 키가 없습니다.</p>
   {% endif %}
-</section>
-
-<script>
+  {# ── 키 발급 폼 ─────────────────────────────────────────────────── #}
+  <section style="margin-bottom:2rem">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem">새 API 키 발급</h2>
+    <form method="post"
+          action="/admin/api-keys/new"
+          style="display:flex;
+                 gap:.5rem;
+                 align-items:flex-end;
+                 max-width:480px">
+      <div style="flex:1">
+        <label style="display:block;font-size:.8rem;margin-bottom:.25rem">키 이름</label>
+        <input name="name"
+               class="input"
+               placeholder="예: Cursor, Claude Code"
+               required
+               style="width:100%" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">발급</button>
+    </form>
+  </section>
+  {# ── 기존 키 목록 ───────────────────────────────────────────────── #}
+  <section>
+    <h2 style="font-size:1.1rem;margin-bottom:1rem">내 API 키</h2>
+    {% if keys %}
+      <table class="admin-table" style="width:100%;max-width:720px">
+        <thead>
+          <tr>
+            <th>이름</th>
+            <th>생성일</th>
+            <th>마지막 사용</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in keys %}
+            <tr>
+              <td>
+                <strong>{{ k.name }}</strong>
+              </td>
+              <td>{{ k.created_at | datefmt }}</td>
+              <td>{{ k.last_used_at | datefmt if k.last_used_at else "-" }}</td>
+              <td>
+                <form method="post"
+                      action="/admin/api-keys/{{ k.id }}/revoke"
+                      onsubmit="return confirm('이 키를 삭제할까요? MCP 클라이언트에서 더 이상 사용할 수 없습니다.');">
+                  <button type="submit" class="btn btn-danger btn-xs">삭제</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">발급된 키가 없습니다.</p>
+    {% endif %}
+  </section>
+  <script>
 function copyKey() {
   var el = document.getElementById('raw-key');
   navigator.clipboard.writeText(el.textContent.trim());
@@ -87,5 +115,5 @@ function copyJson() {
   event.target.textContent = '복사됨';
   setTimeout(function() { event.target.textContent = 'JSON 복사'; }, 2000);
 }
-</script>
+  </script>
 {% endblock %}

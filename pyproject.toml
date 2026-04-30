@@ -28,3 +28,10 @@ markers = [
     "integration: tests that exercise the real DB via db_session fixture",
     "e2e: end-to-end tests requiring full-stack env (Redis/Celery/auth enabled)",
 ]
+
+[tool.djlint]
+profile = "jinja"
+indent = 2
+max_line_length = 120
+# FastAPI+Jinja 환경은 Flask url_for 패턴을 쓰지 않는다. 어드민 UI 는 검색엔진 메타 불필요.
+ignore = "J004,J018,H030,H031,H006,H013,H021,H025,T028,T003,H023,H029"

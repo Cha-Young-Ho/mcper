@@ -1,47 +1,70 @@
 {% extends "admin/base.html" %}
-{% block head %}
-<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
-{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  <a href="/admin/plans/{{ row.id }}">← 상세 보기</a>
-  · <a href="/admin/plans/app/{{ app_enc }}">목록</a>
-</p>
-<p><strong>{{ spec_display_title(row) }}</strong> <span class="muted">· id {{ row.id }}</span></p>
-
-<form class="form-stack" method="post" action="/admin/plans/{{ row.id }}/edit">
-  <div class="field">
-    <label class="field-label" for="title">title (선택)</label>
-    <input class="input" id="title" name="title" value="{{ row.title or '' }}" placeholder="어드민 목록용 제목" autocomplete="off" />
-  </div>
-  <div class="field">
-    <label class="field-label" for="app_target">app_target</label>
-    <input class="input" id="app_target" name="app_target" required value="{{ row.app_target }}" autocomplete="off" />
-  </div>
-  <div class="field">
-    <label class="field-label" for="base_branch">base_branch</label>
-    <input class="input" id="base_branch" name="base_branch" required value="{{ row.base_branch }}" autocomplete="off" />
-  </div>
-  <div class="field">
-    <label class="field-label" for="related_files_text">related_files (한 줄에 경로 하나)</label>
-    <textarea class="input" id="related_files_text" name="related_files_text" rows="6" style="font-family:var(--mono,monospace);font-size:0.9rem">{{ related_lines }}</textarea>
-    <p class="field-hint">레포 루트 기준 상대 경로. 비우면 연결 파일 없음.</p>
-  </div>
-  {% set md_label = "본문 (Markdown 권장)" %}
-  {% set md_name = "content" %}
-  {% set md_id = "content" %}
-  {% set md_value = row.content %}
-  {% set md_required = true %}
-  {% set md_rows = 24 %}
-  {% include "admin/partials/markdown_split_field.html" %}
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">저장 후 재인덱싱 큐</button>
-    <a href="/admin/plans/{{ row.id }}" class="btn btn-secondary">취소</a>
-  </div>
-</form>
-<p class="muted" style="margin-top:1rem;font-size:0.85rem">저장 시 Celery가 켜져 있으면 <code>index_spec</code> 가 다시 돌아 청크·벡터를 갱신합니다.</p>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin/plans/{{ row.id }}">← 상세 보기</a>
+    · <a href="/admin/plans/app/{{ app_enc }}">목록</a>
+  </p>
+  <p>
+    <strong>{{ spec_display_title(row) }}</strong> <span class="muted">· id {{ row.id }}</span>
+  </p>
+  <form class="form-stack"
+        method="post"
+        action="/admin/plans/{{ row.id }}/edit">
+    <div class="field">
+      <label class="field-label" for="title">title (선택)</label>
+      <input class="input"
+             id="title"
+             name="title"
+             value="{{ row.title or '' }}"
+             placeholder="어드민 목록용 제목"
+             autocomplete="off" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="app_target">app_target</label>
+      <input class="input"
+             id="app_target"
+             name="app_target"
+             required
+             value="{{ row.app_target }}"
+             autocomplete="off" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="base_branch">base_branch</label>
+      <input class="input"
+             id="base_branch"
+             name="base_branch"
+             required
+             value="{{ row.base_branch }}"
+             autocomplete="off" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="related_files_text">related_files (한 줄에 경로 하나)</label>
+      <textarea class="input"
+                id="related_files_text"
+                name="related_files_text"
+                rows="6"
+                style="font-family:var(--mono,monospace);
+                       font-size:0.9rem">{{ related_lines }}</textarea>
+      <p class="field-hint">레포 루트 기준 상대 경로. 비우면 연결 파일 없음.</p>
+    </div>
+    {% set md_label = "본문 (Markdown 권장)" %}
+    {% set md_name = "content" %}
+    {% set md_id = "content" %}
+    {% set md_value = row.content %}
+    {% set md_required = true %}
+    {% set md_rows = 24 %}
+    {% include "admin/partials/markdown_split_field.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">저장 후 재인덱싱 큐</button>
+      <a href="/admin/plans/{{ row.id }}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+  <p class="muted" style="margin-top:1rem;font-size:0.85rem">
+    저장 시 Celery가 켜져 있으면 <code>index_spec</code> 가 다시 돌아 청크·벡터를 갱신합니다.
+  </p>
 {% endblock %}
 {% block scripts %}
-{{ super() }}
-{% include "admin/partials/markdown_editor_assets.html" %}
+  {{ super() }}
+  {% include "admin/partials/markdown_editor_assets.html" %}
 {% endblock %}

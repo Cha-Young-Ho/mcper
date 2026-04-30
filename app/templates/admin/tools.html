@@ -1,43 +1,40 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  누적 호출 합계: <strong>{{ mcp_calls_total }}</strong> — 아래에서 툴 이름을 누르면 상세·예시가 펼쳐집니다.
-</p>
-
-<div class="tool-acc-list">
-  {% for t in tool_stats %}
-  <details class="tool-acc">
-    <summary class="tool-acc__summary">
-      <span class="tool-acc__name"><code>{{ t.name }}</code></span>
-      <span class="tool-acc__one">{{ t.one_liner|default(t.summary[:90] ~ '…', true) }}</span>
-      <span class="tool-acc__badge">{{ t.call_count }}</span>
-    </summary>
-    <div class="tool-acc__body">
-      <p class="tool-doc__summary">{{ t.summary }}</p>
-      {% if t.params %}
-      <h3 class="tool-doc__h3">파라미터</h3>
-      <ul class="tool-doc__list">
-        {% for p in t.params %}
-        <li>{{ p }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      {% if t.notes %}
-      <h3 class="tool-doc__h3">참고</h3>
-      <ul class="tool-doc__list">
-        {% for n in t.notes %}
-        <li>{{ n }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      <h3 class="tool-doc__h3">예시</h3>
-      <ul class="tool-doc__examples">
-        {% for ex in t.examples %}
-        <li><pre class="tool-doc__code">{{ ex }}</pre></li>
-        {% endfor %}
-      </ul>
-    </div>
-  </details>
-  {% endfor %}
-</div>
+  <p class="muted" style="margin-top:0">
+    누적 호출 합계: <strong>{{ mcp_calls_total }}</strong> — 아래에서 툴 이름을 누르면 상세·예시가 펼쳐집니다.
+  </p>
+  <div class="tool-acc-list">
+    {% for t in tool_stats %}
+      <details class="tool-acc">
+        <summary class="tool-acc__summary">
+          <span class="tool-acc__name"><code>{{ t.name }}</code></span>
+          <span class="tool-acc__one">{{ t.one_liner|default(t.summary[:90] ~ '…', true) }}</span>
+          <span class="tool-acc__badge">{{ t.call_count }}</span>
+        </summary>
+        <div class="tool-acc__body">
+          <p class="tool-doc__summary">{{ t.summary }}</p>
+          {% if t.params %}
+            <h3 class="tool-doc__h3">파라미터</h3>
+            <ul class="tool-doc__list">
+              {% for p in t.params %}<li>{{ p }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+          {% if t.notes %}
+            <h3 class="tool-doc__h3">참고</h3>
+            <ul class="tool-doc__list">
+              {% for n in t.notes %}<li>{{ n }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+          <h3 class="tool-doc__h3">예시</h3>
+          <ul class="tool-doc__examples">
+            {% for ex in t.examples %}
+              <li>
+                <pre class="tool-doc__code">{{ ex }}</pre>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </details>
+    {% endfor %}
+  </div>
 {% endblock %}

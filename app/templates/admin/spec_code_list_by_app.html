@@ -1,22 +1,24 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  <a href="/admin/plan-code">← 앱 목록</a>
-</p>
-<p>앱 <code>{{ app_name }}</code> — 항목을 누르면 <strong>연결된 코드 경로</strong>만 봅니다.</p>
-<div class="board-list">
-  {% for r in rows %}
-  <article class="board-item">
-    <a href="/admin/plan-code/{{ r.id }}" class="board-item__link">
-      <div class="board-item__meta">
-        <strong>{{ spec_display_title(r) }}</strong>
-        <span class="ver-badge ver-badge--sm">{{ (r.related_files or [])|length }}개 파일</span>
-      </div>
-      <p class="muted" style="margin:0;font-size:0.8rem">#{{ r.id }}</p>
-    </a>
-  </article>
-  {% else %}
-  <div class="empty-state">이 앱에 기획서가 없습니다.</div>
-  {% endfor %}
-</div>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin/plan-code">← 앱 목록</a>
+  </p>
+  <p>
+    앱 <code>{{ app_name }}</code> — 항목을 누르면 <strong>연결된 코드 경로</strong>만 봅니다.
+  </p>
+  <div class="board-list">
+    {% for r in rows %}
+      <article class="board-item">
+        <a href="/admin/plan-code/{{ r.id }}" class="board-item__link">
+          <div class="board-item__meta">
+            <strong>{{ spec_display_title(r) }}</strong>
+            <span class="ver-badge ver-badge--sm">{{ (r.related_files or [])|length }}개 파일</span>
+          </div>
+          <p class="muted" style="margin:0;font-size:0.8rem">#{{ r.id }}</p>
+        </a>
+      </article>
+    {% else %}
+      <div class="empty-state">이 앱에 기획서가 없습니다.</div>
+    {% endfor %}
+  </div>
 {% endblock %}

@@ -1,43 +1,53 @@
 {% extends "admin/base.html" %}
-{% block head %}
-<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
-{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  <a href="/admin/global-rules">← Global rules</a>
-  &nbsp;/&nbsp;
-  <span>{% if section_name == 'main' %}기본{% else %}{{ section_name }}{% endif %}</span>
-</p>
-
-<div class="page-actions page-actions--spread" style="margin-bottom:1.5rem">
-  <a href="/admin/global-rules/s/{{ section_url_encoded }}/publish" class="btn btn-primary">+ 새로 추가하기</a>
-  {% if can_delete_section %}
-  <form method="post" action="/admin/global-rules/s/{{ section_url_encoded }}/delete" onsubmit="return confirm('카테고리 «{{ section_name }}» 전체 버전을 삭제할까요?');">
-    <button type="submit" class="btn btn-danger btn-sm">카테고리 삭제</button>
-  </form>
-  {% endif %}
-</div>
-
-<div class="board-list">
-  {% for r in rows %}
-  <article class="board-item board-item--clickable" onclick="location.href='/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}'">
-    <div class="board-item__meta">
-      <span class="ver-badge">{{ r.version }}</span>
-      <time class="muted board-item__time">{{ r.created_at }}</time>
-    </div>
-    <div class="board-item__excerpt">
-      <pre class="preview-text">{{ r.body[:280] }}{% if r.body|length > 280 %}…{% endif %}</pre>
-    </div>
-    <div class="board-item__actions">
-      <a class="btn btn-ghost btn-sm" href="/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}">내용 보기</a>
-      {% if can_delete_version(r.version) %}
-      <form method="post" action="/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}/delete"
-            class="board-item__del-form" onsubmit="return confirm('버전 {{ r.version }} 행을 삭제할까요?');">
-        <button type="submit" class="btn btn-danger btn-sm">삭제</button>
-      </form>
+  <p class="muted" style="margin-top:0">
+    <a href="/admin/global-rules">← Global rules</a>
+    &nbsp;/&nbsp;
+    <span>
+      {% if section_name == 'main' %}
+        기본
+      {% else %}
+        {{ section_name }}
       {% endif %}
-    </div>
-  </article>
-  {% endfor %}
-</div>
+    </span>
+  </p>
+  <div class="page-actions page-actions--spread"
+       style="margin-bottom:1.5rem">
+    <a href="/admin/global-rules/s/{{ section_url_encoded }}/publish"
+       class="btn btn-primary">+ 새로 추가하기</a>
+    {% if can_delete_section %}
+      <form method="post"
+            action="/admin/global-rules/s/{{ section_url_encoded }}/delete"
+            onsubmit="return confirm('카테고리 «{{ section_name }}» 전체 버전을 삭제할까요?');">
+        <button type="submit" class="btn btn-danger btn-sm">카테고리 삭제</button>
+      </form>
+    {% endif %}
+  </div>
+  <div class="board-list">
+    {% for r in rows %}
+      <article class="board-item board-item--clickable"
+               onclick="location.href='/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}'">
+        <div class="board-item__meta">
+          <span class="ver-badge">{{ r.version }}</span>
+          <time class="muted board-item__time">{{ r.created_at }}</time>
+        </div>
+        <div class="board-item__excerpt">
+          <pre class="preview-text">{{ r.body[:280] }}{% if r.body|length > 280 %}…{% endif %}</pre>
+        </div>
+        <div class="board-item__actions">
+          <a class="btn btn-ghost btn-sm"
+             href="/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}">내용 보기</a>
+          {% if can_delete_version(r.version) %}
+            <form method="post"
+                  action="/admin/global-rules/s/{{ section_url_encoded }}/v/{{ r.version }}/delete"
+                  class="board-item__del-form"
+                  onsubmit="return confirm('버전 {{ r.version }} 행을 삭제할까요?');">
+              <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
 {% endblock %}

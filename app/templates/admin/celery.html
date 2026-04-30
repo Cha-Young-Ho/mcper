@@ -1,154 +1,228 @@
 {% extends "admin/base.html" %}
-
 {% block body %}
-<!-- Active Tasks (live via Inspect API) -->
-<div style="margin-bottom:1.5rem">
-  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem">
-    <h3 style="margin:0">실행 중인 태스크</h3>
-    <span id="active-badge" style="font-size:.78rem;color:#888">조회 중…</span>
-    <button onclick="refreshActive()" style="padding:.2rem .55rem;font-size:.8rem;border:1px solid var(--border,#ccc);border-radius:4px;cursor:pointer;background:none">↻ 갱신</button>
+  <!-- Active Tasks (live via Inspect API) -->
+  <div style="margin-bottom:1.5rem">
+    <div style="display:flex;
+                align-items:center;
+                gap:.75rem;
+                margin-bottom:.6rem">
+      <h3 style="margin:0">실행 중인 태스크</h3>
+      <span id="active-badge" style="font-size:.78rem;color:#888">조회 중…</span>
+      <button onclick="refreshActive()"
+              style="padding:.2rem .55rem;
+                     font-size:.8rem;
+                     border:1px solid var(--border,#ccc);
+                     border-radius:4px;
+                     cursor:pointer;
+                     background:none">↻ 갱신</button>
+    </div>
+    <div id="active-tasks-wrap">
+      <table style="width:100%;
+                    border-collapse:collapse;
+                    font-size:.85rem"
+             id="active-table">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+            <th style="padding:.4rem .6rem">상태</th>
+            <th style="padding:.4rem .6rem">태스크</th>
+            <th style="padding:.4rem .6rem">워커</th>
+            <th style="padding:.4rem .6rem">인자</th>
+          </tr>
+        </thead>
+        <tbody id="active-tbody">
+        </tbody>
+      </table>
+      <p id="active-empty"
+         style="color:#888;
+                font-size:.85rem;
+                display:none;
+                padding:.5rem 0">실행 중인 태스크 없음</p>
+    </div>
   </div>
-  <div id="active-tasks-wrap">
-    <table style="width:100%;border-collapse:collapse;font-size:.85rem" id="active-table">
-      <thead>
-        <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
-          <th style="padding:.4rem .6rem">상태</th>
-          <th style="padding:.4rem .6rem">태스크</th>
-          <th style="padding:.4rem .6rem">워커</th>
-          <th style="padding:.4rem .6rem">인자</th>
-        </tr>
-      </thead>
-      <tbody id="active-tbody"></tbody>
-    </table>
-    <p id="active-empty" style="color:#888;font-size:.85rem;display:none;padding:.5rem 0">실행 중인 태스크 없음</p>
+  <hr style="margin-bottom:1.5rem;
+             border:none;
+             border-top:1px solid var(--border,#e0e0e0)">
+  <!-- Task Stats Table -->
+  {% if task_stats %}
+    <h3 style="margin-bottom:.75rem">태스크 통계</h3>
+    <div style="overflow-x:auto;margin-bottom:1.5rem">
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+            <th style="padding:.5rem">태스크 이름</th>
+            <th style="padding:.5rem;text-align:right">성공</th>
+            <th style="padding:.5rem;text-align:right">실패</th>
+            <th style="padding:.5rem;text-align:right">총 소요 시간</th>
+            <th style="padding:.5rem">마지막 성공</th>
+            <th style="padding:.5rem">마지막 실패</th>
+          </tr>
+        </thead>
+        <tbody id="stats-tbody">
+          {% for s in task_stats %}
+            <tr style="border-bottom:1px solid var(--border,#e0e0e0)">
+              <td style="padding:.5rem">
+                <code>{{ s.task_name }}</code>
+              </td>
+              <td style="padding:.5rem;text-align:right;color:#27ae60">{{ s.success_count }}</td>
+              <td style="padding:.5rem;text-align:right;color:#e74c3c">{{ s.failure_count }}</td>
+              <td style="padding:.5rem;text-align:right">{{ s.total_duration_seconds }}s</td>
+              <td style="padding:.5rem;font-size:.8rem">
+                {{ s.last_success_at.strftime("%m-%d %H:%M") if s.last_success_at else '-' }}
+              </td>
+              <td style="padding:.5rem;font-size:.8rem">
+                {{ s.last_failure_at.strftime("%m-%d %H:%M") if s.last_failure_at else '-' }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <!-- Filters -->
+  <div style="display:flex;
+              gap:.75rem;
+              align-items:center;
+              margin-bottom:1rem;
+              flex-wrap:wrap">
+    <h3 style="margin:0">실패한 태스크</h3>
+    <form method="get"
+          action="/admin/celery"
+          style="display:flex;
+                 gap:.5rem;
+                 align-items:center;
+                 flex-wrap:wrap">
+      <select name="status"
+              style="padding:.35rem .5rem;
+                     border:1px solid var(--border,#ccc);
+                     border-radius:4px;
+                     font-size:.85rem">
+        <option value="">전체 상태</option>
+        <option value="pending"
+                {% if filter_status == 'pending' %}selected{% endif %}>대기 중</option>
+        <option value="retrying"
+                {% if filter_status == 'retrying' %}selected{% endif %}>재시도 중</option>
+        <option value="failed" {% if filter_status == 'failed' %}selected{% endif %}>실패</option>
+        <option value="resolved"
+                {% if filter_status == 'resolved' %}selected{% endif %}>해결됨</option>
+      </select>
+      <select name="entity_type"
+              style="padding:.35rem .5rem;
+                     border:1px solid var(--border,#ccc);
+                     border-radius:4px;
+                     font-size:.85rem">
+        <option value="">전체 유형</option>
+        {% for v in ['spec','code_index','upload'] %}
+          <option value="{{ v }}" {% if filter_entity_type == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit"
+              style="padding:.35rem .75rem;
+                     background:#3498db;
+                     color:#fff;
+                     border:none;
+                     border-radius:4px;
+                     cursor:pointer;
+                     font-size:.85rem">필터 적용</button>
+    </form>
+    <span style="font-size:.8rem;color:#888">총 {{ total_count }}건</span>
   </div>
-</div>
-<hr style="margin-bottom:1.5rem;border:none;border-top:1px solid var(--border,#e0e0e0)">
-
-<!-- Task Stats Table -->
-{% if task_stats %}
-<h3 style="margin-bottom:.75rem">태스크 통계</h3>
-<div style="overflow-x:auto;margin-bottom:1.5rem">
-  <table style="width:100%;border-collapse:collapse;font-size:.9rem">
-    <thead>
-      <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
-        <th style="padding:.5rem">태스크 이름</th>
-        <th style="padding:.5rem;text-align:right">성공</th>
-        <th style="padding:.5rem;text-align:right">실패</th>
-        <th style="padding:.5rem;text-align:right">총 소요 시간</th>
-        <th style="padding:.5rem">마지막 성공</th>
-        <th style="padding:.5rem">마지막 실패</th>
-      </tr>
-    </thead>
-    <tbody id="stats-tbody">
-      {% for s in task_stats %}
-      <tr style="border-bottom:1px solid var(--border,#e0e0e0)">
-        <td style="padding:.5rem"><code>{{ s.task_name }}</code></td>
-        <td style="padding:.5rem;text-align:right;color:#27ae60">{{ s.success_count }}</td>
-        <td style="padding:.5rem;text-align:right;color:#e74c3c">{{ s.failure_count }}</td>
-        <td style="padding:.5rem;text-align:right">{{ s.total_duration_seconds }}s</td>
-        <td style="padding:.5rem;font-size:.8rem">{{ s.last_success_at.strftime('%m-%d %H:%M') if s.last_success_at else '-' }}</td>
-        <td style="padding:.5rem;font-size:.8rem">{{ s.last_failure_at.strftime('%m-%d %H:%M') if s.last_failure_at else '-' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
-<!-- Filters -->
-<div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-  <h3 style="margin:0">실패한 태스크</h3>
-  <form method="get" action="/admin/celery" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-    <select name="status" style="padding:.35rem .5rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:.85rem">
-      <option value="">전체 상태</option>
-      <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>대기 중</option>
-      <option value="retrying" {% if filter_status == 'retrying' %}selected{% endif %}>재시도 중</option>
-      <option value="failed" {% if filter_status == 'failed' %}selected{% endif %}>실패</option>
-      <option value="resolved" {% if filter_status == 'resolved' %}selected{% endif %}>해결됨</option>
-    </select>
-    <select name="entity_type" style="padding:.35rem .5rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:.85rem">
-      <option value="">전체 유형</option>
-      {% for v in ['spec','code_index','upload'] %}
-      <option value="{{ v }}" {% if filter_entity_type == v %}selected{% endif %}>{{ v }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" style="padding:.35rem .75rem;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85rem">필터 적용</button>
-  </form>
-  <span style="font-size:.8rem;color:#888">총 {{ total_count }}건</span>
-</div>
-
-<!-- Failed Tasks Table -->
-{% if failed_tasks %}
-<div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:.85rem">
-    <thead>
-      <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
-        <th style="padding:.5rem">ID</th>
-        <th style="padding:.5rem">태스크 ID</th>
-        <th style="padding:.5rem">유형</th>
-        <th style="padding:.5rem">대상</th>
-        <th style="padding:.5rem">상태</th>
-        <th style="padding:.5rem">재시도</th>
-        <th style="padding:.5rem">오류 메시지</th>
-        <th style="padding:.5rem">생성일시</th>
-        <th style="padding:.5rem">작업</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in failed_tasks %}
-      <tr style="border-bottom:1px solid var(--border,#e0e0e0)" id="row-{{ t.id }}">
-        <td style="padding:.5rem">{{ t.id }}</td>
-        <td style="padding:.5rem"><code style="font-size:.75rem">{{ t.task_id[:12] }}...</code></td>
-        <td style="padding:.5rem">{{ t.entity_type }}</td>
-        <td style="padding:.5rem">{{ t.entity_id }}</td>
-        <td style="padding:.5rem">
-          {% if t.status == 'pending' %}
-          <span style="color:#e67e22;font-weight:600">대기 중</span>
-          {% elif t.status == 'retrying' %}
-          <span style="color:#3498db;font-weight:600">재시도 중</span>
-          {% elif t.status == 'failed' %}
-          <span style="color:#e74c3c;font-weight:600">실패</span>
-          {% elif t.status == 'resolved' %}
-          <span style="color:#27ae60;font-weight:600">해결됨</span>
-          {% else %}
-          {{ t.status }}
-          {% endif %}
-        </td>
-        <td style="padding:.5rem">{{ t.retry_count }}/{{ t.max_retries }}</td>
-        <td style="padding:.5rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ t.error_message }}">{{ t.error_message[:80] }}</td>
-        <td style="padding:.5rem;font-size:.8rem">{{ t.created_at.strftime('%m-%d %H:%M') if t.created_at else '-' }}</td>
-        <td style="padding:.5rem;white-space:nowrap">
-          {% if t.status in ('pending', 'retrying') %}
-          <button onclick="retryTask({{ t.id }})" style="padding:.25rem .5rem;background:#3498db;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:.8rem">재시도</button>
-          {% endif %}
-          {% if t.status != 'resolved' %}
-          <button onclick="resolveTask({{ t.id }})" style="padding:.25rem .5rem;background:#27ae60;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:.8rem">해결 처리</button>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<!-- Pagination -->
-{% if total_pages > 1 %}
-<div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem">
-  {% for p in range(1, total_pages + 1) %}
-  <a href="/admin/celery?page={{ p }}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if filter_entity_type %}&entity_type={{ filter_entity_type }}{% endif %}"
-     style="padding:.35rem .6rem;border:1px solid var(--border,#ccc);border-radius:4px;text-decoration:none;font-size:.85rem;{% if p == current_page %}background:#3498db;color:#fff;{% endif %}">{{ p }}</a>
-  {% endfor %}
-</div>
-{% endif %}
-
-{% else %}
-<p style="color:#888;text-align:center;padding:2rem 0">실패한 태스크가 없습니다.</p>
-{% endif %}
+  <!-- Failed Tasks Table -->
+  {% if failed_tasks %}
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border,#e0e0e0);text-align:left">
+            <th style="padding:.5rem">ID</th>
+            <th style="padding:.5rem">태스크 ID</th>
+            <th style="padding:.5rem">유형</th>
+            <th style="padding:.5rem">대상</th>
+            <th style="padding:.5rem">상태</th>
+            <th style="padding:.5rem">재시도</th>
+            <th style="padding:.5rem">오류 메시지</th>
+            <th style="padding:.5rem">생성일시</th>
+            <th style="padding:.5rem">작업</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in failed_tasks %}
+            <tr style="border-bottom:1px solid var(--border,#e0e0e0)"
+                id="row-{{ t.id }}">
+              <td style="padding:.5rem">{{ t.id }}</td>
+              <td style="padding:.5rem">
+                <code style="font-size:.75rem">{{ t.task_id[:12] }}...</code>
+              </td>
+              <td style="padding:.5rem">{{ t.entity_type }}</td>
+              <td style="padding:.5rem">{{ t.entity_id }}</td>
+              <td style="padding:.5rem">
+                {% if t.status == 'pending' %}
+                  <span style="color:#e67e22;font-weight:600">대기 중</span>
+                {% elif t.status == 'retrying' %}
+                  <span style="color:#3498db;font-weight:600">재시도 중</span>
+                {% elif t.status == 'failed' %}
+                  <span style="color:#e74c3c;font-weight:600">실패</span>
+                {% elif t.status == 'resolved' %}
+                  <span style="color:#27ae60;font-weight:600">해결됨</span>
+                {% else %}
+                  {{ t.status }}
+                {% endif %}
+              </td>
+              <td style="padding:.5rem">{{ t.retry_count }}/{{ t.max_retries }}</td>
+              <td style="padding:.5rem;
+                         max-width:300px;
+                         overflow:hidden;
+                         text-overflow:ellipsis;
+                         white-space:nowrap"
+                  title="{{ t.error_message }}">{{ t.error_message[:80] }}</td>
+              <td style="padding:.5rem;font-size:.8rem">{{ t.created_at.strftime("%m-%d %H:%M") if t.created_at else '-' }}</td>
+              <td style="padding:.5rem;white-space:nowrap">
+                {% if t.status in ('pending', 'retrying') %}
+                  <button onclick="retryTask({{ t.id }})"
+                          style="padding:.25rem .5rem;
+                                 background:#3498db;
+                                 color:#fff;
+                                 border:none;
+                                 border-radius:3px;
+                                 cursor:pointer;
+                                 font-size:.8rem">재시도</button>
+                {% endif %}
+                {% if t.status != 'resolved' %}
+                  <button onclick="resolveTask({{ t.id }})"
+                          style="padding:.25rem .5rem;
+                                 background:#27ae60;
+                                 color:#fff;
+                                 border:none;
+                                 border-radius:3px;
+                                 cursor:pointer;
+                                 font-size:.8rem">해결 처리</button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+      <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem">
+        {% for p in range(1, total_pages + 1) %}
+          <a href="/admin/celery?page={{ p }}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if filter_entity_type %}&entity_type={{ filter_entity_type }}{% endif %}"
+             style="padding:.35rem .6rem;
+                    border:1px solid var(--border,#ccc);
+                    border-radius:4px;
+                    text-decoration:none;
+                    font-size:.85rem;
+                    {% if p == current_page %}background:#3498db;
+                    color:#fff;
+                    {% endif %}">{{ p }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p style="color:#888;text-align:center;padding:2rem 0">실패한 태스크가 없습니다.</p>
+  {% endif %}
 {% endblock %}
-
 {% block scripts %}
-<script>
+  <script>
 async function retryTask(id) {
   if (!confirm('이 태스크를 재시도할까요?')) return;
   try {
@@ -210,5 +284,5 @@ async function refreshActive() {
 
 refreshActive();
 setInterval(refreshActive, 5000);  // 5초마다 자동 갱신
-</script>
+  </script>
 {% endblock %}

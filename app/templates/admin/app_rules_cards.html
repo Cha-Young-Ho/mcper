@@ -1,45 +1,66 @@
 {% extends "admin/base.html" %}
 {% block body %}
-<div data-card-container data-per-page="20">
-<div class="card-filter-bar">
-  <input type="search" class="input card-filter-bar__input" placeholder="앱 검색…" autocomplete="off" data-card-search value="{{ q }}" />
-  <span class="card-filter-bar__count" data-card-count></span>
-  <a href="/admin/app-rules/new{% if domain %}?domain={{ domain }}{% endif %}" class="btn btn-primary" style="margin-left:auto">+ 새 앱</a>
-</div>
-<p class="muted" style="margin-top:0;margin-bottom:0.75rem;font-size:0.875rem">각 앱 카드에서 <strong>rule pull 시 default 포함</strong> 을 켜거나 끌 수 있어요.</p>
-
-<div class="app-card-grid" data-card-grid>
-  {% for c in cards %}
-  <div class="app-card app-card--compound" data-card-label="{{ c.display }}">
-    {% if c.is_default %}<div class="app-card-corner">default</div>{% endif %}
-    <a class="app-card__main" href="{{ c.url }}">
-      <div class="app-card__head">
-        <span class="app-card__name">{{ c.display }}</span>
-        <span class="ver-badge ver-badge--sm">{{ c.latest_version }}</span>
-      </div>
-      <span class="app-card__cta">열기 →</span>
-    </a>
-    <div class="app-card__foot app-card__foot--row">
-      {% if c.show_pull_toggle %}
-      <form method="post" action="/admin/app-rules/app/{{ c.app_url_encoded }}/pull-default-toggle" class="toolbar-flag toolbar-flag--compact">
-        <input type="hidden" name="return_to" value="cards" />
-        <span class="toolbar-flag__label">default 포함</span>
-        <span class="toolbar-flag__state {% if c.include_app_pull_default %}is-on{% endif %}">{% if c.include_app_pull_default %}ON{% else %}OFF{% endif %}</span>
-        <button type="submit" class="btn btn-secondary btn-xs">전환</button>
-      </form>
-      {% endif %}
-      {% if c.can_delete_stream %}
-      <form method="post" action="{{ c.url }}/delete" onsubmit="return confirm('이 앱 스트림 전체를 삭제할까요?');">
-        <button type="submit" class="btn btn-danger btn-xs">삭제</button>
-      </form>
-      {% endif %}
+  <div data-card-container data-per-page="20">
+    <div class="card-filter-bar">
+      <input type="search"
+             class="input card-filter-bar__input"
+             placeholder="앱 검색…"
+             autocomplete="off"
+             data-card-search
+             value="{{ q }}" />
+      <span class="card-filter-bar__count" data-card-count></span>
+      <a href="/admin/app-rules/new{% if domain %}?domain={{ domain }}{% endif %}"
+         class="btn btn-primary"
+         style="margin-left:auto">+ 새 앱</a>
     </div>
+    <p class="muted"
+       style="margin-top:0;
+              margin-bottom:0.75rem;
+              font-size:0.875rem">
+      각 앱 카드에서 <strong>rule pull 시 default 포함</strong> 을 켜거나 끌 수 있어요.
+    </p>
+    <div class="app-card-grid" data-card-grid>
+      {% for c in cards %}
+        <div class="app-card app-card--compound" data-card-label="{{ c.display }}">
+          {% if c.is_default %}<div class="app-card-corner">default</div>{% endif %}
+          <a class="app-card__main" href="{{ c.url }}">
+            <div class="app-card__head">
+              <span class="app-card__name">{{ c.display }}</span>
+              <span class="ver-badge ver-badge--sm">{{ c.latest_version }}</span>
+            </div>
+            <span class="app-card__cta">열기 →</span>
+          </a>
+          <div class="app-card__foot app-card__foot--row">
+            {% if c.show_pull_toggle %}
+              <form method="post"
+                    action="/admin/app-rules/app/{{ c.app_url_encoded }}/pull-default-toggle"
+                    class="toolbar-flag toolbar-flag--compact">
+                <input type="hidden" name="return_to" value="cards" />
+                <span class="toolbar-flag__label">default 포함</span>
+                <span class="toolbar-flag__state {% if c.include_app_pull_default %}is-on{% endif %}">
+                  {% if c.include_app_pull_default %}
+                    ON
+                  {% else %}
+                    OFF
+                  {% endif %}
+                </span>
+                <button type="submit" class="btn btn-secondary btn-xs">전환</button>
+              </form>
+            {% endif %}
+            {% if c.can_delete_stream %}
+              <form method="post"
+                    action="{{ c.url }}/delete"
+                    onsubmit="return confirm('이 앱 스트림 전체를 삭제할까요?');">
+                <button type="submit" class="btn btn-danger btn-xs">삭제</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state app-card-grid__empty">앱 룰이 없습니다.</div>
+      {% endfor %}
+    </div>
+    <div class="pg-bar" data-card-pagination></div>
+    {% include "admin/partials/server_pagination.html" %}
   </div>
-  {% else %}
-  <div class="empty-state app-card-grid__empty">앱 룰이 없습니다.</div>
-  {% endfor %}
-</div>
-<div class="pg-bar" data-card-pagination></div>
-{% include "admin/partials/server_pagination.html" %}
-</div>
 {% endblock %}

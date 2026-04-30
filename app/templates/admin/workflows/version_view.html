@@ -1,68 +1,91 @@
 {% extends "admin/base.html" %}
-{% block head %}
-<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
-{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0">
-  <a href="{{ back_url }}">← {{ back_label }}</a>
-  &nbsp;/&nbsp; v{{ row.version }}
-</p>
-
-<div class="version-meta" style="margin-bottom:1rem">
-  <span class="category-badge">{{ section_display }}</span>
-  <span class="ver-badge">v{{ row.version }}</span>
-  <time class="muted">{{ row.created_at }}</time>
-  <button type="button"
-          class="btn btn-ghost"
-          id="btn-mermaid-view"
-          style="margin-left:0.5rem">한눈에 보기</button>
-</div>
-
-<div class="split-editor split-editor--view-mode">
-  <div class="split-editor__pane">
-    <label class="form-label">원문 (Markdown)</label>
-    <pre class="code-block">{{ row.body }}</pre>
+  <p class="muted" style="margin-top:0">
+    <a href="{{ back_url }}">← {{ back_label }}</a>
+    &nbsp;/&nbsp; v{{ row.version }}
+  </p>
+  <div class="version-meta" style="margin-bottom:1rem">
+    <span class="category-badge">{{ section_display }}</span>
+    <span class="ver-badge">v{{ row.version }}</span>
+    <time class="muted">{{ row.created_at }}</time>
+    <button type="button"
+            class="btn btn-ghost"
+            id="btn-mermaid-view"
+            style="margin-left:0.5rem">한눈에 보기</button>
   </div>
-  <div class="split-editor__pane split-editor__preview-pane">
-    <label class="form-label">렌더링</label>
-    <div id="preview" class="split-editor__preview markdown-body"></div>
-  </div>
-</div>
-
-<hr style="margin:2rem 0" />
-
-<div class="page-actions page-actions--spread">
-  <form method="post" action="{{ save_as_new_url }}"
-        onsubmit="document.querySelector('#edit-body').value = document.querySelector('.code-block').textContent">
-    <input type="hidden" id="edit-body" name="body" value="{{ row.body | e }}" />
-    <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
-  </form>
-
-  {% if can_delete_version %}
-  <form method="post" action="{{ delete_version_url }}"
-        onsubmit="return confirm('버전 {{ row.version }}을 삭제할까요?');">
-    <button type="submit" class="btn btn-danger">이 버전 삭제</button>
-  </form>
-  {% endif %}
-</div>
-
-<!-- Mermaid 모달 -->
-<div id="mermaid-modal"
-     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:1000; align-items:center; justify-content:center; padding:2rem;">
-  <div style="background:#fff; border-radius:12px; max-width:92vw; max-height:92vh; width:min(1100px,92vw); display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.9rem 1.25rem; border-bottom:1px solid #e5e7eb;">
-      <strong style="font-size:1rem;">한눈에 보기 — {{ section_display }} v{{ row.version }}</strong>
-      <button type="button" id="mermaid-modal-close"
-              style="background:none; border:0; font-size:1.4rem; cursor:pointer; line-height:1; color:#6b7280;">✕</button>
+  <div class="split-editor split-editor--view-mode">
+    <div class="split-editor__pane">
+      <label class="form-label">원문 (Markdown)</label>
+      <pre class="code-block">{{ row.body }}</pre>
     </div>
-    <div id="mermaid-modal-body"
-         style="padding:1.25rem; overflow:auto; flex:1 1 auto; min-height:0;">
-      <div class="mermaid" id="mermaid-render-target" style="display:flex; justify-content:center;"></div>
+    <div class="split-editor__pane split-editor__preview-pane">
+      <label class="form-label">렌더링</label>
+      <div id="preview" class="split-editor__preview markdown-body"></div>
     </div>
   </div>
-</div>
-
-<script>
+  <hr style="margin:2rem 0" />
+  <div class="page-actions page-actions--spread">
+    <form method="post"
+          action="{{ save_as_new_url }}"
+          onsubmit="document.querySelector('#edit-body').value = document.querySelector('.code-block').textContent">
+      <input type="hidden" id="edit-body" name="body" value="{{ row.body | e }}" />
+      <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
+    </form>
+    {% if can_delete_version %}
+      <form method="post"
+            action="{{ delete_version_url }}"
+            onsubmit="return confirm('버전 {{ row.version }}을 삭제할까요?');">
+        <button type="submit" class="btn btn-danger">이 버전 삭제</button>
+      </form>
+    {% endif %}
+  </div>
+  <!-- Mermaid 모달 -->
+  <div id="mermaid-modal"
+       style="display:none;
+              position:fixed;
+              inset:0;
+              background:rgba(0,0,0,0.55);
+              z-index:1000;
+              align-items:center;
+              justify-content:center;
+              padding:2rem">
+    <div style="background:#fff;
+                border-radius:12px;
+                max-width:92vw;
+                max-height:92vh;
+                width:min(1100px,92vw);
+                display:flex;
+                flex-direction:column;
+                box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;
+                  align-items:center;
+                  justify-content:space-between;
+                  padding:0.9rem 1.25rem;
+                  border-bottom:1px solid #e5e7eb">
+        <strong style="font-size:1rem;">한눈에 보기 — {{ section_display }} v{{ row.version }}</strong>
+        <button type="button"
+                id="mermaid-modal-close"
+                style="background:none;
+                       border:0;
+                       font-size:1.4rem;
+                       cursor:pointer;
+                       line-height:1;
+                       color:#6b7280">✕</button>
+      </div>
+      <div id="mermaid-modal-body"
+           style="padding:1.25rem;
+                  overflow:auto;
+                  flex:1 1 auto;
+                  min-height:0">
+        <div class="mermaid"
+             id="mermaid-render-target"
+             style="display:flex;
+                    justify-content:center"></div>
+      </div>
+    </div>
+  </div>
+  <script>
 (function () {
   const body = {{ row.body | tojson }};
   const preview = document.getElementById('preview');
@@ -164,5 +187,5 @@ workflow-to-mermaid 스킬로 이 버전 시각화해줘</div>
     if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
   });
 })();
-</script>
+  </script>
 {% endblock %}

@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MCP 인증 — MCPER</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/admin/admin.css?v=3" />
-  <style>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCP 인증 — MCPER</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=3" />
+    <style>
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg, #f8f9fb); }
     .login-card {
       width: 100%;
@@ -52,36 +53,37 @@
     .success-msg .check { font-size: 3rem; margin-bottom: .5rem; }
     .success-msg h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .5rem; color: #059669; }
     .success-msg p { font-size: .85rem; color: #6b7280; margin: 0; }
-  </style>
-</head>
-<body>
-  <div class="login-card">
-    <div class="login-brand">
-      <h1>MCPER</h1>
-      <small>MCP Server Authentication</small>
-    </div>
-
-    <div class="mcp-info">
-      <strong>MCP 클라이언트</strong>가 인증을 요청했습니다.<br/>
-      로그인하면 MCP 도구 접근 토큰이 자동으로 발급됩니다.
-    </div>
-
-    {% if error %}
-    <div class="error-msg">{{ error }}</div>
-    {% endif %}
-
-    <form method="post" action="/auth/mcp-authorize">
-      <input type="hidden" name="request_id" value="{{ request_id }}" />
-      <div class="form-group">
-        <label for="username">아이디</label>
-        <input type="text" id="username" name="username" placeholder="admin" autofocus required />
+    </style>
+  </head>
+  <body>
+    <div class="login-card">
+      <div class="login-brand">
+        <h1>MCPER</h1>
+        <small>MCP Server Authentication</small>
       </div>
-      <div class="form-group">
-        <label for="password">비밀번호</label>
-        <input type="password" id="password" name="password" required />
+      <div class="mcp-info">
+        <strong>MCP 클라이언트</strong>가 인증을 요청했습니다.
+        <br />
+        로그인하면 MCP 도구 접근 토큰이 자동으로 발급됩니다.
       </div>
-      <button type="submit" class="btn-primary">인증 허용</button>
-    </form>
-  </div>
-</body>
+      {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+      <form method="post" action="/auth/mcp-authorize">
+        <input type="hidden" name="request_id" value="{{ request_id }}" />
+        <div class="form-group">
+          <label for="username">아이디</label>
+          <input type="text"
+                 id="username"
+                 name="username"
+                 placeholder="admin"
+                 autofocus
+                 required />
+        </div>
+        <div class="form-group">
+          <label for="password">비밀번호</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit" class="btn-primary">인증 허용</button>
+      </form>
+    </div>
+  </body>
 </html>

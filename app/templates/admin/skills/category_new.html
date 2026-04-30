@@ -1,45 +1,44 @@
 {% extends "admin/base.html" %}
-{% block head %}
-<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />
-{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin/markdown-split.css?v=3" />{% endblock %}
 {% block body %}
-<p class="muted" style="margin-top:0"><a href="{{ cancel_url }}">← 돌아가기</a></p>
-
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
-{% endif %}
-
-<form id="category-form" method="post" action="{{ form_action }}">
-  <div class="form-group" style="max-width:400px; margin-bottom:1.5rem">
-    <label class="form-label" for="section_name">
-      카테고리 이름
-      <small class="muted">(영문·숫자·_-, 기존 카테고리: {{ existing_sections | join(', ') }})</small>
-    </label>
-    <input type="text" id="section_name" name="section_name"
-           class="input" required autocomplete="off"
-           placeholder="예: architecture, db_rules, api_context" />
-  </div>
-
-  <div class="split-editor" style="margin-bottom:1.5rem">
-    <div class="split-editor__pane">
-      <label class="form-label">내용 (Markdown)</label>
-      <textarea id="body" name="body" class="input split-editor__source"
-                placeholder="이 카테고리 전용 스킬/시스템 이해를 입력하세요."
-                spellcheck="false"></textarea>
+  <p class="muted" style="margin-top:0">
+    <a href="{{ cancel_url }}">← 돌아가기</a>
+  </p>
+  {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+  <form id="category-form" method="post" action="{{ form_action }}">
+    <div class="form-group" style="max-width:400px; margin-bottom:1.5rem">
+      <label class="form-label" for="section_name">
+        카테고리 이름
+        <small class="muted">(영문·숫자·_-, 기존 카테고리: {{ existing_sections | join(", ") }})</small>
+      </label>
+      <input type="text"
+             id="section_name"
+             name="section_name"
+             class="input"
+             required
+             autocomplete="off"
+             placeholder="예: architecture, db_rules, api_context" />
     </div>
-    <div class="split-editor__pane split-editor__preview-pane">
-      <label class="form-label">미리보기</label>
-      <div id="preview" class="split-editor__preview markdown-body"></div>
+    <div class="split-editor" style="margin-bottom:1.5rem">
+      <div class="split-editor__pane">
+        <label class="form-label">내용 (Markdown)</label>
+        <textarea id="body"
+                  name="body"
+                  class="input split-editor__source"
+                  placeholder="이 카테고리 전용 스킬/시스템 이해를 입력하세요."
+                  spellcheck="false"></textarea>
+      </div>
+      <div class="split-editor__pane split-editor__preview-pane">
+        <label class="form-label">미리보기</label>
+        <div id="preview" class="split-editor__preview markdown-body"></div>
+      </div>
     </div>
-  </div>
-
-  <div class="page-actions">
-    <button type="submit" class="btn btn-primary">저장</button>
-    <a href="{{ cancel_url }}" class="btn btn-secondary">취소</a>
-  </div>
-</form>
-
-<script>
+    <div class="page-actions">
+      <button type="submit" class="btn btn-primary">저장</button>
+      <a href="{{ cancel_url }}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+  <script>
 (function () {
   const form = document.getElementById('category-form');
   const sectionInput = document.getElementById('section_name');
@@ -53,7 +52,6 @@
     }
   });
 })();
-</script>
-
-<script src="/static/admin/markdown-preview.js?v=3"></script>
+  </script>
+  <script src="/static/admin/markdown-preview.js?v=3"></script>
 {% endblock %}
