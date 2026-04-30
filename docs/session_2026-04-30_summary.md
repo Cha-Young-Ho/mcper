@@ -2,7 +2,7 @@
 
 **컨텍스트**: 2026-04-29 세션의 후속. 남겨둔 Phase 2(ruff), Q03/Q04, worktree 정리를 실행.
 
-## 이번 세션 추가 커밋 (origin/main 대비 56 커밋 ahead)
+## 이번 세션 추가 커밋 (origin/main 대비 60 커밋 ahead)
 
 ### 1차 — 자동화/리팩터링
 | 커밋 | 내용 | 규모 |
@@ -53,7 +53,22 @@
 | `0d414d0` | `test_search_hybrid.py` RRF 순수 함수 15 테스트 | 1 파일 신규 |
 | `43818fe` | `CHANGELOG.md` 신설 — 2세션 55 커밋 전수 정리 (Keep a Changelog) | 1 파일 신규 |
 
-**누적 단위 테스트**: **137 pass** (초기 75 + phase2 47 + RRF 15).
+### 7차 — 감사 범위 밖 품질 개선 + 도커 배포
+| 커밋 | 내용 | 규모 |
+|---|---|---|
+| `67e0367` | djlint 도입 (profile=jinja) + 80 템플릿 포맷 + T032 3건 수정 | 81 파일, +3913/-3105 |
+| `2c56585` | `test_worker_tasks.py` Celery 태스크 mock 기반 8 테스트 | 1 파일 신규 |
+| `079f50f` | `docs/DOCSTRING_STYLE.md` — Google 스타일 가이드 + MCP 예외 규정 | 1 파일 신규 |
+| 배포 | `docker compose build web worker` + `up -d --force-recreate` | — |
+
+**누적 단위 테스트**: **145 pass** (초기 75 → phase2 122 → RRF 137 → worker 145).
+
+**도커 재배포 검증 (컨테이너 내부)**:
+- PyJWT 2.11.0 (python-jose 교체 확인)
+- pdfminer.six 20260107 (CVE 4건 해소)
+- 51 MCP 도구 · 247 라우트 (MCP OAuth 활성화 시)
+- `rule_cache` P12, `admin_rules_service` Q04, `register_all_models` Q12 모두 정상
+- 헬스 5종 HTTP 200
 
 ## admin_rules 구조 변화
 
