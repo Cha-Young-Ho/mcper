@@ -116,6 +116,7 @@ def admin_celery_active_api(
         reserved_raw = inspector.reserved() or {}
 
         def _flatten(raw: dict) -> list[dict]:
+            """중첩 Celery inspect 결과를 단일 리스트로 평탄화."""
             out = []
             for worker, tasks in raw.items():
                 for t in tasks or []:

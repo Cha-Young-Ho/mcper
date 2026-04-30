@@ -52,6 +52,7 @@ def repo_rules_cards(
     if qn:
 
         def _repo_pattern_matches_query(pat: str) -> bool:
+            """레포 패턴 이름이 검색어 q 와 매칭되는지 확인."""
             pl = (pat or "").lower()
             if qn in pl:
                 return True
@@ -335,6 +336,7 @@ def repo_rule_category_board(
     n_ver = len(rows)
 
     def _can_del_ver(_v: int) -> bool:
+        """해당 버전을 삭제해도 되는지 판정."""
         if not (key or "").strip() and sn == vr.DEFAULT_SECTION:
             return n_ver > 1
         return n_ver >= 1

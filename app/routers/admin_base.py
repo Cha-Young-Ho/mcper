@@ -34,6 +34,7 @@ def _datefmt(value: object) -> str:
 
 
 def _make_jinja_env() -> jinja2.Environment:
+    """Jinja2 환경 생성 (공통 필터/글로벌 등 포함)."""
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(_TEMPLATES_DIR)),
         autoescape=jinja2.select_autoescape(["html", "xml"]),

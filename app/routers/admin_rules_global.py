@@ -140,6 +140,7 @@ def global_rule_category_board(
     can_delete_section = sn != vr.DEFAULT_SECTION
 
     def _can_del_ver(_v: int) -> bool:
+        """해당 버전을 삭제해도 되는지 판정."""
         if sn == vr.DEFAULT_SECTION:
             return n_ver > 1
         return n_ver >= 1

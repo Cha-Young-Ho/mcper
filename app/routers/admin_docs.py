@@ -24,6 +24,7 @@ router = APIRouter(prefix="/admin", tags=["admin-docs"])
 
 
 def _section_display(sn: str) -> str:
+    """섹션 표시명: DEFAULT_SECTION 이면 '기본', 아니면 원본."""
     return _section_display_base(sn, vw.DEFAULT_SECTION)
 
 
@@ -53,6 +54,7 @@ def global_docs_board(
     db: Session = Depends(get_db),
     domain: str = "",
 ) -> Response:
+    """글로벌 문서 오버뷰 (카테고리 카드 목록)."""
     domain_filter = domain.strip() or None
     section_rows = vw._global_doc_all_sections_latest(db, domain=domain_filter)
     sections = [
@@ -86,6 +88,7 @@ def global_doc_category_new_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """글로벌 문서 새 카테고리 생성 폼."""
     return templates.TemplateResponse(
         request,
         "admin/docs/category_new.html",
@@ -108,6 +111,7 @@ def global_doc_category_new_submit(
     section_name: str = Form(...),
     body: str = Form(...),
 ) -> Response:
+    """글로벌 문서 새 카테고리 첫 버전 생성."""
     sn = section_name.strip().lower()
     if not sn:
         return templates.TemplateResponse(
@@ -145,6 +149,7 @@ def global_doc_category_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """글로벌 문서 오버뷰 (카테고리 카드 목록)."""
     sn = section_name.strip()
     rows = db.scalars(
         select(GlobalDocVersion)
@@ -186,6 +191,7 @@ def global_doc_category_delete(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """글로벌 문서 카테고리 전체 삭제 (main 제외)."""
     sn = section_name.strip()
     if sn == vw.DEFAULT_SECTION:
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
@@ -201,6 +207,7 @@ def global_doc_category_publish_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """글로벌 문서 카테고리별 새 버전 publish 폼."""
     sn = section_name.strip()
     latest = vw._global_doc_latest(db, sn)
     return templates.TemplateResponse(
@@ -227,6 +234,7 @@ def global_doc_category_publish_submit(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ) -> Response:
+    """글로벌 문서 카테고리별 새 버전 publish."""
     sn = section_name.strip()
     nv = vw.publish_global_doc(db, body, sn)
     return RedirectResponse(
@@ -391,6 +399,7 @@ def new_app_doc_form(
     request: Request,
     _user: str = Depends(require_admin_user),
 ) -> Response:
+    """새 앱 문서 생성 폼."""
     return templates.TemplateResponse(
         request,
         "admin/docs/app_doc_new.html",
@@ -406,6 +415,7 @@ def new_app_doc_submit(
     app_name: str = Form(...),
     body: str = Form(...),
 ) -> Response:
+    """새 앱 문서 생성 처리."""
     key = app_name.strip().lower()
     if not key:
         return templates.TemplateResponse(
@@ -440,6 +450,7 @@ def app_doc_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """문서 앱의 섹션 오버뷰."""
     key = app_name.lower().strip()
     if not db.scalars(
         select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)
@@ -477,6 +488,7 @@ def app_doc_delete_stream(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """앱 전체 스트림 삭제."""
     key = app_name.lower().strip()
     if vw.delete_app_doc_stream(db, key) == 0:
         raise HTTPException(404, "삭제할 항목이 없습니다.")
@@ -558,6 +570,7 @@ def app_doc_category_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """문서 앱의 섹션 오버뷰."""
     key = app_name.lower().strip()
     sn = section_name.strip()
     rows = db.scalars(
@@ -876,6 +889,7 @@ def repo_doc_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """문서 레포 패턴 섹션 오버뷰."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     if not db.scalars(
         select(RepoDocVersion).where(RepoDocVersion.pattern == key).limit(1)
@@ -931,6 +945,7 @@ def repo_doc_category_new_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """레포 문서 새 카테고리 생성 폼."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     pat_url = vw.repo_doc_pat_href_segment(key)
     display = vw.repo_doc_pattern_card_display(key)
@@ -957,6 +972,7 @@ def repo_doc_category_new_submit(
     section_name: str = Form(...),
     body: str = Form(...),
 ) -> Response:
+    """레포 문서 새 카테고리 첫 버전 생성."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     pat_url = vw.repo_doc_pat_href_segment(key)
     sn = section_name.strip().lower()
@@ -998,6 +1014,7 @@ def repo_doc_category_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """문서 레포 패턴 섹션 오버뷰."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vw.repo_doc_pat_href_segment(key)
@@ -1045,6 +1062,7 @@ def repo_doc_category_delete(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """레포 문서 카테고리 전체 삭제 (main 제외)."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vw.repo_doc_pat_href_segment(key)
@@ -1063,6 +1081,7 @@ def repo_doc_category_publish_form(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """레포 문서 카테고리별 새 버전 publish 폼."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vw.repo_doc_pat_href_segment(key)
@@ -1092,6 +1111,7 @@ def repo_doc_category_publish_submit(
     db: Session = Depends(get_db),
     body: str = Form(...),
 ) -> Response:
+    """레포 문서 카테고리별 새 버전 publish."""
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vw.repo_doc_pat_href_segment(key)

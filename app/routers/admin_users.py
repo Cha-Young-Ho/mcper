@@ -28,6 +28,7 @@ def user_list(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """어드민 사용자 목록 조회."""
     users = db.scalars(select(User).order_by(User.id)).all()
     return templates.TemplateResponse(
         request,
@@ -44,6 +45,7 @@ def user_new_form(
     request: Request,
     _user: str = Depends(require_admin_user),
 ) -> Response:
+    """신규 사용자 생성 폼."""
     return templates.TemplateResponse(
         request,
         "admin/users/user_form.html",
@@ -67,6 +69,7 @@ def user_new_submit(
     password: str = Form(""),
     is_admin: str = Form(""),
 ) -> Response:
+    """신규 사용자 생성 처리."""
     key = username.strip()
     if not key:
         return _form_error(request, None, "사용자 이름은 필수입니다.")
@@ -98,6 +101,7 @@ def user_detail(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """사용자 상세 조회."""
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -134,6 +138,7 @@ def user_edit_submit(
     password: str = Form(""),
     is_admin: str = Form(""),
 ) -> Response:
+    """사용자 편집 처리."""
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -171,6 +176,7 @@ def user_delete(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> Response:
+    """사용자 삭제 처리."""
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
