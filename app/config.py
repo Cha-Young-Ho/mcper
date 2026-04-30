@@ -30,7 +30,7 @@ from app.config_merger import (
     expand_env_placeholders,
 )
 
-EmbeddingProvider = Literal["local", "openai", "localhost", "bedrock"]
+EmbeddingProvider = Literal["local", "openai", "localhost", "bedrock", "sidecar"]
 
 
 class AuthSettings(BaseModel):
