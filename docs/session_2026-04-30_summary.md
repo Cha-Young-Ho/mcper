@@ -2,7 +2,7 @@
 
 **컨텍스트**: 2026-04-29 세션의 후속. 남겨둔 Phase 2(ruff), Q03/Q04, worktree 정리를 실행.
 
-## 이번 세션 추가 커밋 (origin/main 대비 44 커밋 ahead)
+## 이번 세션 추가 커밋 (origin/main 대비 48 커밋 ahead)
 
 ### 1차 — 자동화/리팩터링
 | 커밋 | 내용 | 규모 |
@@ -30,7 +30,14 @@
 | `9354992` | Q13 vulture 데드코드 8건 제거 + 리포트 | 5 파일, +136/-24 |
 | `ba56f95` | config EmbeddingProvider Literal 에 `sidecar` 추가 (Q10 테스트 호환) | 1 파일 |
 
-**Skip 항목 (충돌 심함, 다음 세션 재작업)**: Q06 타입힌트 187개 · Q11 docstring 56건 — 각 worktree 브랜치 `worktree-agent-af0cce950105ba66c` / `worktree-agent-a1938aecad845ec45` 에 보존.
+### 4차 — 충돌 복구 + PyJWT 마이그레이션
+| 커밋 | 내용 | 규모 |
+|---|---|---|
+| `cdd7f5b` | python-jose → PyJWT 마이그레이션 (S08 §3.1 권고) | 5 파일, +18/-10 |
+| `32caeb0` | Q11 docstring 55+건 수동 재적용 (main 구조 기준) | 6 파일, +61 |
+| `0e482db` | Q06 라우터 핸들러 ~210개에 `-> Response` 타입힌트 (main 구조 기준 재작성) | 14 파일, +230/-228 |
+
+**worktree 정리**: 7개 agent worktree + 브랜치 모두 제거 완료.
 
 ## admin_rules 구조 변화
 
@@ -61,18 +68,20 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 
 ### 즉시 가능
 
-1. **`git push origin main`** — 44 커밋 ahead
+1. **`git push origin main`** — 48 커밋 ahead
 2. **서비스 계층 단위 테스트 추가** — `admin_rules_service.py` 함수별 스텁/SQLite 기반 테스트. 기존 `tests/unit/` 에 이어서.
 
-### 남은 P2 감사 항목 (2건 + 권고 1건)
+### 남은 P2 감사 항목
 
 | 그룹 | 항목 | 상태 |
 |---|---|---|
 | 성능 | P08 / P09 / P10 / P11 / P12 | ✅ 완료 |
-| 품질 | Q07 / Q08 / Q09 / Q10 / Q12 / Q13 / Q14 | ✅ 완료 |
-| 품질 | **Q06 타입힌트 187개** · **Q11 docstring 56건** | ⏸ worktree 보존, 다음 세션 수동 재적용 |
-| 보안 | S07 / S08 (CVE 4건 해소) / S09 | ✅ 완료 |
-| 보안 | **python-jose → PyJWT 마이그레이션** (docs/deps_audit_2026-04-30.md §3.1) | ⏸ 다음 세션 P1 후보 |
+| 품질 | Q06 (라우터 210개 / 서비스는 phase2) / Q07 / Q08 / Q09 / Q10 / Q11 (55+건 / 라우터는 phase2) / Q12 / Q13 / Q14 | ✅ 완료 |
+| 보안 | S07 / S08 / S09 · python-jose→PyJWT 마이그레이션 | ✅ 완료 |
+
+다음 세션 재작업 후보 (phase2):
+- Q06 서비스 레이어 (`versioned_*.py`) 타입힌트 — main 의 P06/P08/P12/Q07 변경 위에 재적용
+- Q11 라우터 파일 docstring — admin_rules 분할 후 구조에 맞게 재적용
 
 ### 스케일 후속 (필요 시)
 
