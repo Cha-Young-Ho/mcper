@@ -2,7 +2,7 @@
 
 **컨텍스트**: 2026-04-29 세션의 후속. 남겨둔 Phase 2(ruff), Q03/Q04, worktree 정리를 실행.
 
-## 이번 세션 추가 커밋 (origin/main 대비 52 커밋 ahead)
+## 이번 세션 추가 커밋 (origin/main 대비 56 커밋 ahead)
 
 ### 1차 — 자동화/리팩터링
 | 커밋 | 내용 | 규모 |
@@ -46,7 +46,14 @@
 | `b769bba` | Q11-phase2 — 라우터 핸들러 docstring 81개 대량 보강 | 11 파일, +81 |
 | `1ae39f1` | admin_rules_service 확장 21 + rule_cache 26 단위 테스트 (총 47 신규) | 2 파일, +453 |
 
-**누적 단위 테스트**: 122 pass (초기 75 + phase2 47).
+### 6차 — 테스트 확장 + 릴리스 문서
+| 커밋 | 내용 | 규모 |
+|---|---|---|
+| `911e76c` | pytest `asyncio_mode` 설정 제거 (경고 해소) | 1 파일 |
+| `0d414d0` | `test_search_hybrid.py` RRF 순수 함수 15 테스트 | 1 파일 신규 |
+| `43818fe` | `CHANGELOG.md` 신설 — 2세션 55 커밋 전수 정리 (Keep a Changelog) | 1 파일 신규 |
+
+**누적 단위 테스트**: **137 pass** (초기 75 + phase2 47 + RRF 15).
 
 ## admin_rules 구조 변화
 
@@ -77,7 +84,7 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 
 ### 즉시 가능
 
-1. **`git push origin main`** — 52 커밋 ahead
+1. **`git push origin main`** — 56 커밋 ahead
 2. **서비스 계층 단위 테스트 추가** — `admin_rules_service.py` 함수별 스텁/SQLite 기반 테스트. 기존 `tests/unit/` 에 이어서.
 
 ### 감사 항목 전체 완료 ✅
@@ -101,7 +108,7 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 ```bash
 cd /Users/wemadeplay/workspace/personal/mcper
 git status
-git log --oneline origin/main..HEAD | wc -l   # 52 이상이면 push 안 됨
+git log --oneline origin/main..HEAD | wc -l   # 56 이상이면 push 안 됨
 cat docs/session_2026-04-30_summary.md
 
 # 컨테이너/헬스
