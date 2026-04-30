@@ -37,14 +37,17 @@ def _slug(s: str) -> str:
 
 
 def _global_skill_save_path(section_name: str) -> str:
+    """Global 스킬 저장 경로(.cursor/skills/global/...)."""
     return f".cursor/skills/global/{_slug(section_name)}.md"
 
 
 def _app_skill_save_path(app_name: str, section_name: str) -> str:
+    """App 스킬 저장 경로(.cursor/skills/app/{app}/...)."""
     return f".cursor/skills/app/{_slug(app_name)}/{_slug(section_name)}.md"
 
 
 def _repo_skill_save_path(pattern: str, section_name: str) -> str:
+    """Repo 스킬 저장 경로(.cursor/skills/repo/{pattern}/...). 빈 패턴은 default."""
     pat_slug = _slug(pattern) if pattern else "default"
     return f".cursor/skills/repo/{pat_slug}/{_slug(section_name)}.md"
 
@@ -115,6 +118,7 @@ def _global_skill_latest(
 def next_global_skill_version(
     session: Session, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """해당 섹션의 다음 global 스킬 버전 번호 (max+1)."""
     cur = session.scalar(
         select(func.max(GlobalSkillVersion.version)).where(
             GlobalSkillVersion.section_name == section_name
@@ -160,6 +164,7 @@ def publish_global_skill(
     *,
     domain: str | None = None,
 ) -> int:
+    """섹션별 다음 버전 번호를 자동 할당해 global 스킬 추가. 반환: 새 version."""
     nv = next_global_skill_version(session, section_name)
     row = GlobalSkillVersion(
         section_name=section_name, version=nv, body=body, domain=domain
@@ -175,6 +180,7 @@ def publish_global_skill(
 def delete_global_skill_version(
     session: Session, section_name: str, version: int
 ) -> None:
+    """Global 스킬의 특정 섹션·버전 1건 삭제."""
     session.execute(
         delete(GlobalSkillVersion).where(
             GlobalSkillVersion.section_name == section_name,
@@ -185,6 +191,7 @@ def delete_global_skill_version(
 
 
 def delete_global_skill_section(session: Session, section_name: str) -> int:
+    """Global 스킬 섹션 전체(모든 버전) 삭제. 삭제된 행 수 반환."""
     res = session.execute(
         delete(GlobalSkillVersion).where(
             GlobalSkillVersion.section_name == section_name
@@ -204,6 +211,7 @@ def list_distinct_apps_with_skills(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[str]:
+    """AppSkill 스트림이 존재하는 고유 app_name 목록."""
     q = select(AppSkillVersion.app_name).distinct()
     df = _domain_filter(AppSkillVersion.domain, domain)
     if df is not None:
@@ -291,6 +299,7 @@ def _app_skill_latest(
 def next_app_skill_version(
     session: Session, app_name: str, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """(app_name, section) 스트림의 다음 app 스킬 버전 번호."""
     key = (app_name or "").lower().strip()
     cur = session.scalar(
         select(func.max(AppSkillVersion.version)).where(
@@ -309,6 +318,7 @@ def publish_app_skill(
     *,
     domain: str | None = None,
 ) -> tuple[str, str, int]:
+    """App 스킬에 다음 버전 자동 할당. 반환: (app_name, section_name, version)."""
     key = (app_name or "").lower().strip()
     nv = next_app_skill_version(session, key, section_name)
     row = AppSkillVersion(
@@ -331,6 +341,7 @@ def publish_app_skill(
 def delete_app_skill_version(
     session: Session, app_name: str, section_name: str, version: int
 ) -> None:
+    """앱 스킬의 특정 섹션·버전 1건 삭제."""
     key = (app_name or "").lower().strip()
     session.execute(
         delete(AppSkillVersion).where(
@@ -343,6 +354,7 @@ def delete_app_skill_version(
 
 
 def delete_app_skill_section(session: Session, app_name: str, section_name: str) -> int:
+    """앱 스킬의 특정 섹션(모든 버전) 삭제. 삭제된 행 수 반환."""
     key = (app_name or "").lower().strip()
     res = session.execute(
         delete(AppSkillVersion).where(
@@ -355,6 +367,7 @@ def delete_app_skill_section(session: Session, app_name: str, section_name: str)
 
 
 def delete_app_skill_stream(session: Session, app_name: str) -> int:
+    """해당 앱의 모든 스킬(모든 섹션·버전) 삭제. 삭제된 행 수 반환."""
     key = (app_name or "").lower().strip()
     res = session.execute(
         delete(AppSkillVersion).where(AppSkillVersion.app_name == key)
@@ -370,14 +383,17 @@ REPO_SKILL_PATTERN_URL_DEFAULT = "__default__"
 
 
 def repo_skill_pat_href_segment(pattern: str) -> str:
+    """Repo 스킬 어드민 URL용 세그먼트 (빈 패턴 → `__default__`)."""
     return REPO_SKILL_PATTERN_URL_DEFAULT if not (pattern or "").strip() else pattern
 
 
 def repo_skill_pattern_from_url_segment(segment: str) -> str:
+    """어드민 URL 세그먼트 → DB pattern (빈 패턴은 `__default__` 표기)."""
     return "" if segment == REPO_SKILL_PATTERN_URL_DEFAULT else segment
 
 
 def repo_skill_pattern_card_display(pattern: str) -> str:
+    """카드 UI 표기: 빈 패턴은 `(default)` 로 표시."""
     return "(default)" if not (pattern or "").strip() else pattern
 
 
@@ -388,6 +404,7 @@ def list_distinct_repo_patterns_with_skills(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[str]:
+    """RepoSkill 스트림이 존재하는 고유 pattern 목록. 빈 패턴(default)을 먼저 정렬."""
     q = select(RepoSkillVersion.pattern).distinct()
     df = _domain_filter(RepoSkillVersion.domain, domain)
     if df is not None:
@@ -475,6 +492,7 @@ def _repo_skill_latest(
 def next_repo_skill_version(
     session: Session, pattern: str, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """(pattern, section) 스트림의 다음 repo 스킬 버전 번호."""
     key = (pattern or "").strip()
     cur = session.scalar(
         select(func.max(RepoSkillVersion.version)).where(
@@ -494,6 +512,7 @@ def publish_repo_skill(
     *,
     domain: str | None = None,
 ) -> tuple[str, str, int]:
+    """Repo 스킬에 다음 버전 자동 할당. 반환: (pattern, section_name, version)."""
     key = (pattern or "").strip()
     nv = next_repo_skill_version(session, key, section_name)
     row = RepoSkillVersion(
@@ -515,6 +534,7 @@ def publish_repo_skill(
 def delete_repo_skill_version(
     session: Session, pattern: str, section_name: str, version: int
 ) -> None:
+    """Repo 스킬의 특정 섹션·버전 1건 삭제."""
     key = (pattern or "").strip()
     session.execute(
         delete(RepoSkillVersion).where(
@@ -527,6 +547,7 @@ def delete_repo_skill_version(
 
 
 def delete_repo_skill_section(session: Session, pattern: str, section_name: str) -> int:
+    """Repo 스킬의 특정 섹션(모든 버전) 삭제. 삭제된 행 수 반환."""
     key = (pattern or "").strip()
     res = session.execute(
         delete(RepoSkillVersion).where(
@@ -539,6 +560,7 @@ def delete_repo_skill_section(session: Session, pattern: str, section_name: str)
 
 
 def delete_repo_skill_stream(session: Session, pattern: str) -> int:
+    """해당 repo 패턴의 모든 스킬(모든 섹션·버전) 삭제. 삭제된 행 수 반환."""
     key = (pattern or "").strip()
     res = session.execute(
         delete(RepoSkillVersion).where(RepoSkillVersion.pattern == key)

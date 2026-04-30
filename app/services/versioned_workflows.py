@@ -34,19 +34,23 @@ DEFAULT_SECTION = "main"
 
 
 def _slug(s: str) -> str:
+    """패턴/이름을 파일시스템 안전 슬러그로 변환 (빈값 → "default")."""
     s = re.sub(r"[^\w\-.]", "_", s or "default")
     return s.strip("_") or "default"
 
 
 def _global_workflow_save_path(section_name: str) -> str:
+    """Global 워크플로우 저장 경로(.cursor/workflows/global/...)."""
     return f".cursor/workflows/global/{_slug(section_name)}.md"
 
 
 def _app_workflow_save_path(app_name: str, section_name: str) -> str:
+    """App 워크플로우 저장 경로(.cursor/workflows/app/{app}/...)."""
     return f".cursor/workflows/app/{_slug(app_name)}/{_slug(section_name)}.md"
 
 
 def _repo_workflow_save_path(pattern: str, section_name: str) -> str:
+    """Repo 워크플로우 저장 경로(.cursor/workflows/repo/{pattern}/...). 빈 패턴은 default."""
     pat_slug = _slug(pattern) if pattern else "default"
     return f".cursor/workflows/repo/{pat_slug}/{_slug(section_name)}.md"
 
@@ -55,6 +59,7 @@ def _repo_workflow_save_path(pattern: str, section_name: str) -> str:
 
 
 def _domain_filter(col, domain: str | None):
+    """domain 필터 조건 생성. development는 NULL도 포함."""
     if domain is None:
         return None
     if domain == "development":
@@ -151,6 +156,7 @@ def _global_workflow_latest(
 def next_global_workflow_version(
     session: Session, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """해당 섹션의 다음 global 워크플로우 버전 번호 (max+1)."""
     cur = session.scalar(
         select(func.max(GlobalWorkflowVersion.version)).where(
             GlobalWorkflowVersion.section_name == section_name
@@ -166,6 +172,7 @@ def publish_global_workflow(
     *,
     domain: str | None = None,
 ) -> int:
+    """섹션별 다음 버전을 자동 할당해 global 워크플로우 추가. 반환: 새 version."""
     nv = next_global_workflow_version(session, section_name)
     row = GlobalWorkflowVersion(
         section_name=section_name, version=nv, body=body, domain=domain
@@ -186,6 +193,7 @@ def publish_global_workflow(
 def delete_global_workflow_version(
     session: Session, section_name: str, version: int
 ) -> None:
+    """Global 워크플로우의 특정 섹션·버전 1건 삭제."""
     session.execute(
         delete(GlobalWorkflowVersion).where(
             GlobalWorkflowVersion.section_name == section_name,
@@ -196,6 +204,7 @@ def delete_global_workflow_version(
 
 
 def delete_global_workflow_section(session: Session, section_name: str) -> int:
+    """Global 워크플로우 섹션 전체(모든 버전) 삭제. 삭제된 행 수 반환."""
     res = session.execute(
         delete(GlobalWorkflowVersion).where(
             GlobalWorkflowVersion.section_name == section_name
@@ -215,6 +224,7 @@ def list_distinct_apps_with_workflows(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[str]:
+    """AppWorkflow 스트림이 존재하는 고유 app_name 목록."""
     q = select(AppWorkflowVersion.app_name).distinct()
     df = _domain_filter(AppWorkflowVersion.domain, domain)
     if df is not None:

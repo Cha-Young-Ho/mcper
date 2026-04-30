@@ -43,6 +43,7 @@ def get_global_rule_impl(
     repo_root: str | None,
     origin_url: str | None,
 ) -> str:
+    """`get_global_rule` MCP 툴의 실제 동작. 권한 체크 후 3계층 룰 마크다운 조립 반환."""
     record_mcp_tool_call("get_global_rule")
     trimmed = _normalize_app_name(app_name or "")
     v = normalize_read_version(version)

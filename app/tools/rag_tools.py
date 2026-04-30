@@ -25,6 +25,7 @@ from app.tools._common import error_json
 
 
 def _parse_json_list(raw: Any) -> list[Any]:
+    """list/JSON 문자열 입력을 list로 정규화. 파싱 실패·형식 불일치 시 빈 list."""
     if raw is None:
         return []
     if isinstance(raw, list):
@@ -47,6 +48,10 @@ def push_code_index_impl(
     nodes: list[dict[str, Any]] | str,
     edges: list[dict[str, Any]] | str,
 ) -> str:
+    """코드 인덱스(노드·엣지) 배치 페이로드를 Celery 큐에 적재.
+
+    반환: 성공 시 `{ok: true, ...}` / 브로커 미설정·실패 시 `{ok: false, error, action_required}`.
+    """
     record_mcp_tool_call("push_code_index")
     with SessionLocal() as _db:
         denied = check_write(_db)
@@ -82,6 +87,10 @@ def push_code_index_impl(
 
 
 def analyze_code_impact_impl(query: str, app_target: str) -> str:
+    """쿼리 매칭 코드 노드를 시드로 코드 그래프를 탐색해 영향범위 반환.
+
+    인덱스가 비어 있으면 `{ok: true, message, graph: null}`. 실패 시 에러 JSON.
+    """
     record_mcp_tool_call("analyze_code_impact")
     with SessionLocal() as db:
         try:
@@ -242,6 +251,8 @@ def find_historical_reference_impl(
 
 
 def register_rag_tools(mcp: FastMCP) -> None:
+    """FastMCP 인스턴스에 RAG·코드 그래프 도구들을 등록한다."""
+
     @mcp.tool()
     def push_spec_chunks_with_embeddings(spec_id: int, chunks_json: Any) -> str:
         """

@@ -239,6 +239,7 @@ def get_mcp_include_repo_default_for_pattern(
 def set_mcp_include_repo_default_for_pattern(
     session: Session, pattern: str, value: bool
 ) -> None:
+    """패턴별 repo `default`(빈 패턴) 병합 여부 저장. 행 없으면 생성."""
     key = pattern if pattern is not None else ""
     row = session.get(McpRepoPatternPullOption, key)
     if row is None:
@@ -277,6 +278,7 @@ def get_mcp_include_app_default_global(session: Session) -> bool:
 
 
 def set_mcp_include_app_default_global(session: Session, value: bool) -> None:
+    """전역 `include_app_default` 플래그 저장 (앱별 행 없을 때 폴백으로 사용)."""
     row = session.get(McpRuleReturnOptions, 1)
     if row is None:
         session.add(
@@ -308,6 +310,7 @@ def get_mcp_include_app_default_for_app(session: Session, app_name: str) -> bool
 def set_mcp_include_app_default_for_app(
     session: Session, app_name: str, value: bool
 ) -> None:
+    """특정 앱별 `__default__` 병합 여부 저장. `__default__` 자체는 금지(ValueError)."""
     key = (app_name or "").strip().lower()
     if not key or key == "__default__":
         raise ValueError("invalid app_name for pull option")
@@ -320,6 +323,7 @@ def set_mcp_include_app_default_for_app(
 
 
 def set_mcp_include_repo_default(session: Session, value: bool) -> None:
+    """전역 `include_repo_default` 플래그 저장 (레거시 — 행 없는 패턴 폴백에만 사용)."""
     row = session.get(McpRuleReturnOptions, 1)
     if row is None:
         session.add(
@@ -425,6 +429,7 @@ def _global_all_sections_latest(
 def _global_exact(
     session: Session, version: int, section_name: str = DEFAULT_SECTION
 ) -> GlobalRuleVersion | None:
+    """지정 섹션·버전의 global 룰 행 1건. 없으면 None."""
     return session.scalars(
         select(GlobalRuleVersion).where(
             GlobalRuleVersion.section_name == section_name,
@@ -517,6 +522,7 @@ def _app_all_sections_latest(session: Session, app_name: str) -> list[AppRuleVer
 def _app_exact(
     session: Session, app_name: str, version: int, section_name: str = DEFAULT_SECTION
 ) -> AppRuleVersion | None:
+    """지정 앱·섹션·버전의 룰 행. 없으면 `__default__` 앱 스트림으로 폴백."""
     key = app_name.lower().strip()
     row = session.scalars(
         select(AppRuleVersion).where(
@@ -576,6 +582,7 @@ def _app_latest_strict(
 def _app_exact_named_only(
     session: Session, app_name: str, version: int, section_name: str = DEFAULT_SECTION
 ) -> AppRuleVersion | None:
+    """지정 앱·섹션·버전의 행 1건만 (`__default__` 폴백 없음)."""
     key = app_name.lower().strip()
     return session.scalars(
         select(AppRuleVersion).where(
@@ -606,6 +613,7 @@ def resolve_app_row_named_only(
 def _repo_latest_for_pattern(
     session: Session, pattern: str, section_name: str = DEFAULT_SECTION
 ) -> RepoRuleVersion | None:
+    """지정 패턴·섹션의 최신 repo 룰 행. 없으면 None."""
     key = pattern.strip()
     max_v = (
         select(func.max(RepoRuleVersion.version))
@@ -704,6 +712,7 @@ def resolve_repo_row(
 
 
 def git_context_uncertain(ctx: GitContext) -> bool:
+    """서버가 Git 메타(origin URL / 현재 브랜치)를 확정하지 못한 상태인지 판별."""
     return (
         not (ctx.repo_url or "").strip()
         or ctx.repo_url == "Unknown"
@@ -1149,6 +1158,7 @@ def get_rule_version_snapshot(
 
 
 def next_global_version(session: Session, section_name: str = DEFAULT_SECTION) -> int:
+    """해당 섹션의 다음 global 룰 버전 번호 (max+1)."""
     m = session.scalar(
         select(func.coalesce(func.max(GlobalRuleVersion.version), 0)).where(
             GlobalRuleVersion.section_name == section_name
@@ -1160,6 +1170,7 @@ def next_global_version(session: Session, section_name: str = DEFAULT_SECTION) -
 def next_app_version(
     session: Session, app_name: str, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """(app_name, section) 스트림의 다음 버전 번호 (max+1)."""
     key = app_name.lower().strip()
     m = session.scalar(
         select(func.max(AppRuleVersion.version)).where(
@@ -1173,6 +1184,7 @@ def next_app_version(
 def next_repo_version(
     session: Session, pattern: str, section_name: str = DEFAULT_SECTION
 ) -> int:
+    """(pattern, section) 스트림의 다음 repo 룰 버전 번호 (max+1)."""
     key = pattern.strip()
     m = session.scalar(
         select(func.coalesce(func.max(RepoRuleVersion.version), 0)).where(
@@ -1194,6 +1206,7 @@ def _try_index_rule(
     domain: str | None = None,
     section_name: str = DEFAULT_SECTION,
 ) -> None:
+    """룰 본문을 임베딩·FTS로 인덱싱. 실패해도 publish 트랜잭션은 유지 (warning 로깅)."""
     try:
         svc = make_default_rule_service(session)
         svc.index_rule(
@@ -1542,6 +1555,7 @@ def list_distinct_apps(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[str]:
+    """AppRule 스트림이 존재하는 고유 app_name 목록 (정렬됨). domain 필터 선택."""
     q = select(AppRuleVersion.app_name).distinct()
     df = _domain_filter(AppRuleVersion.domain, domain)
     if df is not None:
@@ -1571,6 +1585,7 @@ def list_distinct_repo_patterns(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[str]:
+    """RepoRule 스트림이 존재하는 고유 pattern 목록. 빈 패턴(default)을 먼저 정렬."""
     q = select(RepoRuleVersion.pattern).distinct()
     df = _domain_filter(RepoRuleVersion.domain, domain)
     if df is not None:

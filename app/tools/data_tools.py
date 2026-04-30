@@ -7,6 +7,8 @@ from app.tools._common import error_payload
 
 
 def register_data_tools(mcp) -> None:
+    """FastMCP 인스턴스에 등록된 데이터 소스 조회 도구들을 등록한다."""
+
     @mcp.tool()
     def get_data(source: str, query: str = "", limit: int = 50) -> dict:
         """
