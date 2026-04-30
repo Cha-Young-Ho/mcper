@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -147,7 +148,7 @@ def _get_allowed_origins() -> list[str]:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     _validate_startup_config()
     configure_embedding_backend(settings.embedding)
@@ -264,27 +265,27 @@ if _MCP_ENABLED:
             "error_description": "OAuth is not configured on this server",
         }
 
-        def _oauth_disabled_response():
+        def _oauth_disabled_response() -> Response:
             return _JSON(status_code=404, content=_OAUTH_DISABLED_BODY)
 
         @app.post("/register")
         @app.get("/register")
-        def _oauth_register_disabled():
+        def _oauth_register_disabled() -> Response:
             return _oauth_disabled_response()
 
         @app.post("/token")
         @app.get("/token")
-        def _oauth_token_disabled():
+        def _oauth_token_disabled() -> Response:
             return _oauth_disabled_response()
 
         @app.post("/revoke")
         @app.get("/revoke")
-        def _oauth_revoke_disabled():
+        def _oauth_revoke_disabled() -> Response:
             return _oauth_disabled_response()
 
         @app.post("/authorize")
         @app.get("/authorize")
-        def _oauth_authorize_disabled():
+        def _oauth_authorize_disabled() -> Response:
             return _oauth_disabled_response()
 
     # ── MCP OAuth well-known + endpoint proxies at root ──────────────
@@ -303,7 +304,7 @@ if _MCP_ENABLED:
             return f"{_sch}://{_host}", _mount
 
         @app.get("/.well-known/oauth-protected-resource{path:path}")
-        def protected_resource_metadata(path: str = ""):
+        def protected_resource_metadata(path: str = "") -> Response:
             """RFC 9728 Protected Resource Metadata."""
             _base, _mount = _mcp_base_url()
             return {
@@ -314,7 +315,7 @@ if _MCP_ENABLED:
             }
 
         @app.get("/.well-known/oauth-authorization-server{path:path}")
-        def authorization_server_metadata(path: str = ""):
+        def authorization_server_metadata(path: str = "") -> Response:
             """RFC 8414 Authorization Server Metadata (proxy to MCP mount)."""
             _base, _mount = _mcp_base_url()
             from app.auth.mcp_oauth_provider import MCP_SCOPES
@@ -360,13 +361,13 @@ def _startup_done(request: _HealthReq) -> bool:
 
 
 @app.get("/health/live")
-async def health_live():
+async def health_live() -> Response:
     """Liveness probe — 프로세스 이벤트 루프 응답성만 확인."""
     return await _liveness_payload()
 
 
 @app.get("/health/ready")
-async def health_ready(request: _HealthReq):
+async def health_ready(request: _HealthReq) -> Response:
     """Readiness probe — DB + Redis + 임베딩 backend 준비 확인."""
     payload, status = await _readiness_payload(startup_done=_startup_done(request))
     if status != 200:
@@ -375,7 +376,7 @@ async def health_ready(request: _HealthReq):
 
 
 @app.get("/health/startup")
-async def health_startup(request: _HealthReq):
+async def health_startup(request: _HealthReq) -> Response:
     """Startup probe — lifespan 완료 여부. 완료 후 readiness 동일."""
     payload, status = await _startup_payload(_startup_done(request))
     if status != 200:
@@ -384,7 +385,7 @@ async def health_startup(request: _HealthReq):
 
 
 @app.get("/health")
-async def health(request: _HealthReq):
+async def health(request: _HealthReq) -> Response:
     """Deprecated: 기존 클라이언트 호환용. 신규는 /health/ready 사용.
 
     응답은 /health/ready 로직 복제 — 503 조건 동일.
@@ -396,7 +397,7 @@ async def health(request: _HealthReq):
 
 
 @app.get("/health/rag")
-def health_rag():
+def health_rag() -> Response:
     """RAG/Celery 부하 관측: DB + (가능하면) Redis 브로커·기본 큐 깊이."""
     if not check_db_connection():
         return JSONResponse(

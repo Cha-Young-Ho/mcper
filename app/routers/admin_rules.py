@@ -134,7 +134,7 @@ def new_app_wizard_submit(
     )
 
 
-def _wizard_error(request: Request, db: Session, error: str):
+def _wizard_error(request: Request, db: Session, error: str) -> Response:
     """마법사 폼 오류 재표시 헬퍼."""
     raw_patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db))
     repo_options = [

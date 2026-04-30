@@ -242,7 +242,7 @@ async def plan_bulk_upload_submit(
     app_target: str = Form(...),
     base_branch: str = Form("main"),
     files: list[UploadFile] = File(...),
-):
+) -> Response:
     """
     기획서 일괄 업로드.
 
@@ -384,7 +384,7 @@ async def bulk_register_urls(
     urls: list[str] = Body(...),
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin_user),
-):
+) -> Response:
     """Bulk register URLs as documents. Fetches text for each URL, saves as Spec, and enqueues indexing."""
     app_key = ""
     base_branch = "main"

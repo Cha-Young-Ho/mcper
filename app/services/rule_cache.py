@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def _cache_enabled() -> bool:
     return os.environ.get("MCPER_RULE_CACHE", "off").lower().strip() == "redis"
 
 
-def _client():
+def _client() -> Any:
     """Redis 클라이언트(없으면 None). 예외는 여기서 흡수해 호출 측을 단순화."""
     if not _cache_enabled():
         return None

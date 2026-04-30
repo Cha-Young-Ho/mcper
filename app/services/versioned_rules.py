@@ -392,7 +392,7 @@ def _global_latest(
     ).first()
 
 
-def _domain_filter(col, domain: str | None):
+def _domain_filter(col, domain: str | None) -> Any:
     """domain 필터 조건 생성. development는 NULL도 포함."""
     if domain is None:
         return None

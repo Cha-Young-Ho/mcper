@@ -528,7 +528,7 @@ def repo_rule_delete_one_version_legacy(
 
 
 @router.get("/repo-rules/pat/{pat_segment}/publish")
-def repo_rule_publish_form_legacy(pat_segment: str):
+def repo_rule_publish_form_legacy(pat_segment: str) -> Response:
     """backward-compat: /publish → main 카테고리 publish 폼."""
     return RedirectResponse(
         f"/admin/repo-rules/pat/{pat_segment}/s/{vr.DEFAULT_SECTION}/publish",
@@ -575,7 +575,7 @@ def repo_rule_save_as_new_legacy(
 
 
 @router.get("/repo-rules/pat/{pat_segment}/v/{version}")
-def repo_rule_version_view_legacy(pat_segment: str, version: int):
+def repo_rule_version_view_legacy(pat_segment: str, version: int) -> Response:
     """backward-compat: 섹션 없는 버전 조회 → main 카테고리로 리다이렉트."""
     return RedirectResponse(
         f"/admin/repo-rules/pat/{pat_segment}/s/{vr.DEFAULT_SECTION}/v/{version}",

@@ -286,7 +286,7 @@ def global_rule_category_version_delete(
 
 
 @router.get("/global-rules/v/{version}")
-def global_rule_view_legacy(version: int):
+def global_rule_view_legacy(version: int) -> Response:
     """backward-compat: 섹션 없는 버전 조회 → main 카테고리로 리다이렉트."""
     return RedirectResponse(
         f"/admin/global-rules/s/{vr.DEFAULT_SECTION}/v/{version}",

@@ -1,6 +1,9 @@
 """로컬 Sentence Transformers 백엔드."""
 
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 from app.config import EmbeddingSettings
 from .utils import norm_inputs
@@ -13,9 +16,9 @@ class LocalSentenceTransformerBackend:
 
     def __init__(self, cfg: EmbeddingSettings) -> None:
         self._cfg = cfg
-        self._model = None
+        self._model: Any = None
 
-    def _model_or_load(self):
+    def _model_or_load(self) -> Any:
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer

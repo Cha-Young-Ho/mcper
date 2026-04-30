@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
@@ -9,7 +11,7 @@ from app.db.rag_models import RuleChunk
 from app.spec.models import ChunkRecord
 
 
-def _eq_or_null(col, value):
+def _eq_or_null(col, value: Any) -> Any:
     """SQLAlchemy helper: `col IS NULL` when value is None, otherwise `col == value`."""
     return col.is_(None) if value is None else col == value
 

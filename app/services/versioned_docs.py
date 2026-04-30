@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -50,7 +51,7 @@ def _repo_doc_save_path(pattern: str, section_name: str) -> str:
 # ── Domain filter ─────────────────────────────────────────────────────────
 
 
-def _domain_filter(col, domain: str | None):
+def _domain_filter(col, domain: str | None) -> Any:
     if domain is None:
         return None
     if domain == "development":

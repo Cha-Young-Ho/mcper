@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -38,7 +38,7 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 
 @router.get("/google")
-def google_login(request: Request):
+def google_login(request: Request) -> Response:
     """Google OAuth 로그인 시작."""
     client_id = settings.auth.google_client_id
     if not client_id:
@@ -55,7 +55,7 @@ def google_login(request: Request):
 
 
 @router.get("/google/callback", name="google_callback")
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(code: str, db: Session = Depends(get_db)) -> Response:
     """
     Google OAuth 콜백.
     1. code → access_token (Google API)
@@ -127,7 +127,7 @@ GITHUB_USERINFO_URL = "https://api.github.com/user"
 
 
 @router.get("/github")
-def github_login(request: Request):
+def github_login(request: Request) -> Response:
     """GitHub OAuth 로그인 시작."""
     client_id = settings.auth.github_client_id
     if not client_id:
@@ -143,7 +143,7 @@ def github_login(request: Request):
 
 
 @router.get("/github/callback", name="github_callback")
-async def github_callback(code: str, db: Session = Depends(get_db)):
+async def github_callback(code: str, db: Session = Depends(get_db)) -> Response:
     """
     GitHub OAuth 콜백.
     """

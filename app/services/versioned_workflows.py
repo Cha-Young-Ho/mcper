@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
@@ -58,7 +59,7 @@ def _repo_workflow_save_path(pattern: str, section_name: str) -> str:
 # ── Domain filter ─────────────────────────────────────────────────────────
 
 
-def _domain_filter(col, domain: str | None):
+def _domain_filter(col, domain: str | None) -> Any:
     """domain 필터 조건 생성. development는 NULL도 포함."""
     if domain is None:
         return None

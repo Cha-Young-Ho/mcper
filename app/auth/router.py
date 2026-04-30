@@ -7,7 +7,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ def _safe_next(value: str | None) -> str:
 
 
 @router.get("/login")
-def login_page(request: Request, next: str = ""):
+def login_page(request: Request, next: str = "") -> Response:
     """로그인 폼 페이지. MCPER_AUTH_ENABLED=false면 /admin으로 리다이렉트."""
     if not _auth_enabled:
         return RedirectResponse("/admin")
@@ -71,7 +71,7 @@ def login_submit(
     password: str = Form(...),
     next: str = Form(""),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """ID/PW 폼 로그인 → JWT 쿠키 설정 → 리다이렉트."""
     if not _auth_enabled:
         return RedirectResponse("/admin", status_code=303)
@@ -133,7 +133,7 @@ def login_submit(
 
 
 @router.get("/logout")
-def logout():
+def logout() -> Response:
     response = RedirectResponse("/auth/login", status_code=303)
     response.delete_cookie("mcper_token")
     return response
@@ -143,7 +143,7 @@ def logout():
 def me(
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     user = db.scalar(select(User).where(User.username == username))
     if user is None:
         return {"username": username, "email": None, "is_admin": True}
@@ -158,7 +158,7 @@ def create_api_key(
     name: str = Form(...),
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """새 API 키 발급. 원본 키는 이 응답에서 한 번만 노출."""
     raw_key = secrets.token_urlsafe(32)
     key_hash = hash_api_key(raw_key)
@@ -178,7 +178,7 @@ def create_api_key(
 def list_api_keys(
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     user = db.scalar(select(User).where(User.username == username))
     if user is None:
         return []
@@ -199,7 +199,7 @@ def revoke_api_key(
     key_id: int,
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     user = db.scalar(select(User).where(User.username == username))
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -215,7 +215,7 @@ def revoke_api_key(
 async def change_password_forced_form(
     request: Request,
     user: User | None = Depends(get_current_user_optional),
-):
+) -> Response:
     """기본 패스워드 변경 강제 폼 (password_changed_at is NULL일 때만)."""
     if not _auth_enabled or user is None:
         return RedirectResponse(url="/auth/login", status_code=303)
@@ -240,7 +240,7 @@ async def change_password_forced_submit(
     request: Request,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user_optional),
-):
+) -> Response:
     """패스워드 변경 제출."""
     if not _auth_enabled or user is None:
         return RedirectResponse(url="/auth/login", status_code=303)
@@ -323,7 +323,7 @@ async def change_password_forced_submit(
 async def refresh_access_token(
     request: Request,
     db: Session = Depends(get_db),
-):
+) -> Response:
     """
     Refresh 토큰으로 새 Access 토큰 발급.
     Request: { "refresh_token": "..." }
@@ -370,7 +370,7 @@ async def refresh_access_token(
 async def validate_token(
     request: Request,
     user: User | None = Depends(get_current_user_optional),
-):
+) -> Response:
     """
     토큰 유효성 확인.
     Response: { "valid": true, "user_id": 1, "expires_at": "2026-03-31T12:00:00Z" }
@@ -408,7 +408,7 @@ async def validate_token(
 def mcp_authorize_page(
     request: Request,
     request_id: str = "",
-):
+) -> Response:
     """MCP OAuth 플로우: 브라우저에서 로그인 → auth code 발급 → 클라이언트로 리다이렉트."""
     if not _auth_enabled:
         return RedirectResponse("/admin", status_code=303)
@@ -433,7 +433,7 @@ def mcp_authorize_submit(
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """MCP OAuth 로그인 폼 제출 → 인증 성공 시 auth code로 클라이언트에 리다이렉트."""
     if not _auth_enabled:
         return RedirectResponse("/admin", status_code=303)

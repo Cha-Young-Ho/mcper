@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
@@ -66,7 +67,7 @@ def list_sections_for_global_skill(session: Session) -> list[str]:
     return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
-def _domain_filter(col, domain: str | None):
+def _domain_filter(col, domain: str | None) -> Any:
     """domain 필터 조건 생성. development는 NULL도 포함."""
     if domain is None:
         return None
