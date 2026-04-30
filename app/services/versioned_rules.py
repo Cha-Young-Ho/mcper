@@ -25,6 +25,12 @@ from app.db.rule_models import (
 )
 from app.rule.service import make_default_rule_service
 from app.services.git import GitContext, get_git_context
+from app.services.rule_cache import (
+    build_rule_cache_key,
+    get_cached_rule,
+    invalidate_rule,
+    set_cached_rule,
+)
 
 logger = __import__("logging").getLogger(__name__)
 
@@ -909,14 +915,38 @@ def get_rules_markdown(
     조회 전용 (멀티섹션 지원):
     - app_name 없음: global 모든 섹션 (repo_root / origin_url 무시).
     - app_name 있음: global 모든 섹션 + repository 모든 섹션 + 앱 모든 섹션.
+
+    P12 캐시: `MCPER_RULE_CACHE=redis` 일 때만 (app_name, origin_url, version)
+    조합의 마크다운을 Redis 에 5분 캐시. publish_global/app/repo 성공 시 관련
+    키가 invalidate 된다. `repo_root` 는 서버 Git context 에 쓰여 출력이 호출
+    환경에 의존하므로 키에서 제외 — `origin_url` 이 없는 앱 컨텍스트 요청은
+    호출 환경별로 결과가 달라질 수 있어 캐시 대상에서 **빠진다**.
     """
     trimmed = (app_name or "").strip()
     notices: list[str] = []
     meta_extra: list[str] = []
 
+    # app_name 없거나 origin_url 이 명시된 경우에만 캐시 대상 (호출 환경 비의존).
+    # 그 외 경로는 서버 로컬 `git remote -v` 결과에 응답이 달라져 캐시 불가.
+    agent_origin_for_key = normalize_agent_origin_url(origin_url) if trimmed else None
+    cache_eligible = (not trimmed) or agent_origin_for_key is not None
+    cache_key = (
+        build_rule_cache_key(
+            app_name=trimmed or None,
+            origin_url=agent_origin_for_key,
+            version=version,
+        )
+        if cache_eligible
+        else None
+    )
+    if cache_key is not None:
+        hit = get_cached_rule(cache_key)
+        if hit is not None:
+            return hit
+
     if not trimmed:
         global_rows = _global_all_sections_latest(session)
-        return build_markdown_response(
+        out = build_markdown_response(
             global_rows=global_rows,
             repo_rows=[],
             app_rows=[],
@@ -926,6 +956,9 @@ def get_rules_markdown(
             three_layer=False,
             uncertain_git=False,
         )
+        if cache_key is not None:
+            set_cached_rule(cache_key, out)
+        return out
 
     git_ctx = get_git_context(repo_root)
     agent_origin = normalize_agent_origin_url(origin_url)
@@ -997,7 +1030,7 @@ def get_rules_markdown(
             app_rows = _app_all_sections_latest(session, "__default__")
         app_default_rows = []
 
-    return build_markdown_response(
+    out = build_markdown_response(
         global_rows=global_rows,
         repo_rows=repo_rows,
         repo_default_rows=repo_default_rows,
@@ -1009,6 +1042,9 @@ def get_rules_markdown(
         three_layer=True,
         uncertain_git=uncertain,
     )
+    if cache_key is not None:
+        set_cached_rule(cache_key, out)
+    return out
 
 
 def get_rule_version_snapshot(
@@ -1198,6 +1234,8 @@ def publish_global(
     _try_index_rule(
         session, "global", row.id, body, domain=domain, section_name=section_name
     )
+    # P12: 글로벌 변경은 모든 응답에 포함되므로 전체 룰 캐시를 무효화.
+    invalidate_rule("*")
     return nv
 
 
@@ -1223,6 +1261,12 @@ def publish_app(
     _try_index_rule(
         session, "app", row.id, body, app_name=key, domain=domain, section_name=sn
     )
+    # P12: 해당 앱의 모든 캐시 키 무효화. __default__ 는 폴백으로 다른 앱에도
+    # 영향을 주므로 보수적으로 전체 무효화.
+    if key == "__default__":
+        invalidate_rule("*")
+    else:
+        invalidate_rule(f"{key}:*")
     return key, sn, nv
 
 
@@ -1300,6 +1344,9 @@ def publish_repo(
     _try_index_rule(
         session, "repo", row.id, body, pattern=key, domain=domain, section_name=sn
     )
+    # P12: repo 변경은 URL 패턴 매칭에 영향을 주므로 어떤 origin_url 이 매칭될지
+    # 사전 판단이 비싸다. 보수적으로 전체 룰 캐시 무효화.
+    invalidate_rule("*")
     return key, sn, nv
 
 
