@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,7 @@ def global_rules_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     domain: str = "",
-):
+) -> Response:
     """글로벌 규칙 카테고리 오버뷰."""
     domain_filter = domain.strip() or None
     section_rows = svc.list_global_section_previews(db, domain=domain_filter)
@@ -57,7 +57,7 @@ def global_rules_board(
 def global_mcp_app_default_toggle(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱별 옵션 행이 없을 때 쓰는 전역 기본: rule pull 시 __default__ 앱 스트림 포함."""
     cur = vr.get_mcp_include_app_default_global(db)
     vr.set_mcp_include_app_default_global(db, not cur)
@@ -69,7 +69,7 @@ def global_category_new_form(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 새 카테고리 생성 폼."""
     existing_sections = vr.list_sections_for_global(db)
     return templates.TemplateResponse(
@@ -91,7 +91,7 @@ def global_category_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     """글로벌 룰 새 카테고리 첫 버전 생성."""
     sn = section_name.strip().lower()
     if not sn:
@@ -129,7 +129,7 @@ def global_rule_category_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 특정 카테고리의 버전 보드."""
     sn = section_name.strip()
     rows = svc.list_global_category_versions(db, sn)
@@ -164,7 +164,7 @@ def global_rule_category_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 카테고리 전체 삭제 (main 제외)."""
     sn = section_name.strip()
     if sn == vr.DEFAULT_SECTION:
@@ -180,7 +180,7 @@ def global_rule_category_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 카테고리별 새 버전 publish 폼."""
     sn = section_name.strip()
     latest = vr._global_latest(db, sn)
@@ -205,7 +205,7 @@ def global_rule_category_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """글로벌 룰 카테고리별 새 버전 publish."""
     sn = section_name.strip()
     nv = vr.publish_global(db, body, sn)
@@ -221,7 +221,7 @@ def global_rule_category_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """버전 보기에서 수정한 내용을 카테고리 새 버전으로 저장."""
     sn = section_name.strip()
     nv = vr.publish_global(db, body, sn)
@@ -238,7 +238,7 @@ def global_rule_category_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 카테고리 특정 버전 조회."""
     sn = section_name.strip()
     row, n = svc.get_global_category_version(db, sn, version)
@@ -265,7 +265,7 @@ def global_rule_category_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """글로벌 룰 카테고리 특정 버전 삭제."""
     sn = section_name.strip()
     n = svc.count_global_category(db, sn)
@@ -299,7 +299,7 @@ def global_rule_delete_version_legacy(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """backward-compat: main 카테고리 버전 삭제."""
     return global_rule_category_version_delete(vr.DEFAULT_SECTION, version, _user, db)
 
@@ -309,7 +309,7 @@ def global_rule_publish_legacy(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """backward-compat: main 카테고리로 publish."""
     nv = vr.publish_global(db, body, vr.DEFAULT_SECTION)
     return RedirectResponse(
@@ -323,7 +323,7 @@ def global_rule_save_as_new_legacy(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """backward-compat: main 카테고리로 save-as-new."""
     nv = vr.publish_global(db, body, vr.DEFAULT_SECTION)
     return RedirectResponse(

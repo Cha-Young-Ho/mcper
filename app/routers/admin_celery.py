@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,7 @@ def admin_celery_dashboard(
     page: int = 1,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """Celery monitoring dashboard."""
     per_page = 20
     offset = (page - 1) * per_page
@@ -79,7 +79,7 @@ def admin_celery_retry(
     task_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """Retry a failed task."""
     result = CeleryMonitoring.retry_failed_task(db, task_id)
     if not result["ok"]:
@@ -92,7 +92,7 @@ def admin_celery_resolve(
     task_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """Mark a failed task as resolved."""
     ok = CeleryMonitoring.mark_task_resolved(db, task_id)
     if not ok:
@@ -103,7 +103,7 @@ def admin_celery_resolve(
 @router.get("/celery/active")
 def admin_celery_active_api(
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """
     Celery worker 실행 중/대기 중 태스크 조회 (Inspect API).
     timeout=1.5s 로 worker 응답 대기 — worker 없으면 빈 결과 반환.
@@ -145,7 +145,7 @@ def admin_celery_active_api(
 def admin_celery_stats_api(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """JSON API for polling task stats."""
     task_stats = CeleryMonitoring.get_task_stats(db)
     stats_list = (

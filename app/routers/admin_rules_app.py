@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,7 @@ def app_rules_cards(
     domain: str = "",
     limit: int = 50,
     offset: int = 0,
-):
+) -> Response:
     """앱 규칙 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
     # 전체 목록 가져오고 in-Python으로 q 필터 후 limit/offset 적용.
@@ -99,7 +99,7 @@ def app_rules_cards(
 def new_app_form(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """새 앱 규칙 생성 폼."""
     return templates.TemplateResponse(
         request,
@@ -119,7 +119,7 @@ def new_app_submit(
     db: Session = Depends(get_db),
     app_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     """새 앱 규칙 생성 처리."""
     key = app_name.strip().lower()
     if not key:
@@ -157,7 +157,7 @@ def app_rule_board(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱 규칙 섹션 오버뷰 (섹션 카드 목록)."""
     key = app_name.lower().strip()
     if not svc.app_exists(db, key):
@@ -207,7 +207,7 @@ def app_rule_pull_default_toggle(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     return_to: str = Form(""),
-):
+) -> Response:
     """이 앱으로 `get_global_rule` 호출 시 `__default__` 앱 스트림을 함께 내려줄지 (앱별)."""
     key = app_name.lower().strip()
     if key == "__default__":
@@ -232,7 +232,7 @@ def app_rule_delete_stream(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """해당 app_name 의 모든 app_rule_versions 행 삭제 (`__default__` 제외)."""
     key = app_name.lower().strip()
     if key == "__default__":
@@ -249,7 +249,7 @@ def app_rule_delete_stream(
 def app_rule_delete_one_version_legacy(
     app_name: str,
     version: int,
-):
+) -> Response:
     """backward-compat: 섹션 없는 버전 삭제 → main 섹션으로 리다이렉트."""
     key = app_name.lower().strip()
     return RedirectResponse(
@@ -261,7 +261,7 @@ def app_rule_delete_one_version_legacy(
 @router.get("/app-rules/app/{app_name}/publish")
 def app_rule_publish_form_legacy(
     app_name: str,
-):
+) -> Response:
     """backward-compat: /publish → main 섹션 publish 폼으로 리다이렉트."""
     key = app_name.lower().strip()
     return RedirectResponse(
@@ -276,7 +276,7 @@ def app_rule_publish_submit_legacy(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """backward-compat: main 섹션으로 publish."""
     key = app_name.lower().strip()
     _, _sn, nv = vr.publish_app(db, key, body, vr.DEFAULT_SECTION)
@@ -292,7 +292,7 @@ def app_rule_save_as_new_legacy(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """backward-compat: main 섹션으로 save-as-new."""
     key = app_name.lower().strip()
     _, _sn, nv = vr.publish_app(db, key, body, vr.DEFAULT_SECTION)
@@ -306,7 +306,7 @@ def app_rule_save_as_new_legacy(
 def app_rule_version_view_legacy(
     app_name: str,
     version: int,
-):
+) -> Response:
     """backward-compat: 섹션 없는 버전 조회 → main 섹션으로 리다이렉트."""
     key = app_name.lower().strip()
     return RedirectResponse(
@@ -324,7 +324,7 @@ def app_section_new_form(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """새 섹션 생성 폼."""
     key = app_name.lower().strip()
     if not svc.app_exists(db, key):
@@ -353,7 +353,7 @@ def app_section_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     """새 카테고리 첫 버전 생성."""
     key = app_name.lower().strip()
     sn = section_name.strip().lower()
@@ -396,7 +396,7 @@ def app_rule_section_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱 규칙 특정 섹션의 버전 보드."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -438,7 +438,7 @@ def app_rule_section_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """섹션 전체 삭제 (main 섹션 제외)."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -459,7 +459,7 @@ def app_rule_section_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """섹션별 새 버전 publish 폼."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -488,7 +488,7 @@ def app_rule_section_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """섹션별 새 버전 publish."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -506,7 +506,7 @@ def app_rule_section_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """버전 보기에서 수정한 내용을 섹션 새 버전으로 저장."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -525,7 +525,7 @@ def app_rule_section_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱 규칙 섹션 특정 버전 조회."""
     key = app_name.lower().strip()
     sn = section_name.strip()
@@ -558,7 +558,7 @@ def app_rule_section_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱 규칙 섹션 특정 버전 삭제."""
     key = app_name.lower().strip()
     sn = section_name.strip()

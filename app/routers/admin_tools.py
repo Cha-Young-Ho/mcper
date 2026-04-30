@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
@@ -17,7 +17,7 @@ def admin_tools(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """MCP 도구 목록 + 호출 통계."""
     tool_stats, mcp_calls_total = get_tool_stats(db)
     return templates.TemplateResponse(

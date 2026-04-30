@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,7 @@ def repo_pattern_include_repo_default_toggle(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """패턴(카드)마다 repository default 스트림 병합 여부."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not svc.repo_pattern_exists(db, key):
@@ -42,7 +42,7 @@ def repo_rules_cards(
     domain: str = "",
     limit: int = 50,
     offset: int = 0,
-):
+) -> Response:
     """레포 규칙 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
     all_patterns = _sort_repo_patterns(
@@ -125,7 +125,7 @@ def repo_rules_cards(
 def new_repo_pattern_form(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """새 레포 패턴 규칙 생성 폼."""
     return templates.TemplateResponse(
         request,
@@ -146,7 +146,7 @@ def new_repo_pattern_submit(
     pattern: str = Form(...),
     sort_order: int = Form(100),
     body: str = Form(...),
-):
+) -> Response:
     """새 레포 패턴 규칙 생성 처리."""
     key = pattern.strip()
     if key == vr.REPO_PATTERN_URL_DEFAULT:
@@ -182,7 +182,7 @@ def repo_rule_board(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 규칙 카테고리 오버뷰."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not svc.repo_pattern_exists(db, key):
@@ -223,7 +223,7 @@ def repo_rule_delete_pattern_stream(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 규칙 패턴 전체 삭제."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not (key or "").strip():
@@ -245,7 +245,7 @@ def repo_category_new_form(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 새 카테고리 생성 폼."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     if not svc.repo_pattern_exists(db, key):
@@ -276,7 +276,7 @@ def repo_category_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     """레포 룰 새 카테고리 첫 버전 생성."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     pat_url = vr.repo_pat_href_segment(key)
@@ -321,7 +321,7 @@ def repo_rule_category_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 특정 카테고리의 버전 보드."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -364,7 +364,7 @@ def repo_rule_category_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 카테고리 전체 삭제 (main 제외)."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -383,7 +383,7 @@ def repo_rule_category_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 카테고리별 새 버전 publish 폼."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -415,7 +415,7 @@ def repo_rule_category_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """레포 룰 카테고리별 새 버전 publish."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -434,7 +434,7 @@ def repo_rule_category_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     """버전 보기에서 수정한 내용을 카테고리 새 버전으로 저장."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -454,7 +454,7 @@ def repo_rule_category_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 카테고리 특정 버전 조회."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -490,7 +490,7 @@ def repo_rule_category_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """레포 룰 카테고리 특정 버전 삭제."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
@@ -518,7 +518,7 @@ def repo_rule_category_version_delete(
 def repo_rule_delete_one_version_legacy(
     pat_segment: str,
     version: int,
-):
+) -> Response:
     """backward-compat: 섹션 없는 버전 삭제 → main 카테고리로."""
     pat_url = pat_segment
     return RedirectResponse(
@@ -543,7 +543,7 @@ def repo_rule_publish_submit_legacy(
     db: Session = Depends(get_db),
     body: str = Form(...),
     section_name: str = Form(vr.DEFAULT_SECTION),
-):
+) -> Response:
     """backward-compat: main 카테고리로 publish."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = (section_name or vr.DEFAULT_SECTION).strip()
@@ -562,7 +562,7 @@ def repo_rule_save_as_new_legacy(
     db: Session = Depends(get_db),
     body: str = Form(...),
     section_name: str = Form(vr.DEFAULT_SECTION),
-):
+) -> Response:
     """backward-compat: main 카테고리로 save-as-new."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = (section_name or vr.DEFAULT_SECTION).strip()

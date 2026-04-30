@@ -6,7 +6,7 @@ import secrets
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 import jinja2
 from fastapi.templating import Jinja2Templates
@@ -125,7 +125,7 @@ def get_tool_stats(db: Session) -> tuple[list[dict], int]:
 def csrf_token_endpoint(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """CSRF 토큰 반환. JS에서 POST/PUT/DELETE 전 호출."""
     token = request.cookies.get("csrf_token", "")
     return JSONResponse({"csrf_token": token})
@@ -138,7 +138,7 @@ def csrf_token_endpoint(
 def seed_confirm(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """시드 데이터 초기화 확인 페이지."""
     return templates.TemplateResponse(
         request,
@@ -152,7 +152,7 @@ def seed_force_run(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     confirm: str = Form(""),
-):
+) -> Response:
     """시드 데이터 강제 초기화."""
     if confirm != "yes":
         raise HTTPException(400, 'Type "yes" in confirm field')
@@ -175,7 +175,7 @@ def api_keys_page(
     request: Request,
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """API 키 관리 페이지."""
     user = db.scalar(select(User).where(User.username == username))
     keys = (
@@ -204,7 +204,7 @@ def api_keys_create(
     name: str = Form(...),
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """새 API 키 발급 → 키 표시와 함께 페이지 다시 렌더링."""
     user = db.scalar(select(User).where(User.username == username))
     if user is None:
@@ -233,7 +233,7 @@ def api_keys_revoke(
     key_id: int,
     username: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """API 키 삭제."""
     user = db.scalar(select(User).where(User.username == username))
     if user is None:

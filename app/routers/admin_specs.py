@@ -13,6 +13,7 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
 )
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -47,7 +48,7 @@ def plans_app_index(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서 앱 카드 목록."""
     return templates.TemplateResponse(
         request,
@@ -68,7 +69,7 @@ def plans_list_for_app(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱별 기획서 목록."""
     key = app_name.strip()
     rows = db.scalars(
@@ -95,7 +96,7 @@ def plan_detail(
     spec_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서 상세 조회."""
     row = db.get(Spec, spec_id)
     if row is None:
@@ -121,7 +122,7 @@ def plan_edit_form(
     spec_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서 편집 폼."""
     row = db.get(Spec, spec_id)
     if row is None:
@@ -151,7 +152,7 @@ def plan_edit_submit(
     base_branch: str = Form(...),
     content: str = Form(...),
     related_files_text: str = Form(""),
-):
+) -> Response:
     """기획서 편집 처리."""
     row = db.get(Spec, spec_id)
     if row is None:
@@ -175,7 +176,7 @@ def plan_delete_confirm(
     spec_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서 삭제 확인 페이지."""
     row = db.get(Spec, spec_id)
     if row is None:
@@ -199,7 +200,7 @@ def plan_delete(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     confirm: str = Form(""),
-):
+) -> Response:
     """기획서 삭제 처리."""
     if confirm.strip().upper() != "DELETE":
         raise HTTPException(400, "확인 입력란에 대문자 DELETE 를 입력하세요.")
@@ -217,7 +218,7 @@ def plan_bulk_upload_form(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서 일괄 업로드 폼."""
     apps = sorted(
         {row for (row,) in db.execute(select(Spec.app_target).distinct()).all()}
@@ -310,7 +311,7 @@ def plan_code_app_index(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서–코드 앱 카드 목록."""
     return templates.TemplateResponse(
         request,
@@ -331,7 +332,7 @@ def plan_code_list_for_app(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱별 기획서–코드 목록."""
     key = app_name.strip()
     rows = db.scalars(
@@ -357,7 +358,7 @@ def plan_code_detail(
     spec_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """기획서–코드 상세 조회."""
     row = db.get(Spec, spec_id)
     if row is None:

@@ -50,7 +50,7 @@ class ContentRestrictionCreate(BaseModel):
 def list_domains(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     rows = db.scalars(select(Domain).order_by(Domain.id)).all()
     return {
         "domains": [
@@ -75,7 +75,7 @@ def get_user_permissions(
     user_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     rows = db.scalars(
         select(UserPermission)
         .where(UserPermission.user_id == user_id)
@@ -102,7 +102,7 @@ def create_user_permission(
     body: PermissionCreate,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     if body.role not in ("admin", "editor", "viewer"):
         raise HTTPException(400, f"Invalid role: {body.role}")
     perm = UserPermission(
@@ -135,7 +135,7 @@ def delete_user_permission(
     perm_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     perm = db.get(UserPermission, perm_id)
     if perm is None or perm.user_id != user_id:
         raise HTTPException(404, "Permission not found")
@@ -153,7 +153,7 @@ def delete_user_permission(
 def list_content_restrictions(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     rows = db.scalars(select(ContentRestriction).order_by(ContentRestriction.id)).all()
     return {
         "restrictions": [
@@ -175,7 +175,7 @@ def create_content_restriction(
     body: ContentRestrictionCreate,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     if body.restricted_role not in ("viewer", "editor"):
         raise HTTPException(400, f"Invalid restricted_role: {body.restricted_role}")
     cr = ContentRestriction(
@@ -205,7 +205,7 @@ def delete_content_restriction(
     restriction_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> dict:
     cr = db.get(ContentRestriction, restriction_id)
     if cr is None:
         raise HTTPException(404, "Content restriction not found")

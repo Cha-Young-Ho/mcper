@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -27,7 +27,7 @@ def user_list(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     users = db.scalars(select(User).order_by(User.id)).all()
     return templates.TemplateResponse(
         request,
@@ -43,7 +43,7 @@ def user_list(
 def user_new_form(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     return templates.TemplateResponse(
         request,
         "admin/users/user_form.html",
@@ -66,7 +66,7 @@ def user_new_submit(
     email: str = Form(""),
     password: str = Form(""),
     is_admin: str = Form(""),
-):
+) -> Response:
     key = username.strip()
     if not key:
         return _form_error(request, None, "사용자 이름은 필수입니다.")
@@ -97,7 +97,7 @@ def user_detail(
     user_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -133,7 +133,7 @@ def user_edit_submit(
     email: str = Form(""),
     password: str = Form(""),
     is_admin: str = Form(""),
-):
+) -> Response:
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -153,7 +153,7 @@ def user_toggle_active(
     user_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -170,7 +170,7 @@ def user_delete(
     user_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -190,7 +190,7 @@ def permission_add(
     domain_slug: str = Form(""),
     app_name: str = Form(""),
     role: str = Form("viewer"),
-):
+) -> Response:
     u = db.get(User, user_id)
     if u is None:
         raise HTTPException(404, "유저를 찾을 수 없습니다.")
@@ -222,7 +222,7 @@ def permission_delete(
     perm_id: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     db.execute(
         delete(UserPermission).where(
             UserPermission.id == perm_id, UserPermission.user_id == user_id
@@ -235,7 +235,7 @@ def permission_delete(
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
 
-def _form_error(request: Request, user_obj, error: str):
+def _form_error(request: Request, user_obj, error: str) -> Response:
     return templates.TemplateResponse(
         request,
         "admin/users/user_form.html",

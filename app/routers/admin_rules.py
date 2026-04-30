@@ -24,6 +24,7 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -47,7 +48,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 def rules_dev_hub(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """개발 도메인 행동 지침 허브 (Global / Repository / App 선택)."""
     return templates.TemplateResponse(
         request,
@@ -64,7 +65,7 @@ def new_app_wizard_form(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     """앱 + 레포 한 번에 추가하는 마법사 폼."""
     raw_patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db))
     repo_options = [
@@ -96,7 +97,7 @@ def new_app_wizard_submit(
     repo_new_pattern: str = Form(""),
     app_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     """앱 추가 마법사 처리.
 
     - app_name 이미 존재 → 409 JSON (프론트에서 alert 표시)
@@ -162,7 +163,7 @@ def rule_diff(
     v2: int,
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin_user),
-):
+) -> Response:
     """
     Return unified diff between two versions of a global rule.
     rule_id is accepted for API consistency but global rules use a single stream.
@@ -199,7 +200,7 @@ def rule_rollback(
     target_version: int = Body(..., embed=True),
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin_user),
-):
+) -> Response:
     """
     Roll back a global rule to a specific version by creating a new version
     with the content of the target version (append-only principle).
@@ -217,7 +218,7 @@ def rule_rollback(
 def export_rules(
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin_user),
-):
+) -> Response:
     """Export all rules (global + app + repo latest versions) as JSON."""
     data = vr.export_rules_json(db)
     return JSONResponse(
@@ -231,7 +232,7 @@ async def import_rules(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin_user),
-):
+) -> Response:
     """
     Import rules from a JSON export file.
     Expects the same structure produced by GET /admin/rules/export.

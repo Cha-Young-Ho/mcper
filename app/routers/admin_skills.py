@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -34,7 +34,7 @@ def _section_display(sn: str) -> str:
 def skills_dev_hub(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     """개발 도메인 스킬 허브 (Global / Repository / App 선택)."""
     return templates.TemplateResponse(
         request,
@@ -52,7 +52,7 @@ def global_skills_board(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     domain: str = "",
-):
+) -> Response:
     domain_filter = domain.strip() or None
     section_rows = vs._global_skill_all_sections_latest(db, domain=domain_filter)
     sections = [
@@ -85,7 +85,7 @@ def global_skill_category_new_form(
     request: Request,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     return templates.TemplateResponse(
         request,
         "admin/skills/category_new.html",
@@ -107,7 +107,7 @@ def global_skill_category_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     sn = section_name.strip().lower()
     if not sn:
         return templates.TemplateResponse(
@@ -144,7 +144,7 @@ def global_skill_category_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     sn = section_name.strip()
     rows = db.scalars(
         select(GlobalSkillVersion)
@@ -185,7 +185,7 @@ def global_skill_category_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     sn = section_name.strip()
     if sn == vs.DEFAULT_SECTION:
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
@@ -200,7 +200,7 @@ def global_skill_category_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     sn = section_name.strip()
     latest = vs._global_skill_latest(db, sn)
     return templates.TemplateResponse(
@@ -226,7 +226,7 @@ def global_skill_category_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     sn = section_name.strip()
     nv = vs.publish_global_skill(db, body, sn)
     return RedirectResponse(
@@ -240,7 +240,7 @@ def global_skill_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     sn = section_name.strip()
     nv = vs.publish_global_skill(db, body, sn)
     return RedirectResponse(
@@ -255,7 +255,7 @@ def global_skill_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     sn = section_name.strip()
     row = db.scalars(
         select(GlobalSkillVersion).where(
@@ -295,7 +295,7 @@ def global_skill_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     sn = section_name.strip()
     n = int(
         db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn))
@@ -327,7 +327,7 @@ def app_skills_cards(
     domain: str = "",
     limit: int = 50,
     offset: int = 0,
-):
+) -> Response:
     """앱 스킬 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
     all_names = _sort_app_names(
@@ -393,7 +393,7 @@ def app_skills_cards(
 def new_app_skill_form(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     return templates.TemplateResponse(
         request,
         "admin/skills/app_skill_new.html",
@@ -408,7 +408,7 @@ def new_app_skill_submit(
     db: Session = Depends(get_db),
     app_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     key = app_name.strip().lower()
     if not key:
         return templates.TemplateResponse(
@@ -442,7 +442,7 @@ def app_skill_board(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     if not db.scalars(
         select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)
@@ -479,7 +479,7 @@ def app_skill_delete_stream(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     if vs.delete_app_skill_stream(db, key) == 0:
         raise HTTPException(404, "삭제할 항목이 없습니다.")
@@ -492,7 +492,7 @@ def app_skill_category_new_form(
     app_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     if not db.scalars(
         select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)
@@ -520,7 +520,7 @@ def app_skill_category_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip().lower()
     if not sn:
@@ -560,7 +560,7 @@ def app_skill_category_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     rows = db.scalars(
@@ -603,7 +603,7 @@ def app_skill_category_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     if sn == vs.DEFAULT_SECTION:
@@ -622,7 +622,7 @@ def app_skill_category_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     latest = vs._app_skill_latest(db, key, sn)
@@ -650,7 +650,7 @@ def app_skill_category_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     _, _sn, nv = vs.publish_app_skill(db, key, body, sn)
@@ -667,7 +667,7 @@ def app_skill_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     _, _sn, nv = vs.publish_app_skill(db, key, body, sn)
@@ -685,7 +685,7 @@ def app_skill_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     row = db.scalars(
@@ -732,7 +732,7 @@ def app_skill_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = app_name.lower().strip()
     sn = section_name.strip()
     vs.delete_app_skill_version(db, key, sn, version)
@@ -767,7 +767,7 @@ def repo_skills_cards(
     domain: str = "",
     limit: int = 50,
     offset: int = 0,
-):
+) -> Response:
     """레포 스킬 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
     all_patterns = _sort_repo_patterns(
@@ -836,7 +836,7 @@ def repo_skills_cards(
 def new_repo_skill_form(
     request: Request,
     _user: str = Depends(require_admin_user),
-):
+) -> Response:
     return templates.TemplateResponse(
         request,
         "admin/skills/repo_skill_new.html",
@@ -851,7 +851,7 @@ def new_repo_skill_submit(
     db: Session = Depends(get_db),
     pattern: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     key = pattern.strip()
     existing = db.scalars(
         select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)
@@ -878,7 +878,7 @@ def repo_skill_board(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     if not db.scalars(
         select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)
@@ -918,7 +918,7 @@ def repo_skill_delete_stream(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     if not (key or "").strip():
         raise HTTPException(400, "default 패턴은 삭제할 수 없습니다.")
@@ -933,7 +933,7 @@ def repo_skill_category_new_form(
     pat_segment: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     pat_url = vs.repo_skill_pat_href_segment(key)
     display = vs.repo_skill_pattern_card_display(key)
@@ -959,7 +959,7 @@ def repo_skill_category_new_submit(
     db: Session = Depends(get_db),
     section_name: str = Form(...),
     body: str = Form(...),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     pat_url = vs.repo_skill_pat_href_segment(key)
     sn = section_name.strip().lower()
@@ -1000,7 +1000,7 @@ def repo_skill_category_board(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1047,7 +1047,7 @@ def repo_skill_category_delete(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1065,7 +1065,7 @@ def repo_skill_category_publish_form(
     section_name: str,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1094,7 +1094,7 @@ def repo_skill_category_publish_submit(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1112,7 +1112,7 @@ def repo_skill_save_as_new(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
     body: str = Form(...),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1131,7 +1131,7 @@ def repo_skill_version_view(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
@@ -1183,7 +1183,7 @@ def repo_skill_version_delete(
     version: int,
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
-):
+) -> Response:
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
     pat_url = vs.repo_skill_pat_href_segment(key)
