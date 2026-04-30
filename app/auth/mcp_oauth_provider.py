@@ -16,7 +16,6 @@ import secrets
 import time
 from datetime import datetime, timezone
 
-from pydantic import AnyUrl  # noqa: F401 — 외부 import 경로 하위 호환
 from sqlalchemy import select
 
 from mcp.server.auth.provider import (

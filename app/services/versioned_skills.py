@@ -552,7 +552,7 @@ def delete_repo_skill_stream(session: Session, pattern: str) -> int:
 _FILE_SEP = "=" * 60
 
 
-def _skill_file_block(save_path: str, section_display: str, body: str) -> str:
+def _skill_file_block(save_path: str, body: str) -> str:
     return (
         f"{_FILE_SEP}\n"
         f"SKILL FILE: {save_path}\n"
@@ -593,8 +593,7 @@ def get_skills_markdown(
     global_rows = _global_skill_all_sections_latest(session)
     for row in global_rows:
         path = _global_skill_save_path(row.section_name)
-        display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-        blocks.append(_skill_file_block(path, display, row.body))
+        blocks.append(_skill_file_block(path, row.body))
 
     # 2. Repo skills (origin_url 패턴 매칭)
     if origin_url:
@@ -608,10 +607,7 @@ def get_skills_markdown(
             repo_rows = _repo_skill_all_sections_latest(session, pattern)
             for row in repo_rows:
                 path = _repo_skill_save_path(pattern, row.section_name)
-                display = (
-                    "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-                )
-                blocks.append(_skill_file_block(path, display, row.body))
+                blocks.append(_skill_file_block(path, row.body))
 
     # 3. App skills
     if app_name:
@@ -619,10 +615,7 @@ def get_skills_markdown(
         app_rows = _app_skill_all_sections_latest(session, key)
         for row in app_rows:
             path = _app_skill_save_path(key, row.section_name)
-            display = (
-                "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-            )
-            blocks.append(_skill_file_block(path, display, row.body))
+            blocks.append(_skill_file_block(path, row.body))
 
     if not blocks:
         return "# Skills\n\n등록된 스킬(Skills)이 없습니다. 어드민 > 스킬 메뉴에서 추가하세요."

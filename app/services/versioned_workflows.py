@@ -573,7 +573,7 @@ def delete_repo_workflow_stream(session: Session, pattern: str) -> int:
 _FILE_SEP = "=" * 60
 
 
-def _workflow_file_block(save_path: str, section_display: str, body: str) -> str:
+def _workflow_file_block(save_path: str, body: str) -> str:
     return (
         f"{_FILE_SEP}\n"
         f"WORKFLOW FILE: {save_path}\n"
@@ -614,8 +614,7 @@ def get_workflows_markdown(
     global_rows = _global_workflow_all_sections_latest(session)
     for row in global_rows:
         path = _global_workflow_save_path(row.section_name)
-        display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-        blocks.append(_workflow_file_block(path, display, row.body))
+        blocks.append(_workflow_file_block(path, row.body))
 
     if origin_url:
         all_patterns = list_distinct_repo_patterns_with_workflows(session)
@@ -627,20 +626,14 @@ def get_workflows_markdown(
             repo_rows = _repo_workflow_all_sections_latest(session, pattern)
             for row in repo_rows:
                 path = _repo_workflow_save_path(pattern, row.section_name)
-                display = (
-                    "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-                )
-                blocks.append(_workflow_file_block(path, display, row.body))
+                blocks.append(_workflow_file_block(path, row.body))
 
     if app_name:
         key = (app_name or "").lower().strip()
         app_rows = _app_workflow_all_sections_latest(session, key)
         for row in app_rows:
             path = _app_workflow_save_path(key, row.section_name)
-            display = (
-                "기본" if row.section_name == DEFAULT_SECTION else row.section_name
-            )
-            blocks.append(_workflow_file_block(path, display, row.body))
+            blocks.append(_workflow_file_block(path, row.body))
 
     if not blocks:
         return "# Workflows\n\n등록된 워크플로우가 없습니다. 어드민 > 워크플로우 메뉴에서 추가하세요."

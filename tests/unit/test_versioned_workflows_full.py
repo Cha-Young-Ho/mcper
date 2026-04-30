@@ -466,7 +466,7 @@ class TestGetWorkflowsMarkdown:
 
 class TestWorkflowFileBlock:
     def test_block_contains_markers_and_body(self):
-        out = vw._workflow_file_block(".cursor/path.md", "기본", "HELLO")
+        out = vw._workflow_file_block(".cursor/path.md", "HELLO")
         assert "WORKFLOW FILE: .cursor/path.md" in out
         assert "END WORKFLOW FILE: .cursor/path.md" in out
         assert "HELLO" in out
