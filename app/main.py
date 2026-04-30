@@ -35,6 +35,9 @@ from app.routers import (
     admin_rbac,
     admin_specs,
     admin_rules,
+    admin_rules_app,
+    admin_rules_global,
+    admin_rules_repo,
     admin_skills,
     admin_workflows,
     admin_tools,
@@ -223,6 +226,9 @@ if _ADMIN_ENABLED:
     app.include_router(admin_dashboard.router)
     app.include_router(admin_specs.router)
     app.include_router(admin_rules.router)
+    app.include_router(admin_rules_global.router)
+    app.include_router(admin_rules_app.router)
+    app.include_router(admin_rules_repo.router)
     app.include_router(admin_skills.router)
     app.include_router(admin_tools.router)
     app.include_router(admin_celery.router)
