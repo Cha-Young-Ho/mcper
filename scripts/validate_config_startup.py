@@ -9,7 +9,6 @@ Usage:
 
 import sys
 import os
-from pathlib import Path
 
 # ANSI color codes
 RED = "\033[91m"
@@ -96,6 +95,7 @@ class ConfigValidator:
             # Try to connect to Redis
             try:
                 import redis
+
                 redis_url = os.getenv("REDIS_URL", settings.celery_broker_url)
 
                 # Parse minimal connection info

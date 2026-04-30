@@ -35,7 +35,9 @@ def doc_chunk_vector_ids(
         stmt = stmt.where(DocChunk.app_name == app_name)
     if pattern is not None:
         stmt = stmt.where(DocChunk.pattern == pattern)
-    stmt = stmt.order_by(DocChunk.embedding.cosine_distance(query_embedding)).limit(limit)
+    stmt = stmt.order_by(DocChunk.embedding.cosine_distance(query_embedding)).limit(
+        limit
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -55,9 +57,9 @@ def doc_chunk_fts_ids(
         select(DocChunk.id)
         .where(DocChunk.chunk_type != "parent")
         .where(
-            text("doc_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)").bindparams(
-                fts_q=q
-            )
+            text(
+                "doc_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)"
+            ).bindparams(fts_q=q)
         )
     )
     if doc_type:
@@ -115,20 +117,32 @@ def hybrid_doc_search(
     except Exception as exc:
         logger.warning("doc query embed failed, FTS only: %s", exc)
         fts_ids = doc_chunk_fts_ids(
-            db, query=query, doc_type=doc_type_filter,
-            app_name=app_name, pattern=pattern, limit=top_n * 5,
+            db,
+            query=query,
+            doc_type=doc_type_filter,
+            app_name=app_name,
+            pattern=pattern,
+            limit=top_n * 5,
         )
         if not fts_ids:
             return [], "indexed_no_match"
         ranked = fts_ids[:top_n]
     else:
         v_ids = doc_chunk_vector_ids(
-            db, query_embedding=qvec, doc_type=doc_type_filter,
-            app_name=app_name, pattern=pattern, limit=40,
+            db,
+            query_embedding=qvec,
+            doc_type=doc_type_filter,
+            app_name=app_name,
+            pattern=pattern,
+            limit=40,
         )
         f_ids = doc_chunk_fts_ids(
-            db, query=query, doc_type=doc_type_filter,
-            app_name=app_name, pattern=pattern, limit=40,
+            db,
+            query=query,
+            doc_type=doc_type_filter,
+            app_name=app_name,
+            pattern=pattern,
+            limit=40,
         )
         ranked = reciprocal_rank_fusion([v_ids, f_ids])[:top_n]
 
@@ -139,27 +153,33 @@ def hybrid_doc_search(
     by_id = {r.id: r for r in rows}
     ordered = [by_id[i] for i in ranked if i in by_id]
 
-    parent_ids = [ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None]
+    parent_ids = [
+        ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None
+    ]
     parents_by_id: dict[int, DocChunk] = {}
     if parent_ids:
         parents_by_id = {
             p.id: p
-            for p in db.scalars(select(DocChunk).where(DocChunk.id.in_(parent_ids))).all()
+            for p in db.scalars(
+                select(DocChunk).where(DocChunk.id.in_(parent_ids))
+            ).all()
         }
 
     out: list[dict[str, Any]] = []
     for ch in ordered:
         parent = parents_by_id.get(ch.parent_chunk_id) if ch.parent_chunk_id else None
-        out.append({
-            "chunk_id": ch.id,
-            "doc_type": ch.doc_type,
-            "doc_entity_id": ch.doc_entity_id,
-            "app_name": ch.app_name,
-            "pattern": ch.pattern,
-            "section_name": ch.section_name,
-            "chunk_index": ch.chunk_index,
-            "content": ch.content,
-            "parent_content": parent.content if parent else None,
-            "metadata": ch.chunk_metadata,
-        })
+        out.append(
+            {
+                "chunk_id": ch.id,
+                "doc_type": ch.doc_type,
+                "doc_entity_id": ch.doc_entity_id,
+                "app_name": ch.app_name,
+                "pattern": ch.pattern,
+                "section_name": ch.section_name,
+                "chunk_index": ch.chunk_index,
+                "content": ch.content,
+                "parent_content": parent.content if parent else None,
+                "metadata": ch.chunk_metadata,
+            }
+        )
     return out, "hybrid_ok"

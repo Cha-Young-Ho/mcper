@@ -21,8 +21,12 @@ class FailedTask(Base):
     __tablename__ = "failed_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    task_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)  # "spec", "code_index"
+    task_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True, index=True
+    )
+    entity_type: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )  # "spec", "code_index"
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     error_message: Mapped[str] = mapped_column(Text, nullable=False)
     traceback: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -32,7 +36,9 @@ class FailedTask(Base):
     status: Mapped[str] = mapped_column(
         String(64), nullable=False, default="pending", index=True
     )  # pending/retrying/failed/resolved
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=_utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=_utc_now, onupdate=_utc_now
     )
@@ -50,10 +56,14 @@ class CeleryTaskStat(Base):
     __tablename__ = "celery_task_stats"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    task_name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    task_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True, index=True
+    )
     success_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     failure_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    total_duration_seconds: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
+    total_duration_seconds: Mapped[float] = mapped_column(
+        Integer, nullable=False, default=0
+    )
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

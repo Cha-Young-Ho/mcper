@@ -4,11 +4,12 @@ Tests for scripts/validate_config_startup.py configuration validator.
 
 import os
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 # Add scripts directory to path
 import sys
+
 scripts_path = Path(__file__).parent.parent / "scripts"
 sys.path.insert(0, str(scripts_path))
 
@@ -68,7 +69,9 @@ class TestEmbeddingConfigCheck:
         validator = ConfigValidator(verbose=False)
         with patch("app.config.settings") as mock_settings:
             mock_settings.embedding_provider = "openai"
-            with patch("app.services.embeddings.factory.build_embedding_backend") as mock_factory:
+            with patch(
+                "app.services.embeddings.factory.build_embedding_backend"
+            ) as mock_factory:
                 mock_backend = Mock()
                 mock_backend.get_embedding_dimension.return_value = 1536
                 mock_factory.return_value = mock_backend
@@ -80,7 +83,9 @@ class TestEmbeddingConfigCheck:
         validator = ConfigValidator(verbose=False)
         with patch("app.config.settings") as mock_settings:
             mock_settings.embedding_provider = "local"
-            with patch("app.services.embeddings.factory.build_embedding_backend") as mock_factory:
+            with patch(
+                "app.services.embeddings.factory.build_embedding_backend"
+            ) as mock_factory:
                 mock_backend = Mock()
                 mock_backend.get_embedding_dimension.return_value = 0
                 mock_factory.return_value = mock_backend
@@ -93,7 +98,9 @@ class TestEmbeddingConfigCheck:
         validator = ConfigValidator(verbose=False)
         with patch("app.config.settings") as mock_settings:
             mock_settings.embedding_provider = "bedrock"
-            with patch("app.services.embeddings.factory.build_embedding_backend") as mock_factory:
+            with patch(
+                "app.services.embeddings.factory.build_embedding_backend"
+            ) as mock_factory:
                 mock_backend = Mock()
                 mock_backend.get_embedding_dimension.return_value = 5000
                 mock_factory.return_value = mock_backend
@@ -106,13 +113,17 @@ class TestEmbeddingConfigCheck:
         validator = ConfigValidator(verbose=False)
         with patch("app.config.settings") as mock_settings:
             mock_settings.embedding_provider = "invalid_provider"
-            with patch("app.services.embeddings.factory.build_embedding_backend") as mock_factory:
+            with patch(
+                "app.services.embeddings.factory.build_embedding_backend"
+            ) as mock_factory:
                 mock_factory.side_effect = ValueError("Unknown provider")
                 validator.check_embedding_config()
         assert len(validator.errors) >= 1
         assert "Failed to initialize" in validator.errors[0]
 
-    @pytest.mark.skip(reason="Same as test_admin_password_import_error — lazy import uncontrollable via patch")
+    @pytest.mark.skip(
+        reason="Same as test_admin_password_import_error — lazy import uncontrollable via patch"
+    )
     def test_embedding_check_import_error(self):
         validator = ConfigValidator(verbose=False)
         with patch("app.config.settings", side_effect=ImportError("No settings")):

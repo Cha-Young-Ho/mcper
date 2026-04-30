@@ -3,9 +3,8 @@
 import uuid
 
 import pytest
-from datetime import datetime, timezone
 
-from app.db.celery_models import FailedTask, CeleryTaskStat
+from app.db.celery_models import FailedTask
 from app.services.celery_monitoring import CeleryMonitoring
 
 
@@ -70,27 +69,19 @@ class TestCeleryMonitoringQuery:
 
     def test_get_failed_tasks_with_data(self, db_session):
         """Returns failed tasks from DB."""
-        CeleryMonitoring.log_task_failure(
-            db_session, "q-task-1", "spec", 1, "Error 1"
-        )
-        CeleryMonitoring.log_task_failure(
-            db_session, "q-task-2", "spec", 2, "Error 2"
-        )
+        CeleryMonitoring.log_task_failure(db_session, "q-task-1", "spec", 1, "Error 1")
+        CeleryMonitoring.log_task_failure(db_session, "q-task-2", "spec", 2, "Error 2")
         result = CeleryMonitoring.get_failed_tasks(db_session)
         assert len(result) == 2
 
     def test_get_failed_tasks_filter_by_status(self, db_session):
         """Filter failed tasks by status."""
-        CeleryMonitoring.log_task_failure(
-            db_session, "s-task-1", "spec", 1, "Err"
-        )
+        CeleryMonitoring.log_task_failure(db_session, "s-task-1", "spec", 1, "Err")
         task = db_session.query(FailedTask).filter_by(task_id="s-task-1").first()
         task.status = "resolved"
         db_session.commit()
 
-        CeleryMonitoring.log_task_failure(
-            db_session, "s-task-2", "spec", 2, "Err"
-        )
+        CeleryMonitoring.log_task_failure(db_session, "s-task-2", "spec", 2, "Err")
 
         pending = CeleryMonitoring.get_failed_tasks(db_session, status="pending")
         assert len(pending) == 1
@@ -99,9 +90,7 @@ class TestCeleryMonitoringQuery:
 
     def test_get_failed_tasks_filter_by_entity_type(self, db_session):
         """Filter failed tasks by entity type."""
-        CeleryMonitoring.log_task_failure(
-            db_session, "e-task-1", "spec", 1, "Err"
-        )
+        CeleryMonitoring.log_task_failure(db_session, "e-task-1", "spec", 1, "Err")
         CeleryMonitoring.log_task_failure(
             db_session, "e-task-2", "code_index", 2, "Err"
         )
@@ -124,15 +113,15 @@ class TestCeleryMonitoringQuery:
 
     def test_get_failed_tasks_count(self, db_session):
         """Count works correctly."""
-        CeleryMonitoring.log_task_failure(
-            db_session, "c-task-1", "spec", 1, "Err"
-        )
-        CeleryMonitoring.log_task_failure(
-            db_session, "c-task-2", "spec", 2, "Err"
-        )
+        CeleryMonitoring.log_task_failure(db_session, "c-task-1", "spec", 1, "Err")
+        CeleryMonitoring.log_task_failure(db_session, "c-task-2", "spec", 2, "Err")
         assert CeleryMonitoring.get_failed_tasks_count(db_session) == 2
-        assert CeleryMonitoring.get_failed_tasks_count(db_session, status="pending") == 2
-        assert CeleryMonitoring.get_failed_tasks_count(db_session, status="resolved") == 0
+        assert (
+            CeleryMonitoring.get_failed_tasks_count(db_session, status="pending") == 2
+        )
+        assert (
+            CeleryMonitoring.get_failed_tasks_count(db_session, status="resolved") == 0
+        )
 
 
 @pytest.mark.integration
@@ -206,5 +195,7 @@ class TestCeleryMonitoringStats:
         assert result.task_name == name
 
     def test_get_task_stats_nonexistent(self, db_session):
-        result = CeleryMonitoring.get_task_stats(db_session, task_name=_unique_task("ghost"))
+        result = CeleryMonitoring.get_task_stats(
+            db_session, task_name=_unique_task("ghost")
+        )
         assert result is None

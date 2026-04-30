@@ -45,6 +45,8 @@ class OpenAICompatibleBackend:
                 for row in rows:
                     emb = row.get("embedding")
                     if not isinstance(emb, list):
-                        raise RuntimeError("OpenAI 호환 응답에 embedding 배열이 없습니다")
+                        raise RuntimeError(
+                            "OpenAI 호환 응답에 embedding 배열이 없습니다"
+                        )
                     out.append([float(x) for x in emb])
         return out

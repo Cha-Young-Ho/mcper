@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
 
 from app.main import app
 
@@ -17,6 +16,7 @@ class TestBulkRegisterUrlsAuth:
     def test_post_without_csrf_is_blocked(self):
         """CSRFMiddleware must block POST without the token (403 JSON)."""
         from fastapi.testclient import TestClient
+
         client = TestClient(app, base_url="https://testserver")
         response = client.post("/admin/documents/urls", json=["https://example.com"])
         assert response.status_code == 403
@@ -35,16 +35,20 @@ class TestBulkRegisterUrlsSuccess:
     def test_admin_can_register_urls(self, csrf_client):
         """With admin override + CSRF, endpoint processes URLs."""
         from app.auth.dependencies import require_admin_user
+
         app.dependency_overrides[require_admin_user] = lambda: "admin"
 
         try:
-            with patch(
-                "app.routers.admin_specs.fetch_url_as_text",
-                new_callable=AsyncMock,
-                return_value="document body",
-            ), patch(
-                "app.routers.admin_specs.enqueue_or_index_sync",
-                return_value={"indexed": True, "chunks": 1},
+            with (
+                patch(
+                    "app.routers.admin_specs.fetch_url_as_text",
+                    new_callable=AsyncMock,
+                    return_value="document body",
+                ),
+                patch(
+                    "app.routers.admin_specs.enqueue_or_index_sync",
+                    return_value={"indexed": True, "chunks": 1},
+                ),
             ):
                 response = csrf_client.post(
                     "/admin/documents/urls",
@@ -57,6 +61,7 @@ class TestBulkRegisterUrlsSuccess:
 
     def test_empty_url_skipped(self, csrf_client):
         from app.auth.dependencies import require_admin_user
+
         app.dependency_overrides[require_admin_user] = lambda: "admin"
         try:
             response = csrf_client.post(

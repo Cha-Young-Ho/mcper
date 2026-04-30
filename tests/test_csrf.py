@@ -5,7 +5,6 @@ from __future__ import annotations
 import secrets
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.auth_models import User
@@ -54,9 +53,7 @@ class TestCSRFMiddleware:
             # May be 303 redirect on success
             assert response.status_code != 403
 
-    def test_post_with_mismatched_csrf_token_rejected(
-        self, test_client: TestClient
-    ):
+    def test_post_with_mismatched_csrf_token_rejected(self, test_client: TestClient):
         """POST with mismatched CSRF tokens should be rejected."""
         response = test_client.post(
             "/admin/seed/force",
@@ -113,8 +110,11 @@ class TestCORSConfiguration:
         """CORS_ALLOWED_ORIGINS env should override defaults."""
         import os
 
-        with patch.dict(os.environ, {"CORS_ALLOWED_ORIGINS": "https://myapp.com,https://other.com"}):
+        with patch.dict(
+            os.environ, {"CORS_ALLOWED_ORIGINS": "https://myapp.com,https://other.com"}
+        ):
             from app.main import _get_allowed_origins
+
             origins = _get_allowed_origins()
             assert "https://myapp.com" in origins
             assert "https://other.com" in origins
@@ -123,8 +123,12 @@ class TestCORSConfiguration:
         """CORS_ALLOWED_ORIGINS with spaces should be trimmed."""
         import os
 
-        with patch.dict(os.environ, {"CORS_ALLOWED_ORIGINS": " https://myapp.com , https://other.com "}):
+        with patch.dict(
+            os.environ,
+            {"CORS_ALLOWED_ORIGINS": " https://myapp.com , https://other.com "},
+        ):
             from app.main import _get_allowed_origins
+
             origins = _get_allowed_origins()
             assert "https://myapp.com" in origins
             assert "https://other.com" in origins
@@ -245,9 +249,7 @@ class TestCSRFTokenSources:
             # Header matches cookie, so should pass despite wrong form token
             assert response.status_code != 403
 
-    def test_json_post_uses_header_csrf(
-        self, test_client: TestClient
-    ):
+    def test_json_post_uses_header_csrf(self, test_client: TestClient):
         """JSON POST should use X-CSRF-Token header (no form body)."""
         csrf_token = secrets.token_hex(16)
 

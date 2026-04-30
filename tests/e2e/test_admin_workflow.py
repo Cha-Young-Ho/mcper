@@ -1,8 +1,6 @@
 """E2E tests: admin workflow scenarios."""
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.db.models import Spec
 from app.db.rule_models import GlobalRuleVersion
@@ -16,7 +14,11 @@ class TestRuleManagementWorkflow:
     def test_create_global_rule_and_view(self, test_client, db_session):
         """Admin creates global rule version and views it."""
         # Step 1: Create rule in DB
-        db_session.add(GlobalRuleVersion(version=1, body="# Project Rules\n\nFollow coding standards."))
+        db_session.add(
+            GlobalRuleVersion(
+                version=1, body="# Project Rules\n\nFollow coding standards."
+            )
+        )
         db_session.commit()
 
         # Step 2: View rule board
@@ -24,7 +26,9 @@ class TestRuleManagementWorkflow:
         assert response.status_code == 200
 
         # Step 3: View specific version
-        response = test_client.get("/admin/global-rules/v/1", auth=("admin", "changeme"))
+        response = test_client.get(
+            "/admin/global-rules/v/1", auth=("admin", "changeme")
+        )
         assert response.status_code == 200
 
     def test_multiple_rule_versions_workflow(self, test_client, db_session):
@@ -52,13 +56,15 @@ class TestSpecManagementWorkflow:
     def test_spec_crud_workflow(self, test_client, db_session):
         """Admin creates spec, views app cards, lists by app."""
         # Step 1: Create spec
-        db_session.add(Spec(
-            title="Login Feature",
-            content="## Login\n\nImplement OAuth login.",
-            app_target="webapp",
-            base_branch="main",
-            related_files=["auth.py", "login.html"],
-        ))
+        db_session.add(
+            Spec(
+                title="Login Feature",
+                content="## Login\n\nImplement OAuth login.",
+                app_target="webapp",
+                base_branch="main",
+                related_files=["auth.py", "login.html"],
+            )
+        )
         db_session.commit()
 
         # Step 2: View app cards
@@ -66,19 +72,31 @@ class TestSpecManagementWorkflow:
         assert resp_cards.status_code == 200
 
         # Step 3: View specs for app
-        resp_list = test_client.get("/admin/plans/app/webapp", auth=("admin", "changeme"))
+        resp_list = test_client.get(
+            "/admin/plans/app/webapp", auth=("admin", "changeme")
+        )
         assert resp_list.status_code == 200
 
     def test_multiple_apps_workflow(self, test_client, db_session):
         """Admin manages specs across multiple apps."""
-        db_session.add(Spec(
-            title="Feature A", content="Content A",
-            app_target="app1", base_branch="main", related_files=[],
-        ))
-        db_session.add(Spec(
-            title="Feature B", content="Content B",
-            app_target="app2", base_branch="main", related_files=[],
-        ))
+        db_session.add(
+            Spec(
+                title="Feature A",
+                content="Content A",
+                app_target="app1",
+                base_branch="main",
+                related_files=[],
+            )
+        )
+        db_session.add(
+            Spec(
+                title="Feature B",
+                content="Content B",
+                app_target="app2",
+                base_branch="main",
+                related_files=[],
+            )
+        )
         db_session.commit()
 
         # Both apps appear in cards
@@ -129,14 +147,24 @@ class TestCeleryMonitoringWorkflow:
 
     def test_celery_filter_workflow(self, test_client, db_session):
         """Admin filters failed tasks by status and entity type."""
-        db_session.add(FailedTask(
-            task_id="e2e-filter-1", entity_type="spec",
-            entity_id=1, error_message="Err", status="pending",
-        ))
-        db_session.add(FailedTask(
-            task_id="e2e-filter-2", entity_type="code_index",
-            entity_id=2, error_message="Err", status="failed",
-        ))
+        db_session.add(
+            FailedTask(
+                task_id="e2e-filter-1",
+                entity_type="spec",
+                entity_id=1,
+                error_message="Err",
+                status="pending",
+            )
+        )
+        db_session.add(
+            FailedTask(
+                task_id="e2e-filter-2",
+                entity_type="code_index",
+                entity_id=2,
+                error_message="Err",
+                status="failed",
+            )
+        )
         db_session.commit()
 
         # Filter by status

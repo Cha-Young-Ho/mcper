@@ -30,7 +30,9 @@ def _bootstrap_path() -> None:
 def main() -> int:
     _bootstrap_path()
 
-    p = argparse.ArgumentParser(description="Index one spec_id with local embeddings (no Celery).")
+    p = argparse.ArgumentParser(
+        description="Index one spec_id with local embeddings (no Celery)."
+    )
     p.add_argument("spec_id", type=int, help="specs.id")
     args = p.parse_args()
 

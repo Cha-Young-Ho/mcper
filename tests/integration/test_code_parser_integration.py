@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.services.code_parser import CodeSymbol
 from app.services.code_parser_factory import CodeParserFactory, parse_code_file
 
 
@@ -92,20 +91,20 @@ async def fetch_data(url: str):
 
     def test_parse_python_nested_classes(self):
         """Python parser handles nested classes."""
-        code = '''
+        code = """
 class Outer:
     class Inner:
         def method(self):
             pass
-'''
+"""
         symbols = parse_code_file("nested.py", code)
         assert len(symbols) >= 1
 
     def test_parse_python_module_level_vars(self):
         """Python parser handles module with only assignments."""
-        code = '''
+        code = """
 MAX_RETRIES = 3
 DEFAULT_TIMEOUT = 30
-'''
+"""
         symbols = parse_code_file("config.py", code)
         assert isinstance(symbols, list)

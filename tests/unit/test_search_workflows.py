@@ -9,7 +9,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from app.services import search_workflows as sw
 
@@ -32,8 +31,12 @@ class TestWorkflowChunkVectorIds:
     def test_returns_list_from_scalars(self):
         db = _db_with_scalars_queue([[1, 2, 3]])
         result = sw.workflow_chunk_vector_ids(
-            db, query_embedding=[0.1] * 384,
-            workflow_type="global", app_name="a", pattern="p", limit=10,
+            db,
+            query_embedding=[0.1] * 384,
+            workflow_type="global",
+            app_name="a",
+            pattern="p",
+            limit=10,
         )
         assert result == [1, 2, 3]
 
@@ -53,8 +56,12 @@ class TestWorkflowChunkFtsIds:
     def test_valid_query_returns_ids(self):
         db = _db_with_scalars_queue([[10, 20]])
         result = sw.workflow_chunk_fts_ids(
-            db, query="foo",
-            workflow_type="app", app_name="myapp", pattern="pat", limit=5,
+            db,
+            query="foo",
+            workflow_type="app",
+            app_name="myapp",
+            pattern="pat",
+            limit=5,
         )
         assert result == [10, 20]
 
@@ -85,21 +92,31 @@ class TestHybridWorkflowSearch:
         # 2nd: final "ordered" rows fetch → [ch]
         # 3rd: parent fetch → [parent]
         child_chunk = SimpleNamespace(
-            id=5, workflow_type="global", workflow_entity_id=1, app_name=None,
-            pattern=None, section_name="main", chunk_index=0, content="body",
-            parent_chunk_id=99, chunk_metadata={"k": "v"},
+            id=5,
+            workflow_type="global",
+            workflow_entity_id=1,
+            app_name=None,
+            pattern=None,
+            section_name="main",
+            chunk_index=0,
+            content="body",
+            parent_chunk_id=99,
+            chunk_metadata={"k": "v"},
         )
         parent_chunk = SimpleNamespace(
-            id=99, content="parent body",
+            id=99,
+            content="parent body",
         )
         db.scalars.side_effect = [
-            _make_scalars_mock([5]),         # FTS ids
+            _make_scalars_mock([5]),  # FTS ids
             _make_scalars_mock([child_chunk]),  # fetch ordered rows
             _make_scalars_mock([parent_chunk]),  # fetch parents
         ]
 
         with patch.object(sw, "embed_query", side_effect=RuntimeError("embed failed")):
-            results, mode = sw.hybrid_workflow_search(db, query="q", scope="global", top_n=3)
+            results, mode = sw.hybrid_workflow_search(
+                db, query="q", scope="global", top_n=3
+            )
 
         assert mode == "hybrid_ok"
         assert len(results) == 1
@@ -123,9 +140,16 @@ class TestHybridWorkflowSearch:
         db.scalar.return_value = 5
 
         child = SimpleNamespace(
-            id=1, workflow_type="app", workflow_entity_id=10, app_name="my",
-            pattern=None, section_name="sec", chunk_index=0, content="c",
-            parent_chunk_id=None, chunk_metadata={},
+            id=1,
+            workflow_type="app",
+            workflow_entity_id=10,
+            app_name="my",
+            pattern=None,
+            section_name="sec",
+            chunk_index=0,
+            content="c",
+            parent_chunk_id=None,
+            chunk_metadata={},
         )
         # calls in order:
         #   vector_ids: [1]
@@ -138,10 +162,16 @@ class TestHybridWorkflowSearch:
             _make_scalars_mock([child]),
         ]
 
-        with patch.object(sw, "embed_query", return_value=[0.5] * 384), \
-             patch.object(sw, "reciprocal_rank_fusion", return_value=[1]):
+        with (
+            patch.object(sw, "embed_query", return_value=[0.5] * 384),
+            patch.object(sw, "reciprocal_rank_fusion", return_value=[1]),
+        ):
             results, mode = sw.hybrid_workflow_search(
-                db, query="q", app_name="my", scope="app", top_n=5,
+                db,
+                query="q",
+                app_name="my",
+                scope="app",
+                top_n=5,
             )
         assert mode == "hybrid_ok"
         assert len(results) == 1
@@ -154,8 +184,10 @@ class TestHybridWorkflowSearch:
             _make_scalars_mock([]),  # vector ids
             _make_scalars_mock([]),  # fts ids
         ]
-        with patch.object(sw, "embed_query", return_value=[0.1] * 384), \
-             patch.object(sw, "reciprocal_rank_fusion", return_value=[]):
+        with (
+            patch.object(sw, "embed_query", return_value=[0.1] * 384),
+            patch.object(sw, "reciprocal_rank_fusion", return_value=[]),
+        ):
             results, mode = sw.hybrid_workflow_search(db, query="q")
         assert results == []
         assert mode == "indexed_no_match"
@@ -172,7 +204,10 @@ class TestHybridWorkflowSearch:
         db = MagicMock()
         db.scalar.return_value = 0
         results, mode = sw.hybrid_workflow_search(
-            db, query="q", pattern="github.com/org", scope="repo",
+            db,
+            query="q",
+            pattern="github.com/org",
+            scope="repo",
         )
         assert mode == "no_index"
 
@@ -182,17 +217,26 @@ class TestHybridWorkflowSearch:
         db.scalar.return_value = 2
 
         child = SimpleNamespace(
-            id=1, workflow_type="global", workflow_entity_id=1, app_name=None,
-            pattern=None, section_name="main", chunk_index=0, content="c",
-            parent_chunk_id=None, chunk_metadata={},
+            id=1,
+            workflow_type="global",
+            workflow_entity_id=1,
+            app_name=None,
+            pattern=None,
+            section_name="main",
+            chunk_index=0,
+            content="c",
+            parent_chunk_id=None,
+            chunk_metadata={},
         )
         db.scalars.side_effect = [
-            _make_scalars_mock([1, 2]),   # vector
-            _make_scalars_mock([]),       # fts
+            _make_scalars_mock([1, 2]),  # vector
+            _make_scalars_mock([]),  # fts
             _make_scalars_mock([child]),  # only id=1 returned even though ranked=[1,2]
         ]
-        with patch.object(sw, "embed_query", return_value=[0.0] * 384), \
-             patch.object(sw, "reciprocal_rank_fusion", return_value=[1, 2]):
+        with (
+            patch.object(sw, "embed_query", return_value=[0.0] * 384),
+            patch.object(sw, "reciprocal_rank_fusion", return_value=[1, 2]),
+        ):
             results, mode = sw.hybrid_workflow_search(db, query="q")
         assert mode == "hybrid_ok"
         assert len(results) == 1

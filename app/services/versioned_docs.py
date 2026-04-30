@@ -84,7 +84,9 @@ def _try_index_doc(
     except Exception:
         logger.warning(
             "doc indexing failed type=%s id=%s",
-            doc_type, doc_entity_id, exc_info=True,
+            doc_type,
+            doc_entity_id,
+            exc_info=True,
         )
 
 
@@ -93,7 +95,9 @@ def _try_index_doc(
 
 def list_sections_for_global_doc(session: Session) -> list[str]:
     rows = session.scalars(select(GlobalDocVersion.section_name).distinct()).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return sorted(
+        {r for r in rows if r}, key=lambda s: "" if s == DEFAULT_SECTION else s
+    ) or [DEFAULT_SECTION]
 
 
 def _global_doc_all_sections_latest(
@@ -115,10 +119,14 @@ def _global_doc_all_sections_latest(
     if df is not None:
         q = q.where(_domain_filter(GlobalDocVersion.domain, domain))
     rows = session.scalars(q).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
-def _global_doc_latest(session: Session, section_name: str = DEFAULT_SECTION) -> GlobalDocVersion | None:
+def _global_doc_latest(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> GlobalDocVersion | None:
     max_v = (
         select(func.max(GlobalDocVersion.version))
         .where(GlobalDocVersion.section_name == section_name)
@@ -132,7 +140,9 @@ def _global_doc_latest(session: Session, section_name: str = DEFAULT_SECTION) ->
     ).first()
 
 
-def next_global_doc_version(session: Session, section_name: str = DEFAULT_SECTION) -> int:
+def next_global_doc_version(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> int:
     cur = session.scalar(
         select(func.max(GlobalDocVersion.version)).where(
             GlobalDocVersion.section_name == section_name
@@ -142,20 +152,32 @@ def next_global_doc_version(session: Session, section_name: str = DEFAULT_SECTIO
 
 
 def publish_global_doc(
-    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> int:
     nv = next_global_doc_version(session, section_name)
-    row = GlobalDocVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    row = GlobalDocVersion(
+        section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
     _try_index_doc(
-        session, "global", row.id, body,
-        domain=domain, section_name=section_name,
+        session,
+        "global",
+        row.id,
+        body,
+        domain=domain,
+        section_name=section_name,
     )
     return nv
 
 
-def delete_global_doc_version(session: Session, section_name: str, version: int) -> None:
+def delete_global_doc_version(
+    session: Session, section_name: str, version: int
+) -> None:
     session.execute(
         delete(GlobalDocVersion).where(
             GlobalDocVersion.section_name == section_name,
@@ -196,7 +218,9 @@ def list_distinct_apps_with_docs(
     return names
 
 
-def count_distinct_apps_with_docs(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_apps_with_docs(
+    session: Session, *, domain: str | None = None
+) -> int:
     """AppDoc 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(AppDocVersion.app_name)))
     df = _domain_filter(AppDocVersion.domain, domain)
@@ -212,10 +236,14 @@ def list_sections_for_app_doc(session: Session, app_name: str) -> list[str]:
         .where(AppDocVersion.app_name == key)
         .distinct()
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return sorted(
+        {r for r in rows if r}, key=lambda s: "" if s == DEFAULT_SECTION else s
+    ) or [DEFAULT_SECTION]
 
 
-def _app_doc_all_sections_latest(session: Session, app_name: str) -> list[AppDocVersion]:
+def _app_doc_all_sections_latest(
+    session: Session, app_name: str
+) -> list[AppDocVersion]:
     key = (app_name or "").lower().strip()
     subq = (
         select(
@@ -234,7 +262,9 @@ def _app_doc_all_sections_latest(session: Session, app_name: str) -> list[AppDoc
             & (AppDocVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _app_doc_latest(
@@ -243,7 +273,9 @@ def _app_doc_latest(
     key = (app_name or "").lower().strip()
     max_v = (
         select(func.max(AppDocVersion.version))
-        .where(AppDocVersion.app_name == key, AppDocVersion.section_name == section_name)
+        .where(
+            AppDocVersion.app_name == key, AppDocVersion.section_name == section_name
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -255,7 +287,9 @@ def _app_doc_latest(
     ).first()
 
 
-def next_app_doc_version(session: Session, app_name: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_app_doc_version(
+    session: Session, app_name: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (app_name or "").lower().strip()
     cur = session.scalar(
         select(func.max(AppDocVersion.version)).where(
@@ -267,21 +301,35 @@ def next_app_doc_version(session: Session, app_name: str, section_name: str = DE
 
 
 def publish_app_doc(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    app_name: str,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     key = (app_name or "").lower().strip()
     nv = next_app_doc_version(session, key, section_name)
-    row = AppDocVersion(app_name=key, section_name=section_name, version=nv, body=body, domain=domain)
+    row = AppDocVersion(
+        app_name=key, section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
     _try_index_doc(
-        session, "app", row.id, body,
-        app_name=key, domain=domain, section_name=section_name,
+        session,
+        "app",
+        row.id,
+        body,
+        app_name=key,
+        domain=domain,
+        section_name=section_name,
     )
     return key, section_name, nv
 
 
-def delete_app_doc_version(session: Session, app_name: str, section_name: str, version: int) -> None:
+def delete_app_doc_version(
+    session: Session, app_name: str, section_name: str, version: int
+) -> None:
     key = (app_name or "").lower().strip()
     session.execute(
         delete(AppDocVersion).where(
@@ -342,7 +390,7 @@ def list_distinct_repo_patterns_with_docs(
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    patterns = sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    patterns = sorted({r or "" for r in rows}, key=lambda p: "" if not p else p.lower())
     if offset:
         patterns = patterns[offset:]
     if limit is not None:
@@ -350,7 +398,9 @@ def list_distinct_repo_patterns_with_docs(
     return patterns
 
 
-def count_distinct_repo_patterns_with_docs(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_repo_patterns_with_docs(
+    session: Session, *, domain: str | None = None
+) -> int:
     """RepoDoc 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(RepoDocVersion.pattern)))
     df = _domain_filter(RepoDocVersion.domain, domain)
@@ -366,10 +416,14 @@ def list_sections_for_repo_doc(session: Session, pattern: str) -> list[str]:
         .where(RepoDocVersion.pattern == key)
         .distinct()
     ).all()
-    return sorted({r for r in rows if r}, key=lambda s: ("" if s == DEFAULT_SECTION else s)) or [DEFAULT_SECTION]
+    return sorted(
+        {r for r in rows if r}, key=lambda s: "" if s == DEFAULT_SECTION else s
+    ) or [DEFAULT_SECTION]
 
 
-def _repo_doc_all_sections_latest(session: Session, pattern: str) -> list[RepoDocVersion]:
+def _repo_doc_all_sections_latest(
+    session: Session, pattern: str
+) -> list[RepoDocVersion]:
     key = (pattern or "").strip()
     subq = (
         select(
@@ -388,7 +442,9 @@ def _repo_doc_all_sections_latest(session: Session, pattern: str) -> list[RepoDo
             & (RepoDocVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _repo_doc_latest(
@@ -397,7 +453,9 @@ def _repo_doc_latest(
     key = (pattern or "").strip()
     max_v = (
         select(func.max(RepoDocVersion.version))
-        .where(RepoDocVersion.pattern == key, RepoDocVersion.section_name == section_name)
+        .where(
+            RepoDocVersion.pattern == key, RepoDocVersion.section_name == section_name
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -409,7 +467,9 @@ def _repo_doc_latest(
     ).first()
 
 
-def next_repo_doc_version(session: Session, pattern: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_repo_doc_version(
+    session: Session, pattern: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (pattern or "").strip()
     cur = session.scalar(
         select(func.max(RepoDocVersion.version)).where(
@@ -431,17 +491,31 @@ def publish_repo_doc(
 ) -> tuple[str, str, int]:
     key = (pattern or "").strip()
     nv = next_repo_doc_version(session, key, section_name)
-    row = RepoDocVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order, domain=domain)
+    row = RepoDocVersion(
+        pattern=key,
+        section_name=section_name,
+        version=nv,
+        body=body,
+        sort_order=sort_order,
+        domain=domain,
+    )
     session.add(row)
     session.commit()
     _try_index_doc(
-        session, "repo", row.id, body,
-        pattern=key, domain=domain, section_name=section_name,
+        session,
+        "repo",
+        row.id,
+        body,
+        pattern=key,
+        domain=domain,
+        section_name=section_name,
     )
     return key, section_name, nv
 
 
-def delete_repo_doc_version(session: Session, pattern: str, section_name: str, version: int) -> None:
+def delete_repo_doc_version(
+    session: Session, pattern: str, section_name: str, version: int
+) -> None:
     key = (pattern or "").strip()
     session.execute(
         delete(RepoDocVersion).where(
@@ -532,7 +606,9 @@ def get_docs_markdown(
             repo_rows = _repo_doc_all_sections_latest(session, pattern)
             for row in repo_rows:
                 path = _repo_doc_save_path(pattern, row.section_name)
-                display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                display = (
+                    "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                )
                 blocks.append(_doc_file_block(path, display, row.body))
 
     if app_name:
@@ -540,7 +616,9 @@ def get_docs_markdown(
         app_rows = _app_doc_all_sections_latest(session, key)
         for row in app_rows:
             path = _app_doc_save_path(key, row.section_name)
-            display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            display = (
+                "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            )
             blocks.append(_doc_file_block(path, display, row.body))
 
     if not blocks:
@@ -579,13 +657,15 @@ def _legacy_ilike_search_docs(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "global",
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "global",
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     if scope in ("all", "app") and app_name:
         key = app_name.lower().strip()
@@ -600,14 +680,16 @@ def _legacy_ilike_search_docs(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "app",
-                "app_name": r.app_name,
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "app",
+                    "app_name": r.app_name,
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     if scope in ("all", "repo"):
         rows = session.scalars(
@@ -620,14 +702,16 @@ def _legacy_ilike_search_docs(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "repo",
-                "pattern": r.pattern,
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "repo",
+                    "pattern": r.pattern,
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     return results[:top_n]
 
@@ -657,35 +741,41 @@ def _enrich_chunks_with_version_rows(
         if wtype == "global":
             row = _global_doc_latest(session, section)
             if row is not None:
-                out.append({
-                    "scope": "global",
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "global",
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
         elif wtype == "app" and app:
             row = _app_doc_latest(session, app, section)
             if row is not None:
-                out.append({
-                    "scope": "app",
-                    "app_name": row.app_name,
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "app",
+                        "app_name": row.app_name,
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
         elif wtype == "repo":
             row = _repo_doc_latest(session, pat or "", section)
             if row is not None:
-                out.append({
-                    "scope": "repo",
-                    "pattern": row.pattern,
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "repo",
+                        "pattern": row.pattern,
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
     return out
 
 
@@ -705,7 +795,11 @@ def search_docs(
         from app.services.search_docs import hybrid_doc_search
 
         chunks, mode = hybrid_doc_search(
-            session, query=q, app_name=app_name, scope=scope, top_n=top_n,
+            session,
+            query=q,
+            app_name=app_name,
+            scope=scope,
+            top_n=top_n,
         )
         if mode == "hybrid_ok" and chunks:
             enriched = _enrich_chunks_with_version_rows(session, chunks)

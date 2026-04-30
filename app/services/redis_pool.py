@@ -8,6 +8,7 @@ ad-hoc 으로 redis.from_url() 을 매 호출마다 생성하면 고부하 시 T
     Celery 의 broker/backend 는 Celery 가 자체 커넥션을 관리하므로 여기서
     다루지 않는다. (celery_app.py 의 설정은 그대로 유지)
 """
+
 from __future__ import annotations
 
 import os
@@ -25,11 +26,7 @@ _client: Optional["redis.Redis"] = None  # type: ignore[name-defined]
 
 def get_redis_url() -> str | None:
     """REDIS_URL 또는 Celery broker URL 에서 해석."""
-    return (
-        os.environ.get("REDIS_URL")
-        or os.environ.get("CELERY_BROKER_URL")
-        or None
-    )
+    return os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or None
 
 
 def get_redis() -> "redis.Redis | None":

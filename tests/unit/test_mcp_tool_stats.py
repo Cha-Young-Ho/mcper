@@ -15,7 +15,9 @@ from app.services.mcp_tool_stats import record_mcp_tool_call
 class TestRecordMcpToolCall:
     def test_executes_upsert_and_commits(self):
         mock_session = MagicMock()
-        with patch("app.services.mcp_tool_stats.SessionLocal", return_value=mock_session):
+        with patch(
+            "app.services.mcp_tool_stats.SessionLocal", return_value=mock_session
+        ):
             record_mcp_tool_call("some_tool")
         mock_session.execute.assert_called_once()
         mock_session.commit.assert_called_once()
@@ -24,7 +26,9 @@ class TestRecordMcpToolCall:
     def test_session_closed_even_when_commit_fails(self):
         mock_session = MagicMock()
         mock_session.commit.side_effect = RuntimeError("commit boom")
-        with patch("app.services.mcp_tool_stats.SessionLocal", return_value=mock_session):
+        with patch(
+            "app.services.mcp_tool_stats.SessionLocal", return_value=mock_session
+        ):
             # best-effort: must not raise
             record_mcp_tool_call("some_tool")
         mock_session.close.assert_called_once()
@@ -40,7 +44,9 @@ class TestRecordMcpToolCall:
     def test_never_raises_on_execute_failure(self):
         mock_session = MagicMock()
         mock_session.execute.side_effect = RuntimeError("execute boom")
-        with patch("app.services.mcp_tool_stats.SessionLocal", return_value=mock_session):
+        with patch(
+            "app.services.mcp_tool_stats.SessionLocal", return_value=mock_session
+        ):
             record_mcp_tool_call("some_tool")
         # close still invoked in finally
         mock_session.close.assert_called_once()

@@ -54,7 +54,9 @@ engine: Engine = create_engine(
     max_overflow=_MAX_OVERFLOW,
 )
 
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, class_=Session)
+SessionLocal = sessionmaker(
+    bind=engine, autocommit=False, autoflush=False, class_=Session
+)
 
 
 def _apply_lightweight_migrations(connection) -> None:
@@ -63,9 +65,7 @@ def _apply_lightweight_migrations(connection) -> None:
     create_all 은 이미 있는 테이블에 컬럼을 안 붙이므로, 예전 specs 행만 있던 DB용.
     """
     connection.execute(
-        text(
-            "ALTER TABLE specs ADD COLUMN IF NOT EXISTS title VARCHAR(512)"
-        )
+        text("ALTER TABLE specs ADD COLUMN IF NOT EXISTS title VARCHAR(512)")
     )
     # User 테이블에 password_changed_at 컬럼 추가 (없을 경우)
     connection.execute(
@@ -236,7 +236,6 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
-
     # ── Skills 테이블 생성 (Rules와 완전 별개) ─────────────────────────
     connection.execute(
         text(
@@ -400,7 +399,6 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
-
     # ── workflow_chunks 테이블 (워크플로우 벡터 검색용) ────────────────
     connection.execute(
         text(
@@ -431,7 +429,6 @@ def _apply_lightweight_migrations(connection) -> None:
             """
         )
     )
-
 
     # ── Workflows 테이블 생성 (Rules/Skills와 별개) ──────────────────────
     connection.execute(
@@ -492,7 +489,6 @@ def _apply_lightweight_migrations(connection) -> None:
         )
     )
 
-
     # ── doc_chunks 테이블 (일반 문서 벡터 검색용) ──────────────────────
     connection.execute(
         text(
@@ -523,7 +519,6 @@ def _apply_lightweight_migrations(connection) -> None:
             """
         )
     )
-
 
     # ── Docs 테이블 생성 (Workflows 미러) ──────────────────────────────
     connection.execute(
@@ -797,7 +792,6 @@ def _apply_rag_indexes(connection) -> None:
             """
         )
     )
-
 
     # ── workflow_chunks: FTS generated column + GIN + HNSW ────────────────
     connection.execute(

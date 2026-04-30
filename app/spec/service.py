@@ -70,7 +70,7 @@ class SpecIndexingService:
         self._repo.delete_by_spec(spec_id)
 
         # 4. Parent 저장 (flush → id 획득)
-        parent_db_ids: dict[int, int] = {}   # {chunk_index(음수) → db_id}
+        parent_db_ids: dict[int, int] = {}  # {chunk_index(음수) → db_id}
         for parent in parents:
             db_id = self._repo.save_parent(spec_id, parent)
             parent_db_ids[parent.chunk_index] = db_id
@@ -83,7 +83,9 @@ class SpecIndexingService:
 
         logger.info(
             "spec indexed spec_id=%s parents=%d children=%d",
-            spec_id, len(parents), len(children),
+            spec_id,
+            len(parents),
+            len(children),
         )
         return IndexResult(
             ok=True,
@@ -94,6 +96,7 @@ class SpecIndexingService:
 
 
 # ── 팩토리 ────────────────────────────────────────────────────────────────────
+
 
 def make_default_service(db: Session) -> SpecIndexingService:
     """기본 구성(HeadingAwareParentChildChunker + Postgres + 로컬 임베딩)으로 서비스 생성."""

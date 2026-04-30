@@ -23,7 +23,6 @@ from mcp.server.auth.provider import (
     AccessToken,
     AuthorizationCode,
     AuthorizationParams,
-    OAuthAuthorizationServerProvider,
     RefreshToken,
     construct_redirect_uri,
 )
@@ -33,7 +32,7 @@ from app.auth.session_store import (
     DEFAULT_CLIENT_TTL,
     get_session_store,
 )
-from app.db.auth_models import ApiKey, User
+from app.db.auth_models import ApiKey
 from app.db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -277,7 +276,9 @@ class McperOAuthProvider:
         if data:
             if data.get("expires_at", 0) < time.time():
                 store.delete_access_token(token)
-                logger.warning("load_access_token: store token expired (%s...)", token_hint)
+                logger.warning(
+                    "load_access_token: store token expired (%s...)", token_hint
+                )
                 return None
             return AccessToken(
                 token=token,
@@ -294,11 +295,14 @@ class McperOAuthProvider:
             if api_key is None:
                 logger.warning(
                     "load_access_token: token not found in store (~%d entries) or DB (%s...)",
-                    store.access_token_count(), token_hint,
+                    store.access_token_count(),
+                    token_hint,
                 )
                 return None
             if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
-                logger.warning("load_access_token: DB token expired (%s...)", token_hint)
+                logger.warning(
+                    "load_access_token: DB token expired (%s...)", token_hint
+                )
                 return None
             api_key.last_used_at = datetime.now(timezone.utc)
             db.commit()
@@ -341,12 +345,14 @@ def _store_mcp_access_token(user_id: int, token: str, client_id: str) -> None:
         expires_at = datetime.fromtimestamp(
             time.time() + ACCESS_TOKEN_EXPIRY, tz=timezone.utc
         )
-        db.add(ApiKey(
-            user_id=user_id,
-            key_hash=key_hash,
-            name=f"mcp-oauth-{client_id[:16]}",
-            expires_at=expires_at,
-        ))
+        db.add(
+            ApiKey(
+                user_id=user_id,
+                key_hash=key_hash,
+                name=f"mcp-oauth-{client_id[:16]}",
+                expires_at=expires_at,
+            )
+        )
         db.commit()
     finally:
         db.close()

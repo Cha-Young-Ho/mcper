@@ -3,13 +3,10 @@
 import uuid
 
 import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from app.db.rule_models import GlobalRuleVersion, AppRuleVersion, RepoRuleVersion
+from app.db.rule_models import GlobalRuleVersion
 from app.db.models import Spec
-from app.db.celery_models import FailedTask, CeleryTaskStat
+from app.db.celery_models import FailedTask
 
 
 def _unique_section() -> str:
@@ -43,7 +40,11 @@ class TestAdminDashboardIntegration:
 
     def test_dashboard_shows_global_version_count(self, test_client, db_session):
         """Dashboard displays global rule version count from DB."""
-        db_session.add(GlobalRuleVersion(section_name=_unique_section(), version=1, body="# Test rule v1"))
+        db_session.add(
+            GlobalRuleVersion(
+                section_name=_unique_section(), version=1, body="# Test rule v1"
+            )
+        )
         db_session.commit()
         response = test_client.get("/admin", auth=("admin", "changeme"))
         assert response.status_code == 200
@@ -52,7 +53,11 @@ class TestAdminDashboardIntegration:
         """Dashboard renders tool stats section."""
         response = test_client.get("/admin", auth=("admin", "changeme"))
         assert response.status_code == 200
-        assert b"Tools" in response.content or b"tools" in response.content or response.status_code == 200
+        assert (
+            b"Tools" in response.content
+            or b"tools" in response.content
+            or response.status_code == 200
+        )
 
 
 @pytest.mark.integration
@@ -66,26 +71,30 @@ class TestAdminSpecsIntegration:
 
     def test_plans_app_index_with_data(self, test_client, db_session):
         """Plans page shows app cards when specs exist."""
-        db_session.add(Spec(
-            title="Test Spec",
-            content="Test content",
-            app_target="testapp",
-            base_branch="main",
-            related_files=[],
-        ))
+        db_session.add(
+            Spec(
+                title="Test Spec",
+                content="Test content",
+                app_target="testapp",
+                base_branch="main",
+                related_files=[],
+            )
+        )
         db_session.commit()
         response = test_client.get("/admin/plans", auth=("admin", "changeme"))
         assert response.status_code == 200
 
     def test_plans_list_for_app(self, test_client, db_session):
         """Listing specs for a specific app works."""
-        db_session.add(Spec(
-            title="App Spec",
-            content="Content for myapp",
-            app_target="myapp",
-            base_branch="main",
-            related_files=[],
-        ))
+        db_session.add(
+            Spec(
+                title="App Spec",
+                content="Content for myapp",
+                app_target="myapp",
+                base_branch="main",
+                related_files=[],
+            )
+        )
         db_session.commit()
         response = test_client.get("/admin/plans/app/myapp", auth=("admin", "changeme"))
         assert response.status_code == 200
@@ -120,7 +129,9 @@ class TestAdminRulesIntegration:
     def test_global_rule_view_specific_version(self, test_client, db_session):
         """Viewing a specific global rule version works."""
         sec = _unique_section()
-        db_session.add(GlobalRuleVersion(section_name=sec, version=1, body="# Rule v1 content"))
+        db_session.add(
+            GlobalRuleVersion(section_name=sec, version=1, body="# Rule v1 content")
+        )
         db_session.commit()
         # The view route lives at /admin/global-rules/{section}/v/{version}
         # Old route `/admin/global-rules/v/1` referenced implicit 'main' section which now
@@ -130,7 +141,9 @@ class TestAdminRulesIntegration:
 
     def test_global_rule_view_nonexistent_returns_404(self, test_client):
         """Viewing a nonexistent version returns 404."""
-        response = test_client.get("/admin/global-rules/v/99999", auth=("admin", "changeme"))
+        response = test_client.get(
+            "/admin/global-rules/v/99999", auth=("admin", "changeme")
+        )
         assert response.status_code == 404
 
     def test_global_mcp_app_default_toggle(self, csrf_client):
@@ -165,26 +178,30 @@ class TestAdminCeleryIntegration:
 
     def test_celery_dashboard_with_failed_tasks(self, test_client, db_session):
         """Celery dashboard shows failed tasks."""
-        db_session.add(FailedTask(
-            task_id="test-task-001",
-            entity_type="spec",
-            entity_id=1,
-            error_message="Test error",
-            status="pending",
-        ))
+        db_session.add(
+            FailedTask(
+                task_id="test-task-001",
+                entity_type="spec",
+                entity_id=1,
+                error_message="Test error",
+                status="pending",
+            )
+        )
         db_session.commit()
         response = test_client.get("/admin/celery", auth=("admin", "changeme"))
         assert response.status_code == 200
 
     def test_celery_dashboard_filter_by_status(self, test_client, db_session):
         """Celery dashboard filters by status."""
-        db_session.add(FailedTask(
-            task_id="test-task-filter",
-            entity_type="spec",
-            entity_id=2,
-            error_message="Filter test",
-            status="pending",
-        ))
+        db_session.add(
+            FailedTask(
+                task_id="test-task-filter",
+                entity_type="spec",
+                entity_id=2,
+                error_message="Filter test",
+                status="pending",
+            )
+        )
         db_session.commit()
         response = test_client.get(
             "/admin/celery?status=pending",

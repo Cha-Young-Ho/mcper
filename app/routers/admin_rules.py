@@ -6,7 +6,17 @@ import difflib
 import json
 from urllib.parse import quote
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
@@ -19,7 +29,7 @@ from app.db.rule_models import (
     McpAppPullOption,
     RepoRuleVersion,
 )
-from app.routers.admin_base import DOMAIN_CONFIG, _count, templates
+from app.routers.admin_base import DOMAIN_CONFIG, templates
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -97,7 +107,10 @@ def new_app_wizard_submit(
     ).first()
     if existing_app is not None:
         return JSONResponse(
-            {"error": "already_exists", "message": f"'{app_key}' 앱이 이미 존재합니다. 기존 앱 화면에서 새 버전을 추가하세요."},
+            {
+                "error": "already_exists",
+                "message": f"'{app_key}' 앱이 이미 존재합니다. 기존 앱 화면에서 새 버전을 추가하세요.",
+            },
             status_code=409,
         )
 
@@ -105,7 +118,9 @@ def new_app_wizard_submit(
 
     if repo_mode == "new" and repo_pattern:
         exists_repo = db.scalars(
-            select(RepoRuleVersion).where(RepoRuleVersion.pattern == repo_pattern).limit(1)
+            select(RepoRuleVersion)
+            .where(RepoRuleVersion.pattern == repo_pattern)
+            .limit(1)
         ).first()
         if exists_repo is None:
             placeholder = f"# {repo_pattern}\n\n업무 지침 내용을 여기에 추가하세요.\n"
@@ -125,8 +140,7 @@ def _wizard_error(request: Request, db: Session, error: str):
     """마법사 폼 오류 재표시 헬퍼."""
     raw_patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db))
     repo_options = [
-        {"pattern": p, "display": vr.repo_pattern_card_display(p)}
-        for p in raw_patterns
+        {"pattern": p, "display": vr.repo_pattern_card_display(p)} for p in raw_patterns
     ]
     return templates.TemplateResponse(
         request,
@@ -156,20 +170,24 @@ def global_rules_board(
     section_rows = vr._global_all_sections_latest(db, domain=domain_filter)
     sections = []
     for r in section_rows:
-        sections.append({
-            "section_name": r.section_name,
-            "version": r.version,
-            "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-            "created_at": r.created_at,
-            "url": f"/admin/global-rules/s/{quote(r.section_name, safe='')}",
-        })
+        sections.append(
+            {
+                "section_name": r.section_name,
+                "version": r.version,
+                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
+                "created_at": r.created_at,
+                "url": f"/admin/global-rules/s/{quote(r.section_name, safe='')}",
+            }
+        )
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
         request,
         "admin/global_rules_board.html",
         {
             "request": request,
-            "title": f"Global rules — {domain_cfg['display']}" if domain_cfg else "Global rules",
+            "title": f"Global rules — {domain_cfg['display']}"
+            if domain_cfg
+            else "Global rules",
             "sections": sections,
             "include_app_default_global": vr.get_mcp_include_app_default_global(db),
             "domain": domain_filter or "",
@@ -234,7 +252,10 @@ def global_category_new_submit(
     existing = vr.list_sections_for_global(db)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     nv = vr.publish_global(db, body, sn)
@@ -379,9 +400,7 @@ def global_rule_category_version_view(
     if row is None:
         raise HTTPException(404, "Not found")
     n = int(
-        db.scalar(
-            select(func.count()).where(GlobalRuleVersion.section_name == sn)
-        ) or 0
+        db.scalar(select(func.count()).where(GlobalRuleVersion.section_name == sn)) or 0
     )
     can_delete_version = n > 1 if sn == vr.DEFAULT_SECTION else n >= 1
     return templates.TemplateResponse(
@@ -414,7 +433,10 @@ def global_rule_category_version_delete(
         raise HTTPException(400, "기본(main) 카테고리는 최소 1개 버전이 필요합니다.")
     res = db.execute(
         delete(GlobalRuleVersion).where(
-            and_(GlobalRuleVersion.section_name == sn, GlobalRuleVersion.version == version)
+            and_(
+                GlobalRuleVersion.section_name == sn,
+                GlobalRuleVersion.version == version,
+            )
         )
     )
     db.commit()
@@ -521,8 +543,7 @@ def app_rules_cards(
 
     # N+1 방지: 앱당 최신 행을 2 쿼리(집계 + 조인)로 일괄 조회 후 dict 룩업.
     latest_by_app = {
-        row.app_name: row
-        for row in vr.get_latest_app_rules(db, domain=domain_filter)
+        row.app_name: row for row in vr.get_latest_app_rules(db, domain=domain_filter)
     }
 
     cards: list[dict] = []
@@ -543,7 +564,9 @@ def app_rules_cards(
                 "url": f"/admin/app-rules/app/{quote(name, safe='')}",
                 "show_pull_toggle": not is_def,
                 "include_app_pull_default": (
-                    vr.get_mcp_include_app_default_for_app(db, name) if not is_def else False
+                    vr.get_mcp_include_app_default_for_app(db, name)
+                    if not is_def
+                    else False
                 ),
             }
         )
@@ -554,7 +577,9 @@ def app_rules_cards(
         "admin/app_rules_cards.html",
         {
             "request": request,
-            "title": f"App rules — {domain_cfg['display']}" if domain_cfg else "App rules",
+            "title": f"App rules — {domain_cfg['display']}"
+            if domain_cfg
+            else "App rules",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -648,18 +673,22 @@ def app_rule_board(
     section_rows = vr._app_all_sections_latest(db, key)
     sections = []
     for r in section_rows:
-        sections.append({
-            "section_name": r.section_name,
-            "version": r.version,
-            "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-            "created_at": r.created_at,
-            "url": f"/admin/app-rules/app/{quote(key, safe='')}/s/{quote(r.section_name, safe='')}",
-        })
+        sections.append(
+            {
+                "section_name": r.section_name,
+                "version": r.version,
+                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
+                "created_at": r.created_at,
+                "url": f"/admin/app-rules/app/{quote(key, safe='')}/s/{quote(r.section_name, safe='')}",
+            }
+        )
 
     can_delete_stream = key != "__default__"
     show_pull_default_toggle = key != "__default__"
     include_app_pull_default = (
-        vr.get_mcp_include_app_default_for_app(db, key) if show_pull_default_toggle else False
+        vr.get_mcp_include_app_default_for_app(db, key)
+        if show_pull_default_toggle
+        else False
     )
 
     return templates.TemplateResponse(
@@ -861,7 +890,10 @@ def app_section_new_submit(
     existing = vr.list_sections_for_app(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다. 기존 카테고리에서 새 버전을 추가하세요."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다. 기존 카테고리에서 새 버전을 추가하세요.",
+            },
             status_code=409,
         )
     _, _sn, nv = vr.publish_app(db, key, body, sn)
@@ -1039,7 +1071,8 @@ def app_rule_section_version_view(
                 AppRuleVersion.app_name == key,
                 AppRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     can_delete_version = n >= 1 and (
         (key != "__default__" or sn != vr.DEFAULT_SECTION) or n > 1
@@ -1077,10 +1110,13 @@ def app_rule_section_version_delete(
                 AppRuleVersion.app_name == key,
                 AppRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if key == "__default__" and sn == vr.DEFAULT_SECTION and n <= 1:
-        raise HTTPException(400, "default 앱 기본(main) 카테고리는 최소 1개 버전이 필요합니다.")
+        raise HTTPException(
+            400, "default 앱 기본(main) 카테고리는 최소 1개 버전이 필요합니다."
+        )
     res = db.execute(
         delete(AppRuleVersion).where(
             and_(
@@ -1099,7 +1135,8 @@ def app_rule_section_version_delete(
                 AppRuleVersion.app_name == key,
                 AppRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if n_after > 0:
         return RedirectResponse(
@@ -1155,7 +1192,9 @@ def repo_rules_cards(
 ):
     """레포 규칙 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    all_patterns = _sort_repo_patterns(vr.list_distinct_repo_patterns(db, domain=domain_filter))
+    all_patterns = _sort_repo_patterns(
+        vr.list_distinct_repo_patterns(db, domain=domain_filter)
+    )
     qn = q.strip().lower()
     if qn:
 
@@ -1169,15 +1208,18 @@ def repo_rules_cards(
 
         all_patterns = [p for p in all_patterns if _repo_pattern_matches_query(p)]
 
-    total = len(all_patterns) if qn else vr.count_distinct_repo_patterns(db, domain=domain_filter)
+    total = (
+        len(all_patterns)
+        if qn
+        else vr.count_distinct_repo_patterns(db, domain=domain_filter)
+    )
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     patterns = all_patterns[offset : offset + limit]
 
     # N+1 방지: 패턴당 최신 행을 2 쿼리로 일괄 조회.
     latest_by_pat = {
-        row.pattern: row
-        for row in vr.get_latest_repo_rules(db, domain=domain_filter)
+        row.pattern: row for row in vr.get_latest_repo_rules(db, domain=domain_filter)
     }
 
     cards: list[dict] = []
@@ -1197,7 +1239,9 @@ def repo_rules_cards(
                 "latest_version": latest.version,
                 "url": f"/admin/repo-rules/pat/{seg}",
                 "pat_segment": seg,
-                "include_repo_default": vr.get_mcp_include_repo_default_for_pattern(db, pat),
+                "include_repo_default": vr.get_mcp_include_repo_default_for_pattern(
+                    db, pat
+                ),
             }
         )
 
@@ -1207,7 +1251,9 @@ def repo_rules_cards(
         "admin/repo_rules_cards.html",
         {
             "request": request,
-            "title": f"Repository rules — {domain_cfg['display']}" if domain_cfg else "Repository rules",
+            "title": f"Repository rules — {domain_cfg['display']}"
+            if domain_cfg
+            else "Repository rules",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -1302,13 +1348,15 @@ def repo_rule_board(
     sections = []
     for r in section_rows:
         sn_url = quote(r.section_name, safe="")
-        sections.append({
-            "section_name": r.section_name,
-            "version": r.version,
-            "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
-            "created_at": r.created_at,
-            "url": f"/admin/repo-rules/pat/{pat_url}/s/{sn_url}",
-        })
+        sections.append(
+            {
+                "section_name": r.section_name,
+                "version": r.version,
+                "preview": r.body[:200] + ("…" if len(r.body) > 200 else ""),
+                "created_at": r.created_at,
+                "url": f"/admin/repo-rules/pat/{pat_url}/s/{sn_url}",
+            }
+        )
 
     return templates.TemplateResponse(
         request,
@@ -1412,7 +1460,10 @@ def repo_category_new_submit(
     existing = vr.list_sections_for_repo(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     _, _sn, nv = vr.publish_repo(db, key, body, section_name=sn)
@@ -1591,7 +1642,8 @@ def repo_rule_category_version_view(
                 RepoRuleVersion.pattern == key,
                 RepoRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     can_delete_version = n >= 1 and (
         (key or "").strip() != "" or sn != vr.DEFAULT_SECTION or n > 1
@@ -1632,10 +1684,13 @@ def repo_rule_category_version_delete(
                 RepoRuleVersion.pattern == key,
                 RepoRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if not (key or "").strip() and sn == vr.DEFAULT_SECTION and n <= 1:
-        raise HTTPException(400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다.")
+        raise HTTPException(
+            400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다."
+        )
     res = db.execute(
         delete(RepoRuleVersion).where(
             and_(
@@ -1654,7 +1709,8 @@ def repo_rule_category_version_delete(
                 RepoRuleVersion.pattern == key,
                 RepoRuleVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     pat_url = vr.repo_pat_href_segment(key)
     if n_after > 0:
@@ -1761,9 +1817,13 @@ def rule_diff(
     ).first()
 
     if row1 is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v1} not found")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"Global rule version {v1} not found"
+        )
     if row2 is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Global rule version {v2} not found")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"Global rule version {v2} not found"
+        )
 
     lines1 = row1.body.splitlines(keepends=True)
     lines2 = row2.body.splitlines(keepends=True)
@@ -1826,13 +1886,19 @@ async def import_rules(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid JSON: {exc}") from exc
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"Invalid JSON: {exc}"
+        ) from exc
 
     results: dict[str, object] = {}
 
     # global
     global_section = data.get("global", {})
-    global_body = (global_section.get("body") or "").strip() if isinstance(global_section, dict) else ""
+    global_body = (
+        (global_section.get("body") or "").strip()
+        if isinstance(global_section, dict)
+        else ""
+    )
     if global_body:
         new_gv = vr.publish_global(db, global_body)
         results["global"] = {"new_version": new_gv}
@@ -1842,13 +1908,17 @@ async def import_rules(
     for app_name, info in (data.get("apps") or {}).items():
         if isinstance(info, dict):
             # new format: {section_name: {version, body}}
-            sections_in = {k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")}
+            sections_in = {
+                k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")
+            }
             if sections_in:
                 for sn, sinfo in sections_in.items():
                     body = (sinfo.get("body") or "").strip()
                     if body:
                         _, _sn, new_v = vr.publish_app(db, app_name, body, sn)
-                apps_imported[app_name] = {sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")}
+                apps_imported[app_name] = {
+                    sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")
+                }
             else:
                 # legacy format: {body: ...}
                 body = (info.get("body") or "").strip()
@@ -1863,13 +1933,19 @@ async def import_rules(
     for pat_key, info in (data.get("repos") or {}).items():
         pattern = "" if pat_key == "__default__" else pat_key
         if isinstance(info, dict):
-            sections_in = {k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")}
+            sections_in = {
+                k: v for k, v in info.items() if isinstance(v, dict) and v.get("body")
+            }
             if sections_in:
                 for sn, sinfo in sections_in.items():
                     body = (sinfo.get("body") or "").strip()
                     if body:
-                        _, _sn, new_v = vr.publish_repo(db, pattern, body, section_name=sn)
-                repos_imported[pat_key] = {sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")}
+                        _, _sn, new_v = vr.publish_repo(
+                            db, pattern, body, section_name=sn
+                        )
+                repos_imported[pat_key] = {
+                    sn: new_v for sn, sinfo in sections_in.items() if sinfo.get("body")
+                }
             else:
                 body = (info.get("body") or "").strip()
                 if body:

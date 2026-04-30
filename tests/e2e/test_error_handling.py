@@ -1,7 +1,6 @@
 """E2E tests: error handling and edge cases."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.mark.e2e
@@ -107,4 +106,6 @@ class TestCrossModuleErrorScenarios:
         ]
         for page in pages:
             response = test_client.get(page, auth=("admin", "changeme"))
-            assert response.status_code == 200, f"{page} returned {response.status_code}"
+            assert response.status_code == 200, (
+                f"{page} returned {response.status_code}"
+            )

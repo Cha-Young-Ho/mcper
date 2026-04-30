@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
 
 from app.services.code_parser import CodeSymbol
 from app.services.code_parser_factory import CodeParserFactory, parse_code_file
 from app.services.code_parser_python import (
     PythonCodeParser,
     _extract_source_lines,
-    _get_docstring,
-    _get_function_signature,
 )
 from app.services.code_parser_javascript import (
     JavaScriptCodeParser,
@@ -24,7 +21,9 @@ from app.services.code_parser_javascript import (
 
 class TestCodeSymbol:
     def test_creation(self):
-        sym = CodeSymbol(name="foo", kind="function", line_number=1, content="def foo(): pass")
+        sym = CodeSymbol(
+            name="foo", kind="function", line_number=1, content="def foo(): pass"
+        )
         assert sym.name == "foo"
         assert sym.docstring is None
         assert sym.signature is None
@@ -106,6 +105,7 @@ class TestPythonCodeParser:
 class TestPythonHelpers:
     def test_extract_source_lines(self):
         import ast
+
         code = "x = 1\ndef foo():\n    pass\n"
         tree = ast.parse(code)
         funcs = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]

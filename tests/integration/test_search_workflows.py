@@ -47,9 +47,15 @@ class TestPublishIndexingHook:
     def test_publish_global_creates_chunks(self, db_session: Session):
         _cleanup(db_session)
         try:
-            publish_global_workflow(db_session, SAMPLE_BODY, section_name="spec-implementation")
-            chunks = db_session.query(WorkflowChunk).filter_by(workflow_type="global").all()
-            assert len(chunks) > 0, "publish_global_workflow should create workflow_chunks"
+            publish_global_workflow(
+                db_session, SAMPLE_BODY, section_name="spec-implementation"
+            )
+            chunks = (
+                db_session.query(WorkflowChunk).filter_by(workflow_type="global").all()
+            )
+            assert len(chunks) > 0, (
+                "publish_global_workflow should create workflow_chunks"
+            )
             # child chunks (embedding target) must exist; parent chunks are optional for short bodies
             assert any(c.chunk_type == "child" for c in chunks)
         finally:
@@ -58,8 +64,12 @@ class TestPublishIndexingHook:
     def test_publish_app_creates_chunks_with_app_name(self, db_session: Session):
         _cleanup(db_session)
         try:
-            publish_app_workflow(db_session, "testapp", SAMPLE_BODY, section_name="main")
-            chunks = db_session.query(WorkflowChunk).filter_by(workflow_type="app").all()
+            publish_app_workflow(
+                db_session, "testapp", SAMPLE_BODY, section_name="main"
+            )
+            chunks = (
+                db_session.query(WorkflowChunk).filter_by(workflow_type="app").all()
+            )
             assert len(chunks) > 0
             assert all(c.app_name == "testapp" for c in chunks)
         finally:
@@ -69,9 +79,14 @@ class TestPublishIndexingHook:
         _cleanup(db_session)
         try:
             publish_repo_workflow(
-                db_session, "github.com/org/repo", SAMPLE_BODY, section_name="review",
+                db_session,
+                "github.com/org/repo",
+                SAMPLE_BODY,
+                section_name="review",
             )
-            chunks = db_session.query(WorkflowChunk).filter_by(workflow_type="repo").all()
+            chunks = (
+                db_session.query(WorkflowChunk).filter_by(workflow_type="repo").all()
+            )
             assert len(chunks) > 0
             assert all(c.pattern == "github.com/org/repo" for c in chunks)
         finally:
@@ -83,19 +98,25 @@ class TestPublishIndexingHook:
             # first publish → entity_id A, chunks for A
             publish_global_workflow(db_session, SAMPLE_BODY, section_name="s1")
             first_ids = {r.id for r in db_session.query(GlobalWorkflowVersion).all()}
-            chunks_a = db_session.query(WorkflowChunk).filter(
-                WorkflowChunk.workflow_entity_id.in_(first_ids)
-            ).count()
+            chunks_a = (
+                db_session.query(WorkflowChunk)
+                .filter(WorkflowChunk.workflow_entity_id.in_(first_ids))
+                .count()
+            )
             assert chunks_a > 0
 
             # second publish → new entity_id B (version bump), chunks for B
-            publish_global_workflow(db_session, SAMPLE_BODY + "\n\n추가 내용\n", section_name="s1")
+            publish_global_workflow(
+                db_session, SAMPLE_BODY + "\n\n추가 내용\n", section_name="s1"
+            )
             all_ids = {r.id for r in db_session.query(GlobalWorkflowVersion).all()}
             new_ids = all_ids - first_ids
             assert len(new_ids) == 1
-            chunks_b = db_session.query(WorkflowChunk).filter(
-                WorkflowChunk.workflow_entity_id.in_(new_ids)
-            ).count()
+            chunks_b = (
+                db_session.query(WorkflowChunk)
+                .filter(WorkflowChunk.workflow_entity_id.in_(new_ids))
+                .count()
+            )
             assert chunks_b > 0
         finally:
             _cleanup(db_session)
@@ -108,8 +129,12 @@ class TestSearchWorkflows:
     def test_search_returns_legacy_shape(self, db_session: Session):
         _cleanup(db_session)
         try:
-            publish_global_workflow(db_session, SAMPLE_BODY, section_name="spec-implementation")
-            results = search_workflows(db_session, query="기획서", scope="global", top_n=5)
+            publish_global_workflow(
+                db_session, SAMPLE_BODY, section_name="spec-implementation"
+            )
+            results = search_workflows(
+                db_session, query="기획서", scope="global", top_n=5
+            )
             assert isinstance(results, list)
             if results:  # hybrid may match or fall back
                 r = results[0]
@@ -130,7 +155,11 @@ class TestSearchWorkflows:
             publish_global_workflow(db_session, SAMPLE_BODY, section_name="g1")
             publish_app_workflow(db_session, "myapp", SAMPLE_BODY, section_name="a1")
             results = search_workflows(
-                db_session, query="구현", app_name="myapp", scope="app", top_n=10,
+                db_session,
+                query="구현",
+                app_name="myapp",
+                scope="app",
+                top_n=10,
             )
             for r in results:
                 assert r["scope"] == "app"
@@ -143,12 +172,16 @@ class TestSearchWorkflows:
         pre-migration state. search_workflows must still find matches via ILIKE fallback."""
         _cleanup(db_session)
         try:
-            publish_global_workflow(db_session, SAMPLE_BODY, section_name="spec-implementation")
+            publish_global_workflow(
+                db_session, SAMPLE_BODY, section_name="spec-implementation"
+            )
             # wipe chunks but keep version row
             db_session.execute(delete(WorkflowChunk))
             db_session.commit()
 
-            results = search_workflows(db_session, query="기획서", scope="global", top_n=5)
+            results = search_workflows(
+                db_session, query="기획서", scope="global", top_n=5
+            )
             # legacy ILIKE path should still return hits since body contains "기획서"
             assert any(r["scope"] == "global" for r in results)
         finally:

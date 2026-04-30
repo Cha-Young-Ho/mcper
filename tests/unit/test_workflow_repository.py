@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -36,7 +36,10 @@ class TestDeleteBySection:
         db = MagicMock()
         repo = SqlAlchemyWorkflowChunkRepository(db)
         repo.delete_by_section(
-            "app", app_name="myapp", pattern=None, section_name="main",
+            "app",
+            app_name="myapp",
+            pattern=None,
+            section_name="main",
         )
         assert db.execute.called
         assert db.execute.call_count == 1
@@ -50,18 +53,26 @@ class TestDeleteBySection:
         clause_null = _eq_or_null(WorkflowChunk.app_name, None)
         clause_eq = _eq_or_null(WorkflowChunk.app_name, "x")
         # compile to SQL text to verify IS NULL vs =
-        assert "IS NULL" in str(clause_null.compile(compile_kwargs={"literal_binds": True}))
+        assert "IS NULL" in str(
+            clause_null.compile(compile_kwargs={"literal_binds": True})
+        )
         assert "=" in str(clause_eq.compile(compile_kwargs={"literal_binds": True}))
 
     def test_delete_all_three_scopes(self):
         db = MagicMock()
         repo = SqlAlchemyWorkflowChunkRepository(db)
         # global
-        repo.delete_by_section("global", app_name=None, pattern=None, section_name="main")
+        repo.delete_by_section(
+            "global", app_name=None, pattern=None, section_name="main"
+        )
         # app
-        repo.delete_by_section("app", app_name="adventure", pattern=None, section_name="main")
+        repo.delete_by_section(
+            "app", app_name="adventure", pattern=None, section_name="main"
+        )
         # repo
-        repo.delete_by_section("repo", app_name=None, pattern="gh.com/x", section_name="s")
+        repo.delete_by_section(
+            "repo", app_name=None, pattern="gh.com/x", section_name="s"
+        )
         assert db.execute.call_count == 3
 
 
@@ -78,12 +89,19 @@ class TestSaveParent:
 
         repo = SqlAlchemyWorkflowChunkRepository(db)
         record = _FakeRecord(
-            chunk_index=-1, content="parent content", section_heading="Section X",
+            chunk_index=-1,
+            content="parent content",
+            section_heading="Section X",
             metadata={"src": "test"},
         )
         returned_id = repo.save_parent(
-            "global", 1, record,
-            app_name="myapp", pattern="pat", domain="dev", section_name="main",
+            "global",
+            1,
+            record,
+            app_name="myapp",
+            pattern="pat",
+            domain="dev",
+            section_name="main",
         )
         assert returned_id == 777
         assert db.add.called
@@ -130,16 +148,27 @@ class TestSaveChildren:
         repo = SqlAlchemyWorkflowChunkRepository(db)
 
         records = [
-            _FakeRecord(chunk_index=0, content="c0", parent_chunk_index=-1, metadata={"k": 1}),
+            _FakeRecord(
+                chunk_index=0, content="c0", parent_chunk_index=-1, metadata={"k": 1}
+            ),
             _FakeRecord(chunk_index=1, content="c1", parent_chunk_index=-1),
-            _FakeRecord(chunk_index=2, content="c2", parent_chunk_index=None),  # no parent
+            _FakeRecord(
+                chunk_index=2, content="c2", parent_chunk_index=None
+            ),  # no parent
         ]
         parent_db_ids = {-1: 100}
         embeddings = [[0.1] * 384, [0.2] * 384, [0.3] * 384]
 
         repo.save_children(
-            "app", 7, records, parent_db_ids, embeddings,
-            app_name="myapp", pattern=None, domain="dev", section_name="sec",
+            "app",
+            7,
+            records,
+            parent_db_ids,
+            embeddings,
+            app_name="myapp",
+            pattern=None,
+            domain="dev",
+            section_name="sec",
         )
 
         assert db.add.call_count == 3
@@ -196,7 +225,10 @@ class TestSaveChildren:
         """strict=True in zip should raise when records and embeddings differ."""
         db = MagicMock()
         repo = SqlAlchemyWorkflowChunkRepository(db)
-        records = [_FakeRecord(chunk_index=0, content="a"), _FakeRecord(chunk_index=1, content="b")]
+        records = [
+            _FakeRecord(chunk_index=0, content="a"),
+            _FakeRecord(chunk_index=1, content="b"),
+        ]
         embeddings = [[0.0] * 384]  # only 1 embedding for 2 records
         with pytest.raises(ValueError):
             repo.save_children("global", 1, records, {}, embeddings)

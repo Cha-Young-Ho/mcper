@@ -6,7 +6,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from app.services import versioned_workflows as vw
 
@@ -36,16 +35,27 @@ class TestSlug:
 
 class TestSavePaths:
     def test_global_path(self):
-        assert vw._global_workflow_save_path("main") == ".cursor/workflows/global/main.md"
+        assert (
+            vw._global_workflow_save_path("main") == ".cursor/workflows/global/main.md"
+        )
 
     def test_app_path(self):
-        assert vw._app_workflow_save_path("myapp", "sec") == ".cursor/workflows/app/myapp/sec.md"
+        assert (
+            vw._app_workflow_save_path("myapp", "sec")
+            == ".cursor/workflows/app/myapp/sec.md"
+        )
 
     def test_repo_path_with_pattern(self):
-        assert vw._repo_workflow_save_path("gh.com/x", "s") == ".cursor/workflows/repo/gh.com_x/s.md"
+        assert (
+            vw._repo_workflow_save_path("gh.com/x", "s")
+            == ".cursor/workflows/repo/gh.com_x/s.md"
+        )
 
     def test_repo_path_empty_pattern_uses_default(self):
-        assert vw._repo_workflow_save_path("", "s") == ".cursor/workflows/repo/default/s.md"
+        assert (
+            vw._repo_workflow_save_path("", "s")
+            == ".cursor/workflows/repo/default/s.md"
+        )
 
 
 class TestDomainFilter:
@@ -66,13 +76,21 @@ class TestDomainFilter:
 
 class TestRepoHelpers:
     def test_pat_href_segment_empty(self):
-        assert vw.repo_workflow_pat_href_segment("") == vw.REPO_WORKFLOW_PATTERN_URL_DEFAULT
+        assert (
+            vw.repo_workflow_pat_href_segment("")
+            == vw.REPO_WORKFLOW_PATTERN_URL_DEFAULT
+        )
 
     def test_pat_href_segment_value(self):
         assert vw.repo_workflow_pat_href_segment("abc") == "abc"
 
     def test_pattern_from_url_segment_default(self):
-        assert vw.repo_workflow_pattern_from_url_segment(vw.REPO_WORKFLOW_PATTERN_URL_DEFAULT) == ""
+        assert (
+            vw.repo_workflow_pattern_from_url_segment(
+                vw.REPO_WORKFLOW_PATTERN_URL_DEFAULT
+            )
+            == ""
+        )
 
     def test_pattern_from_url_segment_value(self):
         assert vw.repo_workflow_pattern_from_url_segment("abc") == "abc"
@@ -153,6 +171,7 @@ class TestGlobalWorkflows:
 
         def _add_side_effect(row):
             row.id = 42
+
         db.add.side_effect = _add_side_effect
 
         with patch.object(vw, "_try_index_workflow") as m:
@@ -235,6 +254,7 @@ class TestAppWorkflows:
 
         def _add(row):
             row.id = 7
+
         db.add.side_effect = _add
         with patch.object(vw, "_try_index_workflow") as m:
             key, sn, ver = vw.publish_app_workflow(db, "MyApp", "body", "main")
@@ -331,6 +351,7 @@ class TestRepoWorkflows:
 
         def _add(row):
             row.id = 3
+
         db.add.side_effect = _add
         with patch.object(vw, "_try_index_workflow") as m:
             key, sn, ver = vw.publish_repo_workflow(db, "gh.com/x", "body")
@@ -389,29 +410,53 @@ class TestGetWorkflowsMarkdown:
         db = MagicMock()
         g_row = SimpleNamespace(section_name="main", body="G")
         repo_row = SimpleNamespace(section_name="main", body="R")
-        with patch.object(vw, "_global_workflow_all_sections_latest", return_value=[g_row]), \
-             patch.object(vw, "list_distinct_repo_patterns_with_workflows",
-                          return_value=["github.com/me", "bitbucket"]), \
-             patch.object(vw, "_repo_workflow_all_sections_latest", return_value=[repo_row]):
-            out = vw.get_workflows_markdown(db, origin_url="https://github.com/me/myrepo.git")
+        with (
+            patch.object(
+                vw, "_global_workflow_all_sections_latest", return_value=[g_row]
+            ),
+            patch.object(
+                vw,
+                "list_distinct_repo_patterns_with_workflows",
+                return_value=["github.com/me", "bitbucket"],
+            ),
+            patch.object(
+                vw, "_repo_workflow_all_sections_latest", return_value=[repo_row]
+            ),
+        ):
+            out = vw.get_workflows_markdown(
+                db, origin_url="https://github.com/me/myrepo.git"
+            )
         assert "R" in out
 
     def test_origin_url_default_pattern_included(self):
         """Empty pattern "" is always included when origin_url is set."""
         db = MagicMock()
         g_row = SimpleNamespace(section_name="main", body="G")
-        with patch.object(vw, "_global_workflow_all_sections_latest", return_value=[g_row]), \
-             patch.object(vw, "list_distinct_repo_patterns_with_workflows",
-                          return_value=["", "other.com"]), \
-             patch.object(vw, "_repo_workflow_all_sections_latest", return_value=[]):
+        with (
+            patch.object(
+                vw, "_global_workflow_all_sections_latest", return_value=[g_row]
+            ),
+            patch.object(
+                vw,
+                "list_distinct_repo_patterns_with_workflows",
+                return_value=["", "other.com"],
+            ),
+            patch.object(vw, "_repo_workflow_all_sections_latest", return_value=[]),
+        ):
             vw.get_workflows_markdown(db, origin_url="https://some.url/")
 
     def test_app_name_renders_app_blocks(self):
         db = MagicMock()
         g_row = SimpleNamespace(section_name="main", body="G")
         app_row = SimpleNamespace(section_name="impl", body="A")
-        with patch.object(vw, "_global_workflow_all_sections_latest", return_value=[g_row]), \
-             patch.object(vw, "_app_workflow_all_sections_latest", return_value=[app_row]):
+        with (
+            patch.object(
+                vw, "_global_workflow_all_sections_latest", return_value=[g_row]
+            ),
+            patch.object(
+                vw, "_app_workflow_all_sections_latest", return_value=[app_row]
+            ),
+        ):
             out = vw.get_workflows_markdown(db, app_name="MyApp")
         assert "A" in out
 

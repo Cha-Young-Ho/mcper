@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Index, Integer, DateTime, String, Text, UniqueConstraint, func
+from sqlalchemy import Integer, DateTime, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models import Base
@@ -28,30 +28,11 @@ class GlobalSkillVersion(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     section_name: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
-    )
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-    domain: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
-
-    __table_args__ = (
-        UniqueConstraint("section_name", "version", name="uq_global_skill_versions_section_version"),
-    )
-
-
-class AppSkillVersion(Base):
-    """앱별 스킬; (app_name, section_name) 단위로 독립 버전 스트림."""
-
-    __tablename__ = "app_skill_versions"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    app_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    section_name: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
+        String(128),
+        nullable=False,
+        default=_DEFAULT_SECTION,
+        server_default=_DEFAULT_SECTION,
+        index=True,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
@@ -63,7 +44,38 @@ class AppSkillVersion(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "app_name", "section_name", "version",
+            "section_name", "version", name="uq_global_skill_versions_section_version"
+        ),
+    )
+
+
+class AppSkillVersion(Base):
+    """앱별 스킬; (app_name, section_name) 단위로 독립 버전 스트림."""
+
+    __tablename__ = "app_skill_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    app_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    section_name: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=_DEFAULT_SECTION,
+        server_default=_DEFAULT_SECTION,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    domain: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "app_name",
+            "section_name",
+            "version",
             name="uq_app_skill_versions_app_section_version",
         ),
     )
@@ -75,9 +87,15 @@ class RepoSkillVersion(Base):
     __tablename__ = "repo_skill_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pattern: Mapped[str] = mapped_column(String(256), nullable=False, default="", index=True)
+    pattern: Mapped[str] = mapped_column(
+        String(256), nullable=False, default="", index=True
+    )
     section_name: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=_DEFAULT_SECTION, server_default=_DEFAULT_SECTION, index=True
+        String(128),
+        nullable=False,
+        default=_DEFAULT_SECTION,
+        server_default=_DEFAULT_SECTION,
+        index=True,
     )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -90,7 +108,9 @@ class RepoSkillVersion(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "pattern", "section_name", "version",
+            "pattern",
+            "section_name",
+            "version",
             name="uq_repo_skill_versions_pattern_section_version",
         ),
     )

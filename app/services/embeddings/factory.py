@@ -38,9 +38,7 @@ def build_embedding_backend(cfg: EmbeddingSettings) -> EmbeddingBackend:
                 "localhost 임베딩: embedding.localhost_model(또는 LOCALHOST_EMBEDDING_MODEL) 을 설정하세요"
             )
         key = (
-            cfg.localhost_api_key
-            or os.environ.get("LOCALHOST_EMBEDDING_API_KEY")
-            or ""
+            cfg.localhost_api_key or os.environ.get("LOCALHOST_EMBEDDING_API_KEY") or ""
         ).strip() or None
         return OpenAICompatibleBackend(
             base_url=base,

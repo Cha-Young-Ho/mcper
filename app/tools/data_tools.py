@@ -20,6 +20,7 @@ def register_data_tools(mcp) -> None:
             dict with 'records' list and 'count'.
         """
         from app.services.datasources.registry import get
+
         # Hold the session open across the authz check AND the data fetch so
         # that no TOCTOU window exists between "may this caller read?" and
         # the actual query. (Audit S05)
@@ -50,6 +51,7 @@ def register_data_tools(mcp) -> None:
             dict with 'sources' list.
         """
         from app.services.datasources.registry import list_sources
+
         with SessionLocal() as db:
             denied = check_read(db)
             if denied:

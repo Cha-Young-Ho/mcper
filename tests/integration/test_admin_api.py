@@ -1,5 +1,7 @@
 """Integration tests for admin API endpoints."""
+
 import pytest
+
 
 @pytest.mark.integration
 class TestAdminAPI:

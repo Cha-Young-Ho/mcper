@@ -4,16 +4,20 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
 from app.db.skill_models import AppSkillVersion, GlobalSkillVersion, RepoSkillVersion
 from app.routers.admin_base import DOMAIN_CONFIG, templates
-from app.routers.admin_common import _sort_app_names, _sort_repo_patterns, _section_display as _section_display_base
+from app.routers.admin_common import (
+    _sort_app_names,
+    _sort_repo_patterns,
+    _section_display as _section_display_base,
+)
 from app.services import versioned_skills as vs
 
 router = APIRouter(prefix="/admin", tags=["admin-skills"])
@@ -67,7 +71,9 @@ def global_skills_board(
         "admin/skills/global_skills_board.html",
         {
             "request": request,
-            "title": f"Global 스킬 — {domain_cfg['display']}" if domain_cfg else "Global 스킬",
+            "title": f"Global 스킬 — {domain_cfg['display']}"
+            if domain_cfg
+            else "Global 스킬",
             "sections": sections,
             "domain": domain_filter or "",
         },
@@ -120,11 +126,16 @@ def global_skill_category_new_submit(
     existing = vs.list_sections_for_global_skill(db)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     nv = vs.publish_global_skill(db, body, sn)
-    return RedirectResponse(f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.get("/global-skills/s/{section_name}")
@@ -218,7 +229,9 @@ def global_skill_category_publish_submit(
 ):
     sn = section_name.strip()
     nv = vs.publish_global_skill(db, body, sn)
-    return RedirectResponse(f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.post("/global-skills/s/{section_name}/save-as-new")
@@ -230,7 +243,9 @@ def global_skill_save_as_new(
 ):
     sn = section_name.strip()
     nv = vs.publish_global_skill(db, body, sn)
-    return RedirectResponse(f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-skills/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.get("/global-skills/s/{section_name}/v/{version}")
@@ -250,7 +265,10 @@ def global_skill_version_view(
     ).first()
     if row is None:
         raise HTTPException(404, "Not found")
-    n = int(db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn)) or 0)
+    n = int(
+        db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn))
+        or 0
+    )
     can_delete = n > 1 if sn == vs.DEFAULT_SECTION else n >= 1
     return templates.TemplateResponse(
         request,
@@ -279,13 +297,21 @@ def global_skill_version_delete(
     db: Session = Depends(get_db),
 ):
     sn = section_name.strip()
-    n = int(db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn)) or 0)
+    n = int(
+        db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn))
+        or 0
+    )
     if sn == vs.DEFAULT_SECTION and n <= 1:
         raise HTTPException(400, "기본(main) 카테고리는 최소 1개 버전이 필요합니다.")
     vs.delete_global_skill_version(db, sn, version)
-    n_after = int(db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn)) or 0)
+    n_after = int(
+        db.scalar(select(func.count()).where(GlobalSkillVersion.section_name == sn))
+        or 0
+    )
     if n_after > 0:
-        return RedirectResponse(f"/admin/global-skills/s/{quote(sn, safe='')}", status_code=303)
+        return RedirectResponse(
+            f"/admin/global-skills/s/{quote(sn, safe='')}", status_code=303
+        )
     return RedirectResponse("/admin/global-skills", status_code=303)
 
 
@@ -304,11 +330,17 @@ def app_skills_cards(
 ):
     """앱 스킬 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    all_names = _sort_app_names(vs.list_distinct_apps_with_skills(db, domain=domain_filter))
+    all_names = _sort_app_names(
+        vs.list_distinct_apps_with_skills(db, domain=domain_filter)
+    )
     if q.strip():
         all_names = [n for n in all_names if q.strip().lower() in n.lower()]
 
-    total = len(all_names) if q.strip() else vs.count_distinct_apps_with_skills(db, domain=domain_filter)
+    total = (
+        len(all_names)
+        if q.strip()
+        else vs.count_distinct_apps_with_skills(db, domain=domain_filter)
+    )
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     names = all_names[offset : offset + limit]
@@ -323,14 +355,16 @@ def app_skills_cards(
         ).first()
         if latest is None:
             continue
-        cards.append({
-            "name": name,
-            "display": name,
-            "latest_version": latest.version,
-            "app_url_encoded": quote(name, safe=""),
-            "url": f"/admin/app-skills/app/{quote(name, safe='')}",
-            "can_delete_stream": True,
-        })
+        cards.append(
+            {
+                "name": name,
+                "display": name,
+                "latest_version": latest.version,
+                "app_url_encoded": quote(name, safe=""),
+                "url": f"/admin/app-skills/app/{quote(name, safe='')}",
+                "can_delete_stream": True,
+            }
+        )
 
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
@@ -338,7 +372,9 @@ def app_skills_cards(
         "admin/skills/app_skills_cards.html",
         {
             "request": request,
-            "title": f"App 스킬 — {domain_cfg['display']}" if domain_cfg else "App 스킬",
+            "title": f"App 스킬 — {domain_cfg['display']}"
+            if domain_cfg
+            else "App 스킬",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -378,10 +414,16 @@ def new_app_skill_submit(
         return templates.TemplateResponse(
             request,
             "admin/skills/app_skill_new.html",
-            {"request": request, "title": "새 앱 스킬", "error": "앱 이름은 필수입니다."},
+            {
+                "request": request,
+                "title": "새 앱 스킬",
+                "error": "앱 이름은 필수입니다.",
+            },
             status_code=400,
         )
-    existing = db.scalars(select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)).first()
+    existing = db.scalars(
+        select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)
+    ).first()
     if existing is not None:
         return JSONResponse(
             {"error": "already_exists", "message": f"'{key}' 앱이 이미 존재합니다."},
@@ -402,7 +444,9 @@ def app_skill_board(
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
-    if not db.scalars(select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)).first():
+    if not db.scalars(
+        select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown app")
     section_rows = vs._app_skill_all_sections_latest(db, key)
     sections = [
@@ -450,7 +494,9 @@ def app_skill_category_new_form(
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
-    if not db.scalars(select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)).first():
+    if not db.scalars(
+        select(AppSkillVersion).where(AppSkillVersion.app_name == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown app")
     return templates.TemplateResponse(
         request,
@@ -494,7 +540,10 @@ def app_skill_category_new_submit(
     existing = vs.list_sections_for_app_skill(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     _, _sn, nv = vs.publish_app_skill(db, key, body, sn)
@@ -561,7 +610,9 @@ def app_skill_category_delete(
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
     if vs.delete_app_skill_section(db, key, sn) == 0:
         raise HTTPException(404, "삭제할 카테고리가 없습니다.")
-    return RedirectResponse(f"/admin/app-skills/app/{quote(key, safe='')}", status_code=303)
+    return RedirectResponse(
+        f"/admin/app-skills/app/{quote(key, safe='')}", status_code=303
+    )
 
 
 @router.get("/app-skills/app/{app_name}/s/{section_name}/publish")
@@ -652,7 +703,8 @@ def app_skill_version_view(
                 AppSkillVersion.app_name == key,
                 AppSkillVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     return templates.TemplateResponse(
         request,
@@ -690,14 +742,17 @@ def app_skill_version_delete(
                 AppSkillVersion.app_name == key,
                 AppSkillVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if n_after > 0:
         return RedirectResponse(
             f"/admin/app-skills/app/{quote(key, safe='')}/s/{quote(sn, safe='')}",
             status_code=303,
         )
-    return RedirectResponse(f"/admin/app-skills/app/{quote(key, safe='')}", status_code=303)
+    return RedirectResponse(
+        f"/admin/app-skills/app/{quote(key, safe='')}", status_code=303
+    )
 
 
 # ── Repo skills ───────────────────────────────────────────────────────────────
@@ -715,12 +770,18 @@ def repo_skills_cards(
 ):
     """레포 스킬 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    all_patterns = _sort_repo_patterns(vs.list_distinct_repo_patterns_with_skills(db, domain=domain_filter))
+    all_patterns = _sort_repo_patterns(
+        vs.list_distinct_repo_patterns_with_skills(db, domain=domain_filter)
+    )
     if q.strip():
         qn = q.strip().lower()
         all_patterns = [p for p in all_patterns if qn in (p or "").lower()]
 
-    total = len(all_patterns) if q.strip() else vs.count_distinct_repo_patterns_with_skills(db, domain=domain_filter)
+    total = (
+        len(all_patterns)
+        if q.strip()
+        else vs.count_distinct_repo_patterns_with_skills(db, domain=domain_filter)
+    )
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     patterns = all_patterns[offset : offset + limit]
@@ -736,15 +797,17 @@ def repo_skills_cards(
         if latest is None:
             continue
         seg = vs.repo_skill_pat_href_segment(pat)
-        cards.append({
-            "pattern": pat,
-            "display": vs.repo_skill_pattern_card_display(pat),
-            "is_default": not (pat or "").strip(),
-            "can_delete_stream": bool((pat or "").strip()),
-            "latest_version": latest.version,
-            "url": f"/admin/repo-skills/pat/{seg}",
-            "pat_segment": seg,
-        })
+        cards.append(
+            {
+                "pattern": pat,
+                "display": vs.repo_skill_pattern_card_display(pat),
+                "is_default": not (pat or "").strip(),
+                "can_delete_stream": bool((pat or "").strip()),
+                "latest_version": latest.version,
+                "url": f"/admin/repo-skills/pat/{seg}",
+                "pat_segment": seg,
+            }
+        )
 
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
@@ -752,7 +815,9 @@ def repo_skills_cards(
         "admin/skills/repo_skills_cards.html",
         {
             "request": request,
-            "title": f"Repository 스킬 — {domain_cfg['display']}" if domain_cfg else "Repository 스킬",
+            "title": f"Repository 스킬 — {domain_cfg['display']}"
+            if domain_cfg
+            else "Repository 스킬",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -788,13 +853,18 @@ def new_repo_skill_submit(
     body: str = Form(...),
 ):
     key = pattern.strip()
-    existing = db.scalars(select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)).first()
+    existing = db.scalars(
+        select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)
+    ).first()
     if existing is not None:
         return templates.TemplateResponse(
             request,
             "admin/skills/repo_skill_new.html",
-            {"request": request, "title": "새 Repository 패턴 스킬",
-             "error": f"이미 존재하는 패턴: {key or '(기본)'}"},
+            {
+                "request": request,
+                "title": "새 Repository 패턴 스킬",
+                "error": f"이미 존재하는 패턴: {key or '(기본)'}",
+            },
             status_code=400,
         )
     vs.publish_repo_skill(db, key, body)
@@ -810,7 +880,9 @@ def repo_skill_board(
     db: Session = Depends(get_db),
 ):
     key = vs.repo_skill_pattern_from_url_segment(pat_segment)
-    if not db.scalars(select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)).first():
+    if not db.scalars(
+        select(RepoSkillVersion).where(RepoSkillVersion.pattern == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown repository pattern")
     pat_url = vs.repo_skill_pat_href_segment(key)
     display = vs.repo_skill_pattern_card_display(key)
@@ -908,7 +980,10 @@ def repo_skill_category_new_submit(
     existing = vs.list_sections_for_repo_skill(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     _, _sn, nv = vs.publish_repo_skill(db, key, body, sn)
@@ -1076,9 +1151,12 @@ def repo_skill_version_view(
                 RepoSkillVersion.pattern == key,
                 RepoSkillVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
-    can_delete = n > 1 if (not (key or "").strip() and sn == vs.DEFAULT_SECTION) else n >= 1
+    can_delete = (
+        n > 1 if (not (key or "").strip() and sn == vs.DEFAULT_SECTION) else n >= 1
+    )
     return templates.TemplateResponse(
         request,
         "admin/skills/version_view.html",
@@ -1115,10 +1193,13 @@ def repo_skill_version_delete(
                 RepoSkillVersion.pattern == key,
                 RepoSkillVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if not (key or "").strip() and sn == vs.DEFAULT_SECTION and n <= 1:
-        raise HTTPException(400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다.")
+        raise HTTPException(
+            400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다."
+        )
     vs.delete_repo_skill_version(db, key, sn, version)
     n_after = int(
         db.scalar(
@@ -1126,7 +1207,8 @@ def repo_skill_version_delete(
                 RepoSkillVersion.pattern == key,
                 RepoSkillVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if n_after > 0:
         return RedirectResponse(

@@ -32,7 +32,9 @@ def skill_chunk_vector_ids(
         stmt = stmt.where(SkillChunk.skill_type == skill_type)
     if app_name:
         stmt = stmt.where(SkillChunk.app_name == app_name)
-    stmt = stmt.order_by(SkillChunk.embedding.cosine_distance(query_embedding)).limit(limit)
+    stmt = stmt.order_by(SkillChunk.embedding.cosine_distance(query_embedding)).limit(
+        limit
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -51,9 +53,9 @@ def skill_chunk_fts_ids(
         select(SkillChunk.id)
         .where(SkillChunk.chunk_type != "parent")
         .where(
-            text("skill_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)").bindparams(
-                fts_q=q
-            )
+            text(
+                "skill_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)"
+            ).bindparams(fts_q=q)
         )
     )
     if skill_type:
@@ -107,7 +109,10 @@ def hybrid_skill_search(
     except Exception as exc:
         logger.warning("skill query embed failed, FTS only: %s", exc)
         fts_ids = skill_chunk_fts_ids(
-            db, query=query, skill_type=skill_type_filter, app_name=app_name,
+            db,
+            query=query,
+            skill_type=skill_type_filter,
+            app_name=app_name,
             limit=top_n * 5,
         )
         if not fts_ids:
@@ -115,12 +120,18 @@ def hybrid_skill_search(
         ranked = fts_ids[:top_n]
     else:
         v_ids = skill_chunk_vector_ids(
-            db, query_embedding=qvec, skill_type=skill_type_filter,
-            app_name=app_name, limit=40,
+            db,
+            query_embedding=qvec,
+            skill_type=skill_type_filter,
+            app_name=app_name,
+            limit=40,
         )
         f_ids = skill_chunk_fts_ids(
-            db, query=query, skill_type=skill_type_filter,
-            app_name=app_name, limit=40,
+            db,
+            query=query,
+            skill_type=skill_type_filter,
+            app_name=app_name,
+            limit=40,
         )
         ranked = reciprocal_rank_fusion([v_ids, f_ids])[:top_n]
 
@@ -132,26 +143,32 @@ def hybrid_skill_search(
     ordered = [by_id[i] for i in ranked if i in by_id]
 
     # Fetch parents for context
-    parent_ids = [ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None]
+    parent_ids = [
+        ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None
+    ]
     parents_by_id: dict[int, SkillChunk] = {}
     if parent_ids:
         parents_by_id = {
             p.id: p
-            for p in db.scalars(select(SkillChunk).where(SkillChunk.id.in_(parent_ids))).all()
+            for p in db.scalars(
+                select(SkillChunk).where(SkillChunk.id.in_(parent_ids))
+            ).all()
         }
 
     out: list[dict[str, Any]] = []
     for ch in ordered:
         parent = parents_by_id.get(ch.parent_chunk_id) if ch.parent_chunk_id else None
-        out.append({
-            "chunk_id": ch.id,
-            "skill_type": ch.skill_type,
-            "skill_entity_id": ch.skill_entity_id,
-            "app_name": ch.app_name,
-            "section_name": ch.section_name,
-            "chunk_index": ch.chunk_index,
-            "content": ch.content,
-            "parent_content": parent.content if parent else None,
-            "metadata": ch.chunk_metadata,
-        })
+        out.append(
+            {
+                "chunk_id": ch.id,
+                "skill_type": ch.skill_type,
+                "skill_entity_id": ch.skill_entity_id,
+                "app_name": ch.app_name,
+                "section_name": ch.section_name,
+                "chunk_index": ch.chunk_index,
+                "content": ch.content,
+                "parent_content": parent.content if parent else None,
+                "metadata": ch.chunk_metadata,
+            }
+        )
     return out, "hybrid_ok"

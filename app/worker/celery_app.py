@@ -6,7 +6,9 @@ import os
 
 from celery import Celery
 
-_broker = (os.environ.get("CELERY_BROKER_URL") or "").strip() or "redis://localhost:6379/0"
+_broker = (
+    os.environ.get("CELERY_BROKER_URL") or ""
+).strip() or "redis://localhost:6379/0"
 _backend = (os.environ.get("CELERY_RESULT_BACKEND") or "").strip() or _broker
 
 celery_app = Celery(
@@ -28,4 +30,3 @@ from app.services.embeddings import configure_embedding_backend
 configure_embedding_backend(_settings.embedding)
 
 from app.worker import tasks as _tasks  # noqa: E402, F401 — register task decorators
-

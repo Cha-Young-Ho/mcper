@@ -20,7 +20,11 @@ from app.tools.doc_tools import register_doc_tools
 # MCPER_MCP_AUTH_ENABLED: MCP 엔드포인트 OAuth (RFC 명세상 HTTPS 필수).
 #   HTTP 개발 환경에서는 false 로 두고, HTTPS 도메인 붙인 뒤 true 로 전환.
 #   미설정 시 _AUTH_ENABLED 값을 따라감 (기존 동작 호환).
-_AUTH_ENABLED = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_AUTH_ENABLED = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 _MCP_AUTH_RAW = os.environ.get("MCPER_MCP_AUTH_ENABLED")
 if _MCP_AUTH_RAW is None:
     _MCP_AUTH_ENABLED = _AUTH_ENABLED
@@ -48,7 +52,9 @@ if _MCP_AUTH_ENABLED:
     # MCP 앱이 /mcp에 마운트되므로, issuer_url도 /mcp 경로 포함
     _mcp_mount = os.environ.get("MCP_MOUNT_PATH", "/mcp").rstrip("/") or "/mcp"
     _mcp_auth_kwargs = {
-        "auth_server_provider": McperOAuthProvider(login_url=f"{_base_url}/auth/mcp-authorize"),
+        "auth_server_provider": McperOAuthProvider(
+            login_url=f"{_base_url}/auth/mcp-authorize"
+        ),
         "auth": McpAuthSettings(
             issuer_url=AnyHttpUrl(f"{_base_url}{_mcp_mount}"),
             resource_server_url=AnyHttpUrl(f"{_base_url}{_mcp_mount}/"),
@@ -73,7 +79,6 @@ mcp = FastMCP(
         "파일이 없으면 사용자에게 app_name 을 직접 물어본다. 폴더명·브랜치명으로 추측 금지. "
         "INI app_name 식별자만 사용(예: my_app). /master 등 접미사 금지. "
         "origin_url 은 git remote -v 의 origin fetch URL. "
-
         # ── 0-1. 공통 전제: 룰 로드 (모든 워크플로우의 선행 조건) ──
         "[룰 로드 — 자동 선행] "
         "다음 구문을 감지하면 즉시 실행 (사용자 확인 불필요): "
@@ -88,7 +93,6 @@ mcp = FastMCP(
         "주의: 스킬(Skills)은 이 단계에서 로드하지 않는다. 컨텍스트 절약을 위해 "
         "실제 작업 수행 시 필요한 스킬만 on-demand로 조회한다. "
         "이 룰 로드는 3개 워크플로우 모두의 선행 조건이다. 룰이 로드되지 않은 상태에서 워크플로우가 시작되면 자동으로 먼저 실행한다. "
-
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # 워크플로우 1 — 기획서 구현 (Spec Implementation)
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -114,7 +118,6 @@ mcp = FastMCP(
         "    반복 실수·피드백을 스킬로 추출·발행. search_skills로 발행 검증. "
         "에이전트 시퀀스: @pm → @planner → @senior → @coder + @tester (병렬) → @infra → 하네스 → @compounder. "
         "단순 작업(버그픽스 등): 중간 단계 생략 가능. 하네스·컴파운드 업데이트는 항상 실행. "
-
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # 워크플로우 2 — 기획서 스캔 (Spec Scan)
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -143,7 +146,6 @@ mcp = FastMCP(
         "(8) [컴파운드 업데이트] @compounder 실행 — 세션 중 교정·피드백을 스킬로 추출·발행. "
         "에이전트 시퀀스: @senior → 하네스 → @compounder. "
         "출력: 구현 판정(YES/NO/PARTIAL), 범위 추정, 의존성 목록, 등록된 스킬. "
-
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # 워크플로우 3 — 에러 헌트 (Error Hunt)
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -180,7 +182,6 @@ mcp = FastMCP(
         "(9) [하네스 업데이트] 에러 패턴·진단 지식이 재사용 가능하면 하네스 문서에 반영. "
         "(10) [컴파운드 업데이트] @compounder 실행 — 에러 진단 과정의 실수·교정·피드백을 스킬로 추출·발행. "
         "에이전트 시퀀스: 진단 → 하네스 → @compounder. "
-
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # 유틸리티 — 하네스 업로드 (독립 실행 가능)
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -202,7 +203,6 @@ mcp = FastMCP(
         "(4) upload_harness(app_name, files=[...], origin_url) 호출 — 일괄 등록. "
         "(5) 결과를 사용자에게 보고 (업로드 건수, 에러, 버전 정보). "
         "(6) 이미 등록된 섹션이 있으면 새 버전으로 갱신된다 (기존 버전 보존). "
-
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # 공통 — 작업 전 검색, 행동 강령, 설정
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -218,18 +218,15 @@ mcp = FastMCP(
         "(f) 코드 변경 영향 범위 파악 시 → analyze_code_impact 사용. "
         "(g) 유사 기획서가 필요할 때 → find_historical_reference (기획서 초안 텍스트 기반 유사도 검색). "
         "search_documents와 find_historical_reference 구분: 키워드로 '찾는' 것은 search, 초안 본문으로 '비교'하는 것은 find_historical_reference. "
-
         "[행동 강령] "
         "Rules(행동 지침)은 코드 작성·리뷰·설계 시 항상 먼저 확인. "
         "✅/❌ 항목은 협의 없이 위반 불가. 위반 발견 시 사용자에게 명시적으로 알린다. "
         "Skills(스킬)는 시스템 구조·패턴 파악에 활용. 로컬에 저장하지 않으며 필요 시 MCP에서 on-demand 조회. "
         "적용 우선순위: Rules 위반 확인 → 필요 Skills on-demand 조회 → 사용자 요청 수행. "
-
         "[저장 규칙] "
         "Cursor: .cursor/rules/mcp-rules.mdc. Claude Code: CLAUDE.md 또는 .claude/ 하위. "
         "응답 말미 [CRITICAL — ...] 지시에 따라 IDE별 경로에 저장. Docker MCP는 호스트 클론 경로. "
         "Skills는 로컬에 저장하지 않는다. 필요할 때 MCP에서 on-demand로 조회하여 참고만 한다. "
-
         "[조회 옵션] version 생략·null·latest=최신, 숫자=해당 버전(없으면 최신 폴백). "
         "app_name 없으면 global 만; app_name 있으면 global+repository(URL 패턴 매칭)+앱 룰 3계층 반환. "
         "[발행 툴] publish_global_rule/publish_repo_rule/publish_app_rule(전체 본문), append_to_app_rule(덧붙이기). "
@@ -248,10 +245,8 @@ mcp = FastMCP(
         "publish_global_doc_tool / publish_app_doc_tool / publish_repo_doc_tool 로 문서 발행. "
         "update_doc(app_name, section_name, body) 로 앱 문서 수정. "
         "Docs = 일반 문서(레퍼런스, 가이드, 메모 등 자유 형식). "
-
         "[권한] 인증이 활성화된 서버에서는 MCP 도구 호출 시 자동으로 권한이 검증된다. "
         "권한 에러('Permission denied') 발생 시 사용자에게 관리자 권한 요청을 안내한다. "
-
         "[하네스 문서 도구] MCPER 프로젝트 자체 문서(CLAUDE.md, 에이전트 가이드, 설계 문서 등)를 검색·조회할 때 사용. "
         "sync_harness_docs: 파일→DB 동기화. search_harness_docs: 하네스 문서 검색. "
         "get_harness_config: 특정 문서 전체 조회. list_harness_docs: 등록 문서 목록."

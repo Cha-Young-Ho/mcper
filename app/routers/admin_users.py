@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
@@ -241,7 +241,9 @@ def _form_error(request: Request, user_obj, error: str):
         "admin/users/user_form.html",
         {
             "request": request,
-            "title": "유저 생성" if user_obj is None else f"유저 수정: {user_obj.username}",
+            "title": "유저 생성"
+            if user_obj is None
+            else f"유저 수정: {user_obj.username}",
             "mode": "create" if user_obj is None else "edit",
             "user_obj": user_obj,
             "error": error,

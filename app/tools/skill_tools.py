@@ -82,7 +82,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
         """
         record_mcp_tool_call("list_skill_sections")
         with SessionLocal() as db:
-            denied = check_read(db, app_name=_normalize_app_name(app_name or "") or None)
+            denied = check_read(
+                db, app_name=_normalize_app_name(app_name or "") or None
+            )
             if denied:
                 return denied
             if scope == "app":
@@ -91,7 +93,10 @@ def register_skill_tools(mcp: FastMCP) -> None:
                 key = _normalize_app_name(app_name)
                 sections = list_sections_for_app_skill(db, key)
             elif scope == "repo":
-                from app.services.versioned_skills import list_distinct_repo_patterns_with_skills
+                from app.services.versioned_skills import (
+                    list_distinct_repo_patterns_with_skills,
+                )
+
                 patterns = list_distinct_repo_patterns_with_skills(db)
                 if origin_url:
                     patterns = [p for p in patterns if p and p in origin_url]
@@ -99,7 +104,9 @@ def register_skill_tools(mcp: FastMCP) -> None:
                         patterns = [""]
                 sections_by_pat: dict[str, list[str]] = {}
                 for pat in patterns:
-                    sections_by_pat[pat or "(default)"] = list_sections_for_repo_skill(db, pat)
+                    sections_by_pat[pat or "(default)"] = list_sections_for_repo_skill(
+                        db, pat
+                    )
                 lines = []
                 for pat, secs in sections_by_pat.items():
                     lines.append(f"패턴: {pat}")
@@ -111,10 +118,14 @@ def register_skill_tools(mcp: FastMCP) -> None:
 
             if not sections:
                 return f"{scope} Skills 카테고리 없음"
-            return f"{scope} Skills 카테고리:\n" + "\n".join(f"  - {s}" for s in sections)
+            return f"{scope} Skills 카테고리:\n" + "\n".join(
+                f"  - {s}" for s in sections
+            )
 
     @mcp.tool()
-    def publish_global_skill_tool(body: str, section_name: str = DEFAULT_SECTION) -> str:
+    def publish_global_skill_tool(
+        body: str, section_name: str = DEFAULT_SECTION
+    ) -> str:
         """
         Global Skills 새 버전을 발행한다.
 
@@ -200,6 +211,7 @@ def register_skill_tools(mcp: FastMCP) -> None:
             if denied:
                 return denied
             from app.services.search_skills import hybrid_skill_search
+
             chunks, mode = hybrid_skill_search(
                 db,
                 query=query,

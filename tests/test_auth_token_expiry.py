@@ -12,7 +12,6 @@ from app.auth.service import (
     hash_api_key,
 )
 from app.db.auth_models import User, ApiKey
-from app.db.database import get_db
 from tests.conftest import auth_disabled_skip
 
 
@@ -23,7 +22,7 @@ class TestJWTTokenExpiry:
         """Verify created token includes exp claim."""
         token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(minutes=15)
+            expires_delta=timedelta(minutes=15),
         )
 
         payload = decode_token(token)
@@ -33,8 +32,7 @@ class TestJWTTokenExpiry:
     def test_token_exp_timestamp_is_future(self, admin_user: User):
         """Verify exp timestamp is in the future."""
         token = create_access_token(
-            data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(minutes=15)
+            data={"sub": str(admin_user.id)}, expires_delta=timedelta(minutes=15)
         )
 
         payload = decode_token(token)
@@ -47,7 +45,7 @@ class TestJWTTokenExpiry:
         """Verify expired token raises JWTError on decode."""
         token = create_access_token(
             data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(hours=-1)  # Expired
+            expires_delta=timedelta(hours=-1),  # Expired
         )
 
         with pytest.raises(JWTError):
@@ -57,7 +55,7 @@ class TestJWTTokenExpiry:
         """Verify allow_expired=True returns payload even if expired."""
         token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(hours=-1)  # Expired
+            expires_delta=timedelta(hours=-1),  # Expired
         )
 
         payload = decode_token(token, allow_expired=True)
@@ -67,8 +65,7 @@ class TestJWTTokenExpiry:
     def test_verify_token_not_expired_valid_token(self, admin_user: User):
         """verify_token_not_expired returns True for valid token."""
         token = create_access_token(
-            data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(minutes=15)
+            data={"sub": str(admin_user.id)}, expires_delta=timedelta(minutes=15)
         )
 
         assert verify_token_not_expired(token) is True
@@ -76,8 +73,7 @@ class TestJWTTokenExpiry:
     def test_verify_token_not_expired_expired_token(self, admin_user: User):
         """verify_token_not_expired returns False for expired token."""
         token = create_access_token(
-            data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(hours=-1)
+            data={"sub": str(admin_user.id)}, expires_delta=timedelta(hours=-1)
         )
 
         assert verify_token_not_expired(token) is False
@@ -90,11 +86,8 @@ class TestJWTTokenExpiry:
         """Token with nbf (not before) in future should be invalid."""
         future_time = datetime.now(timezone.utc) + timedelta(hours=1)
         token = create_access_token(
-            data={
-                "sub": str(admin_user.id),
-                "nbf": int(future_time.timestamp())
-            },
-            expires_delta=timedelta(minutes=15)
+            data={"sub": str(admin_user.id), "nbf": int(future_time.timestamp())},
+            expires_delta=timedelta(minutes=15),
         )
 
         # This should fail because token is not yet valid
@@ -109,7 +102,7 @@ class TestAccessTokenLifetime:
         """Verify access token lifetime is approximately 15 minutes."""
         token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(minutes=15)
+            expires_delta=timedelta(minutes=15),
         )
 
         payload = decode_token(token)
@@ -126,7 +119,7 @@ class TestAccessTokenLifetime:
         """Expired access token should be rejected in get_current_user_optional."""
         expired_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(hours=-1)
+            expires_delta=timedelta(hours=-1),
         )
 
         # Test using a protected endpoint (mock the dependency to use this token)
@@ -141,13 +134,11 @@ class TestAccessTokenLifetime:
             # Should get 401 or 303 (redirect to login)
             assert response.status_code in (401, 303)
 
-    def test_fresh_token_accepted_in_dependency(
-        self, test_client, admin_user: User
-    ):
+    def test_fresh_token_accepted_in_dependency(self, test_client, admin_user: User):
         """Fresh (non-expired) token should be accepted."""
         valid_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(minutes=15)
+            expires_delta=timedelta(minutes=15),
         )
 
         with patch("app.auth.dependencies.get_current_user_optional") as mock_get:
@@ -170,7 +161,7 @@ class TestRefreshTokenPattern:
         """Verify refresh token has type='refresh' claim."""
         refresh_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(days=7)
+            expires_delta=timedelta(days=7),
         )
 
         payload = decode_token(refresh_token)
@@ -180,7 +171,7 @@ class TestRefreshTokenPattern:
         """Verify access token has type='access' claim."""
         access_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(minutes=15)
+            expires_delta=timedelta(minutes=15),
         )
 
         payload = decode_token(access_token)
@@ -190,11 +181,11 @@ class TestRefreshTokenPattern:
         """Verify refresh token has longer lifetime than access token."""
         access_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "access"},
-            expires_delta=timedelta(minutes=15)
+            expires_delta=timedelta(minutes=15),
         )
         refresh_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(days=7)
+            expires_delta=timedelta(days=7),
         )
 
         access_payload = decode_token(access_token)
@@ -215,7 +206,7 @@ class TestRefreshTokenPattern:
         """POST /auth/token/refresh should work with expired access token."""
         refresh_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(days=7)
+            expires_delta=timedelta(days=7),
         )
 
         response = test_client.post(
@@ -240,7 +231,7 @@ class TestRefreshTokenPattern:
         """Refresh token should not work as access token."""
         refresh_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(days=7)
+            expires_delta=timedelta(days=7),
         )
 
         with patch("app.auth.dependencies.get_current_user_optional") as mock_get:
@@ -257,7 +248,7 @@ class TestRefreshTokenPattern:
         """Expired refresh token should be rejected."""
         expired_refresh = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
-            expires_delta=timedelta(days=-1)
+            expires_delta=timedelta(days=-1),
         )
 
         response = test_client.post(
@@ -409,8 +400,7 @@ class TestEdgeCasesTokenExpiry:
     def test_token_with_very_short_lifetime(self, admin_user: User):
         """Token with minimal lifetime should expire quickly."""
         token = create_access_token(
-            data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(seconds=1)
+            data={"sub": str(admin_user.id)}, expires_delta=timedelta(seconds=1)
         )
 
         # Should be decodable immediately
@@ -419,6 +409,7 @@ class TestEdgeCasesTokenExpiry:
 
         # After sleep, should be expired
         import time
+
         time.sleep(2)
         with pytest.raises(JWTError):
             decode_token(token)
@@ -426,8 +417,7 @@ class TestEdgeCasesTokenExpiry:
     def test_token_clock_skew_tolerance(self, admin_user: User):
         """Token should handle minor clock differences gracefully."""
         token = create_access_token(
-            data={"sub": str(admin_user.id)},
-            expires_delta=timedelta(minutes=15)
+            data={"sub": str(admin_user.id)}, expires_delta=timedelta(minutes=15)
         )
 
         # jose library allows some clock skew by default
@@ -550,7 +540,9 @@ class TestRefreshEndpointEdgeCases:
 
         assert response.status_code == 400
 
-    def test_refresh_with_inactive_user(self, test_client, db_session, admin_user: User):
+    def test_refresh_with_inactive_user(
+        self, test_client, db_session, admin_user: User
+    ):
         """Refresh token for inactive user should be rejected."""
         refresh_token = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},

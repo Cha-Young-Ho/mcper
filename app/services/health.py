@@ -20,7 +20,9 @@ from app.config import settings
 _CHECK_TIMEOUT_SEC = 2.0
 
 
-async def _with_timeout(coro, timeout: float = _CHECK_TIMEOUT_SEC) -> tuple[bool, str | None]:
+async def _with_timeout(
+    coro, timeout: float = _CHECK_TIMEOUT_SEC
+) -> tuple[bool, str | None]:
     """Coroutine 을 타임아웃과 함께 실행. (성공여부, 에러메시지) 반환."""
     try:
         result = await asyncio.wait_for(coro, timeout=timeout)
@@ -43,7 +45,9 @@ async def _check_redis() -> tuple[str, str | None]:
     if not settings.celery_enabled:
         return ("skip", "celery not configured")
 
-    broker = (settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or "").strip()
+    broker = (
+        settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or ""
+    ).strip()
     if not broker:
         return ("skip", "broker URL empty")
 
@@ -111,12 +115,7 @@ async def readiness_payload(startup_done: bool = True) -> tuple[dict[str, Any], 
 
     # readiness 판정: DB up + embedding ready + startup done.
     # Redis 는 skip 허용 (celery 비활성 환경), down 은 실패.
-    healthy = (
-        db_ok
-        and emb_ok
-        and startup_done
-        and redis_state in ("up", "skip")
-    )
+    healthy = db_ok and emb_ok and startup_done and redis_state in ("up", "skip")
 
     latency_ms = int((time.monotonic() - t0) * 1000)
     payload: dict[str, Any] = {

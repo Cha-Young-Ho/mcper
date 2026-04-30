@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.service import create_access_token, hash_password
+from app.auth.service import create_access_token
 from app.config import settings
 from app.db.auth_models import User
 from app.db.database import get_db
@@ -75,7 +75,9 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
                 "code": code,
                 "client_id": client_id,
                 "client_secret": client_secret,
-                "redirect_uri": os.environ.get("OAUTH_REDIRECT_BASE", "http://localhost:8001")
+                "redirect_uri": os.environ.get(
+                    "OAUTH_REDIRECT_BASE", "http://localhost:8001"
+                )
                 + "/auth/oauth/google/callback",
                 "grant_type": "authorization_code",
             },

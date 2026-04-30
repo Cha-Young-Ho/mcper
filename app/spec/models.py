@@ -19,11 +19,13 @@ class ChunkRecord:
     """
 
     content: str
-    embed_text: str              # 임베딩에 넣을 텍스트 (컨텍스트 주입 포함). parent 는 미사용.
+    embed_text: str  # 임베딩에 넣을 텍스트 (컨텍스트 주입 포함). parent 는 미사용.
     chunk_type: ChunkType
-    chunk_index: int             # parent: -(n+1),  child: 전역 순서 0‥
+    chunk_index: int  # parent: -(n+1),  child: 전역 순서 0‥
     section_heading: str | None
-    parent_chunk_index: int | None   # child 가 속한 parent 의 chunk_index(음수). 독립 child 는 None.
+    parent_chunk_index: (
+        int | None
+    )  # child 가 속한 parent 의 chunk_index(음수). 독립 child 는 None.
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

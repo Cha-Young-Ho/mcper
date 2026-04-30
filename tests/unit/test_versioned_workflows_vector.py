@@ -11,7 +11,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from app.services import versioned_workflows as vw
 
@@ -20,14 +19,27 @@ class TestTryIndexWorkflow:
     def test_success_path_calls_index_workflow(self):
         db = MagicMock()
         fake_svc = MagicMock()
-        with patch("app.workflow.service.make_default_workflow_service", return_value=fake_svc):
+        with patch(
+            "app.workflow.service.make_default_workflow_service", return_value=fake_svc
+        ):
             vw._try_index_workflow(
-                db, "global", 1, "body",
-                app_name="a", pattern="p", domain="d", section_name="sn",
+                db,
+                "global",
+                1,
+                "body",
+                app_name="a",
+                pattern="p",
+                domain="d",
+                section_name="sn",
             )
         fake_svc.index_workflow.assert_called_once_with(
-            workflow_type="global", workflow_entity_id=1, body="body",
-            app_name="a", pattern="p", domain="d", section_name="sn",
+            workflow_type="global",
+            workflow_entity_id=1,
+            body="body",
+            app_name="a",
+            pattern="p",
+            domain="d",
+            section_name="sn",
         )
 
     def test_failure_is_swallowed_and_logged(self, caplog):
@@ -51,7 +63,10 @@ class TestLegacyIlikeSearchWorkflows:
     def test_global_scope_returns_rows(self):
         db = MagicMock()
         row = SimpleNamespace(
-            section_name="main", version=1, body="# hi", domain=None,
+            section_name="main",
+            version=1,
+            body="# hi",
+            domain=None,
         )
         scalars = MagicMock()
         scalars.all.return_value = [row]
@@ -75,7 +90,11 @@ class TestLegacyIlikeSearchWorkflows:
     def test_app_scope_with_app_name_queries_app(self):
         db = MagicMock()
         app_row = SimpleNamespace(
-            app_name="myapp", section_name="sec", version=2, body="b", domain="dev",
+            app_name="myapp",
+            section_name="sec",
+            version=2,
+            body="b",
+            domain="dev",
         )
         scalars = MagicMock()
         scalars.all.return_value = [app_row]
@@ -89,7 +108,11 @@ class TestLegacyIlikeSearchWorkflows:
     def test_repo_scope_returns_repo_rows(self):
         db = MagicMock()
         repo_row = SimpleNamespace(
-            pattern="gh.com/x", section_name="s", version=3, body="bd", domain=None,
+            pattern="gh.com/x",
+            section_name="s",
+            version=3,
+            body="bd",
+            domain=None,
         )
         scalars = MagicMock()
         scalars.all.return_value = [repo_row]
@@ -108,7 +131,9 @@ class TestLegacyIlikeSearchWorkflows:
             for i in range(3)
         ]
         repo_rows = [
-            SimpleNamespace(pattern="p", section_name=f"r{i}", version=1, body="b", domain=None)
+            SimpleNamespace(
+                pattern="p", section_name=f"r{i}", version=1, body="b", domain=None
+            )
             for i in range(3)
         ]
         scalars_global = MagicMock()
@@ -127,34 +152,69 @@ class TestEnrichChunksWithVersionRows:
         db = MagicMock()
         row = SimpleNamespace(section_name="main", version=1, body="B", domain=None)
         with patch.object(vw, "_global_workflow_latest", return_value=row):
-            out = vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "global", "section_name": "main", "app_name": None, "pattern": None},
-            ])
-        assert out == [{
-            "scope": "global", "section_name": "main",
-            "version": 1, "body": "B", "domain": None,
-        }]
+            out = vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "global",
+                        "section_name": "main",
+                        "app_name": None,
+                        "pattern": None,
+                    },
+                ],
+            )
+        assert out == [
+            {
+                "scope": "global",
+                "section_name": "main",
+                "version": 1,
+                "body": "B",
+                "domain": None,
+            }
+        ]
 
     def test_app_chunk_enriched(self):
         db = MagicMock()
         row = SimpleNamespace(
-            app_name="a", section_name="s", version=2, body="b", domain="d",
+            app_name="a",
+            section_name="s",
+            version=2,
+            body="b",
+            domain="d",
         )
         with patch.object(vw, "_app_workflow_latest", return_value=row):
-            out = vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "app", "section_name": "s", "app_name": "a", "pattern": None},
-            ])
+            out = vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "app",
+                        "section_name": "s",
+                        "app_name": "a",
+                        "pattern": None,
+                    },
+                ],
+            )
         assert out[0]["scope"] == "app"
         assert out[0]["app_name"] == "a"
         assert out[0]["version"] == 2
 
     def test_repo_chunk_enriched(self):
         db = MagicMock()
-        row = SimpleNamespace(pattern="p", section_name="s", version=3, body="b", domain=None)
+        row = SimpleNamespace(
+            pattern="p", section_name="s", version=3, body="b", domain=None
+        )
         with patch.object(vw, "_repo_workflow_latest", return_value=row):
-            out = vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "repo", "section_name": "s", "app_name": None, "pattern": "p"},
-            ])
+            out = vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "repo",
+                        "section_name": "s",
+                        "app_name": None,
+                        "pattern": "p",
+                    },
+                ],
+            )
         assert out[0]["scope"] == "repo"
         assert out[0]["pattern"] == "p"
 
@@ -162,34 +222,71 @@ class TestEnrichChunksWithVersionRows:
         db = MagicMock()
         row = SimpleNamespace(section_name="main", version=1, body="B", domain=None)
         with patch.object(vw, "_global_workflow_latest", return_value=row) as m:
-            out = vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "global", "section_name": "main", "app_name": None, "pattern": None},
-                {"workflow_type": "global", "section_name": "main", "app_name": None, "pattern": None},
-            ])
+            out = vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "global",
+                        "section_name": "main",
+                        "app_name": None,
+                        "pattern": None,
+                    },
+                    {
+                        "workflow_type": "global",
+                        "section_name": "main",
+                        "app_name": None,
+                        "pattern": None,
+                    },
+                ],
+            )
         assert len(out) == 1
         m.assert_called_once()
 
     def test_missing_version_row_skipped(self):
         db = MagicMock()
         with patch.object(vw, "_global_workflow_latest", return_value=None):
-            out = vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "global", "section_name": "ghost", "app_name": None, "pattern": None},
-            ])
+            out = vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "global",
+                        "section_name": "ghost",
+                        "app_name": None,
+                        "pattern": None,
+                    },
+                ],
+            )
         assert out == []
 
     def test_app_without_app_name_skipped(self):
         """app chunk where app_name key is falsy → elif not matched → skipped."""
         db = MagicMock()
-        out = vw._enrich_chunks_with_version_rows(db, [
-            {"workflow_type": "app", "section_name": "s", "app_name": None, "pattern": None},
-        ])
+        out = vw._enrich_chunks_with_version_rows(
+            db,
+            [
+                {
+                    "workflow_type": "app",
+                    "section_name": "s",
+                    "app_name": None,
+                    "pattern": None,
+                },
+            ],
+        )
         assert out == []
 
     def test_unknown_workflow_type_skipped(self):
         db = MagicMock()
-        out = vw._enrich_chunks_with_version_rows(db, [
-            {"workflow_type": "other", "section_name": "s", "app_name": None, "pattern": None},
-        ])
+        out = vw._enrich_chunks_with_version_rows(
+            db,
+            [
+                {
+                    "workflow_type": "other",
+                    "section_name": "s",
+                    "app_name": None,
+                    "pattern": None,
+                },
+            ],
+        )
         assert out == []
 
     def test_missing_section_name_defaults_to_main(self):
@@ -197,9 +294,17 @@ class TestEnrichChunksWithVersionRows:
         db = MagicMock()
         row = SimpleNamespace(section_name="main", version=1, body="B", domain=None)
         with patch.object(vw, "_global_workflow_latest", return_value=row) as m:
-            vw._enrich_chunks_with_version_rows(db, [
-                {"workflow_type": "global", "section_name": None, "app_name": None, "pattern": None},
-            ])
+            vw._enrich_chunks_with_version_rows(
+                db,
+                [
+                    {
+                        "workflow_type": "global",
+                        "section_name": None,
+                        "app_name": None,
+                        "pattern": None,
+                    },
+                ],
+            )
         m.assert_called_once_with(db, "main")
 
 
@@ -212,48 +317,102 @@ class TestSearchWorkflowsOrchestrator:
     def test_hybrid_ok_path_returns_enriched(self):
         db = MagicMock()
         fake_chunks = [
-            {"workflow_type": "global", "section_name": "main", "app_name": None, "pattern": None},
+            {
+                "workflow_type": "global",
+                "section_name": "main",
+                "app_name": None,
+                "pattern": None,
+            },
         ]
         row = SimpleNamespace(section_name="main", version=1, body="B", domain=None)
-        with patch("app.services.search_workflows.hybrid_workflow_search",
-                   return_value=(fake_chunks, "hybrid_ok")), \
-             patch.object(vw, "_global_workflow_latest", return_value=row):
+        with (
+            patch(
+                "app.services.search_workflows.hybrid_workflow_search",
+                return_value=(fake_chunks, "hybrid_ok"),
+            ),
+            patch.object(vw, "_global_workflow_latest", return_value=row),
+        ):
             out = vw.search_workflows(db, "q", scope="global", top_n=5)
-        assert out == [{
-            "scope": "global", "section_name": "main",
-            "version": 1, "body": "B", "domain": None,
-        }]
+        assert out == [
+            {
+                "scope": "global",
+                "section_name": "main",
+                "version": 1,
+                "body": "B",
+                "domain": None,
+            }
+        ]
 
     def test_hybrid_ok_but_enriched_empty_falls_back_to_ilike(self):
         """hybrid returns chunks but version lookup returns nothing → ILIKE fallback."""
         db = MagicMock()
         fake_chunks = [
-            {"workflow_type": "global", "section_name": "gone", "app_name": None, "pattern": None},
+            {
+                "workflow_type": "global",
+                "section_name": "gone",
+                "app_name": None,
+                "pattern": None,
+            },
         ]
-        ilike_results = [{"scope": "global", "section_name": "main", "version": 1, "body": "x", "domain": None}]
-        with patch("app.services.search_workflows.hybrid_workflow_search",
-                   return_value=(fake_chunks, "hybrid_ok")), \
-             patch.object(vw, "_global_workflow_latest", return_value=None), \
-             patch.object(vw, "_legacy_ilike_search_workflows", return_value=ilike_results) as fallback:
+        ilike_results = [
+            {
+                "scope": "global",
+                "section_name": "main",
+                "version": 1,
+                "body": "x",
+                "domain": None,
+            }
+        ]
+        with (
+            patch(
+                "app.services.search_workflows.hybrid_workflow_search",
+                return_value=(fake_chunks, "hybrid_ok"),
+            ),
+            patch.object(vw, "_global_workflow_latest", return_value=None),
+            patch.object(
+                vw, "_legacy_ilike_search_workflows", return_value=ilike_results
+            ) as fallback,
+        ):
             out = vw.search_workflows(db, "q", scope="global")
         fallback.assert_called_once()
         assert out == ilike_results
 
     def test_hybrid_no_index_falls_back(self):
         db = MagicMock()
-        ilike_results = [{"scope": "app", "app_name": "x", "section_name": "s", "version": 1, "body": "b", "domain": None}]
-        with patch("app.services.search_workflows.hybrid_workflow_search",
-                   return_value=([], "no_index")), \
-             patch.object(vw, "_legacy_ilike_search_workflows", return_value=ilike_results):
+        ilike_results = [
+            {
+                "scope": "app",
+                "app_name": "x",
+                "section_name": "s",
+                "version": 1,
+                "body": "b",
+                "domain": None,
+            }
+        ]
+        with (
+            patch(
+                "app.services.search_workflows.hybrid_workflow_search",
+                return_value=([], "no_index"),
+            ),
+            patch.object(
+                vw, "_legacy_ilike_search_workflows", return_value=ilike_results
+            ),
+        ):
             out = vw.search_workflows(db, "q", app_name="x", scope="app")
         assert out == ilike_results
 
     def test_hybrid_exception_falls_back_to_ilike(self, caplog):
         db = MagicMock()
         ilike_results = []
-        with patch("app.services.search_workflows.hybrid_workflow_search",
-                   side_effect=RuntimeError("pgvector missing")), \
-             patch.object(vw, "_legacy_ilike_search_workflows", return_value=ilike_results):
+        with (
+            patch(
+                "app.services.search_workflows.hybrid_workflow_search",
+                side_effect=RuntimeError("pgvector missing"),
+            ),
+            patch.object(
+                vw, "_legacy_ilike_search_workflows", return_value=ilike_results
+            ),
+        ):
             with caplog.at_level("WARNING"):
                 out = vw.search_workflows(db, "q")
         assert out == []

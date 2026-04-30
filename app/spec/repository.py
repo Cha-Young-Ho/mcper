@@ -27,9 +27,9 @@ class SqlAlchemySpecChunkRepository(ISpecChunkRepository):
         """Parent 청크 저장 후 flush() → DB id 반환."""
         row = SpecChunk(
             spec_id=spec_id,
-            chunk_index=record.chunk_index,   # 음수
+            chunk_index=record.chunk_index,  # 음수
             content=record.content,
-            embedding=None,                   # parent 는 임베딩 없음
+            embedding=None,  # parent 는 임베딩 없음
             chunk_metadata={
                 **record.metadata,
                 "chunk_type": "parent",
@@ -39,7 +39,7 @@ class SqlAlchemySpecChunkRepository(ISpecChunkRepository):
             parent_chunk_id=None,
         )
         self._db.add(row)
-        self._db.flush()   # id 를 얻기 위해 flush (commit 아님)
+        self._db.flush()  # id 를 얻기 위해 flush (commit 아님)
         return row.id
 
     def save_children(
@@ -55,20 +55,22 @@ class SqlAlchemySpecChunkRepository(ISpecChunkRepository):
             if record.parent_chunk_index is not None:
                 parent_db_id = parent_db_ids.get(record.parent_chunk_index)
 
-            self._db.add(SpecChunk(
-                spec_id=spec_id,
-                chunk_index=record.chunk_index,
-                content=record.content,
-                embedding=list(vec),
-                chunk_metadata={
-                    **record.metadata,
-                    "chunk_type": "child",
-                    "section_heading": record.section_heading,
-                    "chunk_index": record.chunk_index,
-                },
-                chunk_type="child",
-                parent_chunk_id=parent_db_id,
-            ))
+            self._db.add(
+                SpecChunk(
+                    spec_id=spec_id,
+                    chunk_index=record.chunk_index,
+                    content=record.content,
+                    embedding=list(vec),
+                    chunk_metadata={
+                        **record.metadata,
+                        "chunk_type": "child",
+                        "section_heading": record.section_heading,
+                        "chunk_index": record.chunk_index,
+                    },
+                    chunk_type="child",
+                    parent_chunk_id=parent_db_id,
+                )
+            )
 
     # ── 트랜잭션 ─────────────────────────────────────────────────────────────
 

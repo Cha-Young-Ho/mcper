@@ -27,9 +27,7 @@ def hash_api_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
-def create_access_token(
-    data: dict, expires_delta: timedelta | None = None
-) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.auth.token_expire_minutes)
@@ -48,7 +46,7 @@ def decode_token(token: str, allow_expired: bool = False) -> dict:
             token,
             settings.auth.secret_key,
             algorithms=["HS256"],
-            options={"verify_exp": not allow_expired}
+            options={"verify_exp": not allow_expired},
         )
     except Exception as e:
         if allow_expired and "expired" in str(e).lower():
@@ -57,7 +55,7 @@ def decode_token(token: str, allow_expired: bool = False) -> dict:
                 token,
                 settings.auth.secret_key,
                 algorithms=["HS256"],
-                options={"verify_exp": False}
+                options={"verify_exp": False},
             )
         raise JWTError("Token validation failed") from e
 

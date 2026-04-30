@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import func, select
 
-from app.db.rule_models import GlobalRuleVersion
 from app.db.seed_defaults import seed_if_empty
 
 
@@ -151,6 +149,6 @@ class TestSeedIfEmptyAdvisoryLock:
             )
 
         # lock SQL에 정수 키가 있어야 함
-        assert any(
-            any(char.isdigit() for char in stmt) for stmt in advisory_calls
-        ), "Advisory lock SQL must include a numeric lock key."
+        assert any(any(char.isdigit() for char in stmt) for stmt in advisory_calls), (
+            "Advisory lock SQL must include a numeric lock key."
+        )

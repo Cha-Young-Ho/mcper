@@ -62,9 +62,9 @@ def spec_chunk_fts_ids(
         .where(Spec.app_target == app_target)
         .where(SpecChunk.chunk_type != "parent")
         .where(
-            text("spec_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)").bindparams(
-                fts_q=q
-            )
+            text(
+                "spec_chunks.content_tsv @@ plainto_tsquery('simple', :fts_q)"
+            ).bindparams(fts_q=q)
         )
         .limit(limit)
     )
@@ -104,12 +104,16 @@ def hybrid_spec_search(
         qvec = embed_query(query)
     except Exception as exc:
         logger.warning("query embed failed, FTS only: %s", exc)
-        fts_ids = spec_chunk_fts_ids(db, app_target=app_target, query=query, limit=top_n * 5)
+        fts_ids = spec_chunk_fts_ids(
+            db, app_target=app_target, query=query, limit=top_n * 5
+        )
         if not fts_ids:
             return [], "indexed_no_match"
         ranked = fts_ids[:top_n]
     else:
-        v_ids = spec_chunk_vector_ids(db, app_target=app_target, query_embedding=qvec, limit=40)
+        v_ids = spec_chunk_vector_ids(
+            db, app_target=app_target, query_embedding=qvec, limit=40
+        )
         f_ids = spec_chunk_fts_ids(db, app_target=app_target, query=query, limit=40)
         ranked = reciprocal_rank_fusion([v_ids, f_ids])[: max(top_n, 20)]
         ranked = ranked[:top_n]
@@ -121,15 +125,21 @@ def hybrid_spec_search(
     by_id = {r.id: r for r in rows}
     ordered = [by_id[i] for i in ranked if i in by_id]
     spec_ids = {r.spec_id for r in ordered}
-    specs = {s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()}
+    specs = {
+        s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()
+    }
 
     # child 청크가 매칭된 경우 → parent 의 섹션 원문을 컨텍스트로 함께 반환
-    parent_ids = [ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None]
+    parent_ids = [
+        ch.parent_chunk_id for ch in ordered if ch.parent_chunk_id is not None
+    ]
     parents_by_id: dict[int, SpecChunk] = {}
     if parent_ids:
         parents_by_id = {
             p.id: p
-            for p in db.scalars(select(SpecChunk).where(SpecChunk.id.in_(parent_ids))).all()
+            for p in db.scalars(
+                select(SpecChunk).where(SpecChunk.id.in_(parent_ids))
+            ).all()
         }
 
     out: list[dict[str, Any]] = []
@@ -142,8 +152,10 @@ def hybrid_spec_search(
                 "spec_id": ch.spec_id,
                 "chunk_index": ch.chunk_index,
                 "chunk_type": ch.chunk_type,
-                "content": ch.content,               # 매칭된 child 원문 (하이라이트용)
-                "parent_content": parent.content if parent else None,  # 섹션 전체 (컨텍스트)
+                "content": ch.content,  # 매칭된 child 원문 (하이라이트용)
+                "parent_content": parent.content
+                if parent
+                else None,  # 섹션 전체 (컨텍스트)
                 "metadata": ch.chunk_metadata,
                 "spec_title": sp.title if sp else None,
                 "related_files": sp.related_files if sp else [],
@@ -183,7 +195,9 @@ def code_node_fts_ids(
         select(CodeNode.id)
         .where(CodeNode.app_target == app_target)
         .where(
-            text("code_nodes.content_tsv @@ plainto_tsquery('simple', :fts_q)").bindparams(fts_q=q)
+            text(
+                "code_nodes.content_tsv @@ plainto_tsquery('simple', :fts_q)"
+            ).bindparams(fts_q=q)
         )
         .limit(limit)
     )
@@ -203,7 +217,9 @@ def hybrid_code_seed_ids(
 ) -> list[int]:
     has_nodes = bool(
         db.scalar(
-            select(func.count()).select_from(CodeNode).where(CodeNode.app_target == app_target)
+            select(func.count())
+            .select_from(CodeNode)
+            .where(CodeNode.app_target == app_target)
         )
     )
     if not has_nodes:
@@ -212,7 +228,9 @@ def hybrid_code_seed_ids(
         qvec = embed_query(query)
     except Exception:
         return code_node_fts_ids(db, app_target=app_target, query=query, limit=top_n)
-    v_ids = code_node_vector_ids(db, app_target=app_target, query_embedding=qvec, limit=25)
+    v_ids = code_node_vector_ids(
+        db, app_target=app_target, query_embedding=qvec, limit=25
+    )
     f_ids = code_node_fts_ids(db, app_target=app_target, query=query, limit=25)
     return reciprocal_rank_fusion([v_ids, f_ids])[:top_n]
 

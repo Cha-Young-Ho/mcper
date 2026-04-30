@@ -17,9 +17,6 @@ from app.services.versioned_rules import (
     export_rules_markdown,
     get_rule_version_snapshot,
     get_rules_markdown,
-    list_sections_for_app,
-    list_sections_for_global,
-    list_sections_for_repo,
     normalize_read_version,
     patch_app_rule,
     patch_global_rule,
@@ -29,7 +26,6 @@ from app.services.versioned_rules import (
     publish_repo,
     rollback_app_rule,
     rollback_global_rule,
-    rollback_repo_rule,
 )
 
 # Cursor 전용 참고 경로 (다른 IDE는 각 제품 문서·CLAUDE.md·.agent/rules 등 사용)
@@ -185,7 +181,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 return denied
             name, sn_out, v = publish_app(db, key, body, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                {
+                    "scope": "app",
+                    "app_name": name,
+                    "section_name": sn_out,
+                    "version": v,
+                },
                 ensure_ascii=False,
             )
         finally:
@@ -215,7 +216,13 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 return denied
             name, sn_out, v = append_app_rule_body(db, key, append_markdown, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v, "appended": True},
+                {
+                    "scope": "app",
+                    "app_name": name,
+                    "section_name": sn_out,
+                    "version": v,
+                    "appended": True,
+                },
                 ensure_ascii=False,
             )
         except ValueError as e:
@@ -278,7 +285,9 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         record_mcp_tool_call("list_rule_sections")
         db = SessionLocal()
         try:
-            denied = check_read(db, app_name=_normalize_app_name(app_name or "") or None)
+            denied = check_read(
+                db, app_name=_normalize_app_name(app_name or "") or None
+            )
             if denied:
                 return denied
             from app.services.versioned_rules import (
@@ -286,10 +295,14 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 _global_all_sections_latest,
                 _repo_all_sections_latest_for_pattern,
             )
+
             if app_name:
                 key = _normalize_app_name(app_name)
                 rows = _app_all_sections_latest(db, key)
-                sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+                sections = [
+                    {"section_name": r.section_name, "latest_version": r.version}
+                    for r in rows
+                ]
                 return json.dumps(
                     {"scope": "app", "app_name": key, "sections": sections},
                     ensure_ascii=False,
@@ -297,13 +310,19 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             if repo_pattern is not None:
                 pat = (repo_pattern or "").strip()
                 rows = _repo_all_sections_latest_for_pattern(db, pat)
-                sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+                sections = [
+                    {"section_name": r.section_name, "latest_version": r.version}
+                    for r in rows
+                ]
                 return json.dumps(
                     {"scope": "repo", "pattern": pat, "sections": sections},
                     ensure_ascii=False,
                 )
             rows = _global_all_sections_latest(db)
-            sections = [{"section_name": r.section_name, "latest_version": r.version} for r in rows]
+            sections = [
+                {"section_name": r.section_name, "latest_version": r.version}
+                for r in rows
+            ]
             return json.dumps(
                 {"scope": "global", "sections": sections},
                 ensure_ascii=False,
@@ -343,7 +362,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 return denied
             name, sn_out, v = publish_app(db, key, body, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                {
+                    "scope": "app",
+                    "app_name": name,
+                    "section_name": sn_out,
+                    "version": v,
+                },
                 ensure_ascii=False,
             )
         finally:
@@ -390,7 +414,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 return denied
             name, sn_out, v = patch_app_rule(db, key, patch_markdown, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                {
+                    "scope": "app",
+                    "app_name": name,
+                    "section_name": sn_out,
+                    "version": v,
+                },
                 ensure_ascii=False,
             )
         finally:
@@ -465,7 +494,12 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 return denied
             name, sn_out, v = rollback_app_rule(db, key, target_version, sn)
             return json.dumps(
-                {"scope": "app", "app_name": name, "section_name": sn_out, "version": v},
+                {
+                    "scope": "app",
+                    "app_name": name,
+                    "section_name": sn_out,
+                    "version": v,
+                },
                 ensure_ascii=False,
             )
         except ValueError as e:
@@ -521,6 +555,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             if denied:
                 return denied
             from app.services.search_rules import hybrid_rule_search
+
             chunks, mode = hybrid_rule_search(
                 db,
                 query=query,

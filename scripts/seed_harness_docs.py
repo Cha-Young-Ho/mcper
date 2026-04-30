@@ -33,7 +33,9 @@ def main() -> None:
         if result.get("ok"):
             print(f"Registered harness docs: {result['count']}")
             for doc in result["docs"]:
-                print(f"  [{doc['scope']:>10}] {doc['title']:<35} ({doc['content_length']} chars)")
+                print(
+                    f"  [{doc['scope']:>10}] {doc['title']:<35} ({doc['content_length']} chars)"
+                )
         else:
             print(f"Error: {result.get('error')}")
         return

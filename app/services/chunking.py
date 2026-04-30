@@ -10,7 +10,9 @@ DEFAULT_CHUNK_CHARS = 1800
 DEFAULT_OVERLAP_CHARS = 180
 
 
-def _split_recursive(text: str, separators: list[str], chunk_size: int, overlap: int) -> list[str]:
+def _split_recursive(
+    text: str, separators: list[str], chunk_size: int, overlap: int
+) -> list[str]:
     if len(text) <= chunk_size:
         return [text] if text.strip() else []
     chunks: list[str] = []

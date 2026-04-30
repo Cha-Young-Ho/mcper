@@ -31,10 +31,10 @@ MCP_TOOLS: list[dict[str, Any]] = [
         ],
         "examples": [
             "최초 부트스트랩 (앱 미확인): `get_global_rule()`",
-            "권장: `get_global_rule(app_name=\"your_app_name\", origin_url=\"git@github.com:org/repo.git\")`",
-            "full remote 출력 그대로: `get_global_rule(app_name=\"your_app_name\", origin_url=\"origin  git@github.com:org/r.git (fetch)\")`",
-            "서버 Git 경로 지정: `get_global_rule(app_name=\"your_app_name\", repo_root=\"/path/to/repo\")`",
-            "특정 앱 버전 조회: `get_global_rule(app_name=\"your_app_name\", version=3)`",
+            '권장: `get_global_rule(app_name="your_app_name", origin_url="git@github.com:org/repo.git")`',
+            'full remote 출력 그대로: `get_global_rule(app_name="your_app_name", origin_url="origin  git@github.com:org/r.git (fetch)")`',
+            '서버 Git 경로 지정: `get_global_rule(app_name="your_app_name", repo_root="/path/to/repo")`',
+            '특정 앱 버전 조회: `get_global_rule(app_name="your_app_name", version=3)`',
             "글로벌 특정 버전: `get_global_rule(version=2)`",
         ],
     },
@@ -56,7 +56,7 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "`mcp_include_app_default`는 `app_name` 있을 때만 true/false, 없으면 null (앱별·글로벌 기본값 반영). `mcp_include_repo_default`는 매칭된 레포 패턴 기준.",
         ],
         "examples": [
-            '`check_rule_versions()`',
+            "`check_rule_versions()`",
             '`check_rule_versions(app_name="your_app_name", origin_url="git@github.com:org/repo.git")`',
         ],
     },
@@ -136,11 +136,11 @@ MCP_TOOLS: list[dict[str, Any]] = [
             "둘 다 없으면: 글로벌 룰 섹션 목록.",
         ],
         "notes": [
-            "반환 예: `{\"scope\": \"app\", \"app_name\": \"myapp\", \"sections\": [{\"section_name\": \"main\", \"latest_version\": 3}]}`",
+            '반환 예: `{"scope": "app", "app_name": "myapp", "sections": [{"section_name": "main", "latest_version": 3}]}`',
         ],
         "examples": [
             '`list_rule_sections(app_name="myapp")` — 앱 섹션 목록',
-            '`list_rule_sections()` — 글로벌 섹션 목록',
+            "`list_rule_sections()` — 글로벌 섹션 목록",
             '`list_rule_sections(repo_pattern="github.com/org")` — 레포 섹션 목록',
         ],
     },

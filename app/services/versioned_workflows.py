@@ -19,7 +19,11 @@ import re
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
 
-from app.db.workflow_models import AppWorkflowVersion, GlobalWorkflowVersion, RepoWorkflowVersion
+from app.db.workflow_models import (
+    AppWorkflowVersion,
+    GlobalWorkflowVersion,
+    RepoWorkflowVersion,
+)
 from app.workflow.service import make_default_workflow_service
 
 logger = logging.getLogger(__name__)
@@ -84,7 +88,9 @@ def _try_index_workflow(
     except Exception:
         logger.warning(
             "workflow indexing failed type=%s id=%s",
-            workflow_type, workflow_entity_id, exc_info=True,
+            workflow_type,
+            workflow_entity_id,
+            exc_info=True,
         )
 
 
@@ -121,10 +127,14 @@ def _global_workflow_all_sections_latest(
     if df is not None:
         q = q.where(_domain_filter(GlobalWorkflowVersion.domain, domain))
     rows = session.scalars(q).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
-def _global_workflow_latest(session: Session, section_name: str = DEFAULT_SECTION) -> GlobalWorkflowVersion | None:
+def _global_workflow_latest(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> GlobalWorkflowVersion | None:
     max_v = (
         select(func.max(GlobalWorkflowVersion.version))
         .where(GlobalWorkflowVersion.section_name == section_name)
@@ -138,7 +148,9 @@ def _global_workflow_latest(session: Session, section_name: str = DEFAULT_SECTIO
     ).first()
 
 
-def next_global_workflow_version(session: Session, section_name: str = DEFAULT_SECTION) -> int:
+def next_global_workflow_version(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> int:
     cur = session.scalar(
         select(func.max(GlobalWorkflowVersion.version)).where(
             GlobalWorkflowVersion.section_name == section_name
@@ -148,20 +160,32 @@ def next_global_workflow_version(session: Session, section_name: str = DEFAULT_S
 
 
 def publish_global_workflow(
-    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> int:
     nv = next_global_workflow_version(session, section_name)
-    row = GlobalWorkflowVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    row = GlobalWorkflowVersion(
+        section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
     _try_index_workflow(
-        session, "global", row.id, body,
-        domain=domain, section_name=section_name,
+        session,
+        "global",
+        row.id,
+        body,
+        domain=domain,
+        section_name=section_name,
     )
     return nv
 
 
-def delete_global_workflow_version(session: Session, section_name: str, version: int) -> None:
+def delete_global_workflow_version(
+    session: Session, section_name: str, version: int
+) -> None:
     session.execute(
         delete(GlobalWorkflowVersion).where(
             GlobalWorkflowVersion.section_name == section_name,
@@ -173,7 +197,9 @@ def delete_global_workflow_version(session: Session, section_name: str, version:
 
 def delete_global_workflow_section(session: Session, section_name: str) -> int:
     res = session.execute(
-        delete(GlobalWorkflowVersion).where(GlobalWorkflowVersion.section_name == section_name)
+        delete(GlobalWorkflowVersion).where(
+            GlobalWorkflowVersion.section_name == section_name
+        )
     )
     session.commit()
     return res.rowcount
@@ -202,7 +228,9 @@ def list_distinct_apps_with_workflows(
     return names
 
 
-def count_distinct_apps_with_workflows(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_apps_with_workflows(
+    session: Session, *, domain: str | None = None
+) -> int:
     """AppWorkflow 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(AppWorkflowVersion.app_name)))
     df = _domain_filter(AppWorkflowVersion.domain, domain)
@@ -224,7 +252,9 @@ def list_sections_for_app_workflow(session: Session, app_name: str) -> list[str]
     return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
-def _app_workflow_all_sections_latest(session: Session, app_name: str) -> list[AppWorkflowVersion]:
+def _app_workflow_all_sections_latest(
+    session: Session, app_name: str
+) -> list[AppWorkflowVersion]:
     key = (app_name or "").lower().strip()
     subq = (
         select(
@@ -243,7 +273,9 @@ def _app_workflow_all_sections_latest(session: Session, app_name: str) -> list[A
             & (AppWorkflowVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _app_workflow_latest(
@@ -252,7 +284,10 @@ def _app_workflow_latest(
     key = (app_name or "").lower().strip()
     max_v = (
         select(func.max(AppWorkflowVersion.version))
-        .where(AppWorkflowVersion.app_name == key, AppWorkflowVersion.section_name == section_name)
+        .where(
+            AppWorkflowVersion.app_name == key,
+            AppWorkflowVersion.section_name == section_name,
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -264,7 +299,9 @@ def _app_workflow_latest(
     ).first()
 
 
-def next_app_workflow_version(session: Session, app_name: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_app_workflow_version(
+    session: Session, app_name: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (app_name or "").lower().strip()
     cur = session.scalar(
         select(func.max(AppWorkflowVersion.version)).where(
@@ -276,21 +313,35 @@ def next_app_workflow_version(session: Session, app_name: str, section_name: str
 
 
 def publish_app_workflow(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    app_name: str,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     key = (app_name or "").lower().strip()
     nv = next_app_workflow_version(session, key, section_name)
-    row = AppWorkflowVersion(app_name=key, section_name=section_name, version=nv, body=body, domain=domain)
+    row = AppWorkflowVersion(
+        app_name=key, section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
     _try_index_workflow(
-        session, "app", row.id, body,
-        app_name=key, domain=domain, section_name=section_name,
+        session,
+        "app",
+        row.id,
+        body,
+        app_name=key,
+        domain=domain,
+        section_name=section_name,
     )
     return key, section_name, nv
 
 
-def delete_app_workflow_version(session: Session, app_name: str, section_name: str, version: int) -> None:
+def delete_app_workflow_version(
+    session: Session, app_name: str, section_name: str, version: int
+) -> None:
     key = (app_name or "").lower().strip()
     session.execute(
         delete(AppWorkflowVersion).where(
@@ -302,7 +353,9 @@ def delete_app_workflow_version(session: Session, app_name: str, section_name: s
     session.commit()
 
 
-def delete_app_workflow_section(session: Session, app_name: str, section_name: str) -> int:
+def delete_app_workflow_section(
+    session: Session, app_name: str, section_name: str
+) -> int:
     key = (app_name or "").lower().strip()
     res = session.execute(
         delete(AppWorkflowVersion).where(
@@ -316,7 +369,9 @@ def delete_app_workflow_section(session: Session, app_name: str, section_name: s
 
 def delete_app_workflow_stream(session: Session, app_name: str) -> int:
     key = (app_name or "").lower().strip()
-    res = session.execute(delete(AppWorkflowVersion).where(AppWorkflowVersion.app_name == key))
+    res = session.execute(
+        delete(AppWorkflowVersion).where(AppWorkflowVersion.app_name == key)
+    )
     session.commit()
     return res.rowcount
 
@@ -351,7 +406,7 @@ def list_distinct_repo_patterns_with_workflows(
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    patterns = sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    patterns = sorted({r or "" for r in rows}, key=lambda p: "" if not p else p.lower())
     if offset:
         patterns = patterns[offset:]
     if limit is not None:
@@ -359,7 +414,9 @@ def list_distinct_repo_patterns_with_workflows(
     return patterns
 
 
-def count_distinct_repo_patterns_with_workflows(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_repo_patterns_with_workflows(
+    session: Session, *, domain: str | None = None
+) -> int:
     """RepoWorkflow 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(RepoWorkflowVersion.pattern)))
     df = _domain_filter(RepoWorkflowVersion.domain, domain)
@@ -381,7 +438,9 @@ def list_sections_for_repo_workflow(session: Session, pattern: str) -> list[str]
     return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
-def _repo_workflow_all_sections_latest(session: Session, pattern: str) -> list[RepoWorkflowVersion]:
+def _repo_workflow_all_sections_latest(
+    session: Session, pattern: str
+) -> list[RepoWorkflowVersion]:
     key = (pattern or "").strip()
     subq = (
         select(
@@ -400,7 +459,9 @@ def _repo_workflow_all_sections_latest(session: Session, pattern: str) -> list[R
             & (RepoWorkflowVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _repo_workflow_latest(
@@ -409,7 +470,10 @@ def _repo_workflow_latest(
     key = (pattern or "").strip()
     max_v = (
         select(func.max(RepoWorkflowVersion.version))
-        .where(RepoWorkflowVersion.pattern == key, RepoWorkflowVersion.section_name == section_name)
+        .where(
+            RepoWorkflowVersion.pattern == key,
+            RepoWorkflowVersion.section_name == section_name,
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -421,7 +485,9 @@ def _repo_workflow_latest(
     ).first()
 
 
-def next_repo_workflow_version(session: Session, pattern: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_repo_workflow_version(
+    session: Session, pattern: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (pattern or "").strip()
     cur = session.scalar(
         select(func.max(RepoWorkflowVersion.version)).where(
@@ -443,17 +509,31 @@ def publish_repo_workflow(
 ) -> tuple[str, str, int]:
     key = (pattern or "").strip()
     nv = next_repo_workflow_version(session, key, section_name)
-    row = RepoWorkflowVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order, domain=domain)
+    row = RepoWorkflowVersion(
+        pattern=key,
+        section_name=section_name,
+        version=nv,
+        body=body,
+        sort_order=sort_order,
+        domain=domain,
+    )
     session.add(row)
     session.commit()
     _try_index_workflow(
-        session, "repo", row.id, body,
-        pattern=key, domain=domain, section_name=section_name,
+        session,
+        "repo",
+        row.id,
+        body,
+        pattern=key,
+        domain=domain,
+        section_name=section_name,
     )
     return key, section_name, nv
 
 
-def delete_repo_workflow_version(session: Session, pattern: str, section_name: str, version: int) -> None:
+def delete_repo_workflow_version(
+    session: Session, pattern: str, section_name: str, version: int
+) -> None:
     key = (pattern or "").strip()
     session.execute(
         delete(RepoWorkflowVersion).where(
@@ -465,7 +545,9 @@ def delete_repo_workflow_version(session: Session, pattern: str, section_name: s
     session.commit()
 
 
-def delete_repo_workflow_section(session: Session, pattern: str, section_name: str) -> int:
+def delete_repo_workflow_section(
+    session: Session, pattern: str, section_name: str
+) -> int:
     key = (pattern or "").strip()
     res = session.execute(
         delete(RepoWorkflowVersion).where(
@@ -479,7 +561,9 @@ def delete_repo_workflow_section(session: Session, pattern: str, section_name: s
 
 def delete_repo_workflow_stream(session: Session, pattern: str) -> int:
     key = (pattern or "").strip()
-    res = session.execute(delete(RepoWorkflowVersion).where(RepoWorkflowVersion.pattern == key))
+    res = session.execute(
+        delete(RepoWorkflowVersion).where(RepoWorkflowVersion.pattern == key)
+    )
     session.commit()
     return res.rowcount
 
@@ -543,7 +627,9 @@ def get_workflows_markdown(
             repo_rows = _repo_workflow_all_sections_latest(session, pattern)
             for row in repo_rows:
                 path = _repo_workflow_save_path(pattern, row.section_name)
-                display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                display = (
+                    "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                )
                 blocks.append(_workflow_file_block(path, display, row.body))
 
     if app_name:
@@ -551,7 +637,9 @@ def get_workflows_markdown(
         app_rows = _app_workflow_all_sections_latest(session, key)
         for row in app_rows:
             path = _app_workflow_save_path(key, row.section_name)
-            display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            display = (
+                "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            )
             blocks.append(_workflow_file_block(path, display, row.body))
 
     if not blocks:
@@ -590,13 +678,15 @@ def _legacy_ilike_search_workflows(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "global",
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "global",
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     if scope in ("all", "app") and app_name:
         key = app_name.lower().strip()
@@ -611,14 +701,16 @@ def _legacy_ilike_search_workflows(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "app",
-                "app_name": r.app_name,
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "app",
+                    "app_name": r.app_name,
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     if scope in ("all", "repo"):
         rows = session.scalars(
@@ -631,14 +723,16 @@ def _legacy_ilike_search_workflows(
             .limit(top_n)
         ).all()
         for r in rows:
-            results.append({
-                "scope": "repo",
-                "pattern": r.pattern,
-                "section_name": r.section_name,
-                "version": r.version,
-                "body": r.body,
-                "domain": r.domain,
-            })
+            results.append(
+                {
+                    "scope": "repo",
+                    "pattern": r.pattern,
+                    "section_name": r.section_name,
+                    "version": r.version,
+                    "body": r.body,
+                    "domain": r.domain,
+                }
+            )
 
     return results[:top_n]
 
@@ -668,35 +762,41 @@ def _enrich_chunks_with_version_rows(
         if wtype == "global":
             row = _global_workflow_latest(session, section)
             if row is not None:
-                out.append({
-                    "scope": "global",
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "global",
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
         elif wtype == "app" and app:
             row = _app_workflow_latest(session, app, section)
             if row is not None:
-                out.append({
-                    "scope": "app",
-                    "app_name": row.app_name,
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "app",
+                        "app_name": row.app_name,
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
         elif wtype == "repo":
             row = _repo_workflow_latest(session, pat or "", section)
             if row is not None:
-                out.append({
-                    "scope": "repo",
-                    "pattern": row.pattern,
-                    "section_name": row.section_name,
-                    "version": row.version,
-                    "body": row.body,
-                    "domain": row.domain,
-                })
+                out.append(
+                    {
+                        "scope": "repo",
+                        "pattern": row.pattern,
+                        "section_name": row.section_name,
+                        "version": row.version,
+                        "body": row.body,
+                        "domain": row.domain,
+                    }
+                )
     return out
 
 
@@ -716,14 +816,20 @@ def search_workflows(
         from app.services.search_workflows import hybrid_workflow_search
 
         chunks, mode = hybrid_workflow_search(
-            session, query=q, app_name=app_name, scope=scope, top_n=top_n,
+            session,
+            query=q,
+            app_name=app_name,
+            scope=scope,
+            top_n=top_n,
         )
         if mode == "hybrid_ok" and chunks:
             enriched = _enrich_chunks_with_version_rows(session, chunks)
             if enriched:
                 return enriched[:top_n]
     except Exception:
-        logger.warning("hybrid workflow search failed, falling back to ILIKE", exc_info=True)
+        logger.warning(
+            "hybrid workflow search failed, falling back to ILIKE", exc_info=True
+        )
 
     return _legacy_ilike_search_workflows(session, q, app_name, scope, top_n)
 

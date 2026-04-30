@@ -81,7 +81,11 @@ def collect_host_entries(app_settings: AppSettings) -> list[str]:
     if single:
         add(single)
 
-    if os.environ.get("MCP_AUTO_EC2_PUBLIC_IP", "1").strip() not in ("0", "false", "no"):
+    if os.environ.get("MCP_AUTO_EC2_PUBLIC_IP", "1").strip() not in (
+        "0",
+        "false",
+        "no",
+    ):
         ip = _ec2_public_ipv4()
         if ip:
             ext_port = (os.environ.get("MCP_EXTERNAL_PORT") or "8001").strip()
@@ -102,8 +106,7 @@ def sync_mcp_allowed_hosts(session: Session, app_settings: AppSettings) -> list[
 
     # select(컬럼만) 이면 스칼라가 str 등으로 온다 (ORM 행이 아님).
     existing = {
-        str(r).strip()
-        for r in session.scalars(select(McpAllowedHost.host_entry)).all()
+        str(r).strip() for r in session.scalars(select(McpAllowedHost.host_entry)).all()
     }
     added: list[str] = []
     for h in entries:

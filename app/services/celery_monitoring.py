@@ -151,14 +151,24 @@ class CeleryMonitoring:
             elif failed_task.entity_type == "code_index":
                 # For code_index, we don't have enough context to requeue
                 # This would need to be handled differently
-                logger.warning("Cannot auto-retry code_index task without original payload")
-                return {"ok": False, "error": "cannot auto-retry code_index without payload"}
+                logger.warning(
+                    "Cannot auto-retry code_index task without original payload"
+                )
+                return {
+                    "ok": False,
+                    "error": "cannot auto-retry code_index without payload",
+                }
             else:
-                return {"ok": False, "error": f"unknown entity_type: {failed_task.entity_type}"}
+                return {
+                    "ok": False,
+                    "error": f"unknown entity_type: {failed_task.entity_type}",
+                }
 
             failed_task.retry_count += 1
             failed_task.status = "retrying"
-            failed_task.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=10)
+            failed_task.next_retry_at = datetime.now(timezone.utc) + timedelta(
+                seconds=10
+            )
             db.commit()
 
             logger.info(

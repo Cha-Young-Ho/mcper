@@ -1,12 +1,8 @@
 """Tests for upload_documents_batch MCP tool - batch document upload functionality."""
 
 import json
-import pytest
 from unittest.mock import patch, MagicMock
-from sqlalchemy.orm import Session
 
-from app.db.database import SessionLocal
-from app.db.models import Spec
 
 
 class TestUploadDocumentsBatchBasics:

@@ -30,7 +30,11 @@ logger = logging.getLogger(__name__)
 
 ASGIApp = Callable[[dict[str, Any], Callable, Callable], Any]
 
-_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # MCP OAuth 독립 스위치 (HTTPS 필수이므로 HTTP 환경에서는 false).
 # mcp_app.py 와 동일한 로직으로 결정.
@@ -41,7 +45,9 @@ else:
     _mcp_auth_enabled = _mcp_auth_raw.lower() in ("1", "true", "yes")
 
 # SDK OAuth가 활성이면 Bearer 인증은 SDK가 처리 → 게이트는 Host/Origin만 검사
-_sdk_auth_active = _mcp_auth_enabled  # SDK auth = MCP auth enabled (mcp_app.py와 동일 조건)
+_sdk_auth_active = (
+    _mcp_auth_enabled  # SDK auth = MCP auth enabled (mcp_app.py와 동일 조건)
+)
 
 
 def _mcp_transport_gate_bypassed() -> bool:
@@ -61,12 +67,14 @@ def _resolve_user_from_jwt(token: str) -> CurrentUser | None:
     """JWT payload에서 user_id를 추출하고 DB에서 User 조회 → CurrentUser."""
     try:
         from app.auth.service import decode_token
+
         payload = decode_token(token)
         user_id_str = payload.get("sub")
         if not user_id_str:
             return None
         from sqlalchemy import select
         from app.db.auth_models import User
+
         db = SessionLocal()
         try:
             user = db.scalar(select(User).where(User.id == int(user_id_str)))
@@ -116,7 +124,9 @@ def _resolve_user_from_api_key(token: str) -> CurrentUser | None:
     return None
 
 
-def _check_bearer_auth(auth_header: str | None) -> tuple[bool, int, bytes, CurrentUser | None]:
+def _check_bearer_auth(
+    auth_header: str | None,
+) -> tuple[bool, int, bytes, CurrentUser | None]:
     """MCP endpoint Bearer 토큰(JWT or API 키) 검증 + 유저 추출.
     MCPER_MCP_AUTH_ENABLED=false 면 체크 스킵 (HTTP 개발 환경용)."""
     if not _mcp_auth_enabled:
@@ -140,9 +150,14 @@ def _check_bearer_auth(auth_header: str | None) -> tuple[bool, int, bytes, Curre
 
 
 # SDK OAuth 엔드포인트 경로 (content-type 검사 제외, 인증 검사 제외)
-_OAUTH_PATHS = {"/authorize", "/token", "/register", "/revoke",
-                "/.well-known/oauth-authorization-server",
-                "/.well-known/oauth-protected-resource"}
+_OAUTH_PATHS = {
+    "/authorize",
+    "/token",
+    "/register",
+    "/revoke",
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/oauth-protected-resource",
+}
 
 
 def _is_oauth_endpoint(path: str | None) -> bool:
@@ -171,7 +186,9 @@ def _sync_validate(
         # Bearer 토큰이 있으면 CurrentUser 추출만 시도 (실패해도 통과 — SDK가 거부)
         if auth_header and auth_header.startswith("Bearer "):
             token_or_key = auth_header[7:]
-            user = _resolve_user_from_jwt(token_or_key) or _resolve_user_from_api_key(token_or_key)
+            user = _resolve_user_from_jwt(token_or_key) or _resolve_user_from_api_key(
+                token_or_key
+            )
     else:
         # 기존: 게이트가 직접 Bearer 인증 검사
         ok, status, body, user = _check_bearer_auth(auth_header)
@@ -180,7 +197,11 @@ def _sync_validate(
 
     if _mcp_transport_gate_bypassed():
         # OAuth 엔드포인트는 content-type 검사 불필요 (form-urlencoded 등 사용)
-        if not is_oauth and method.upper() == "POST" and not content_type_ok_for_mcp_post(content_type):
+        if (
+            not is_oauth
+            and method.upper() == "POST"
+            and not content_type_ok_for_mcp_post(content_type)
+        ):
             return False, 400, b"Invalid Content-Type header", None
         return True, 0, b"", user
 
@@ -200,7 +221,11 @@ def _sync_validate(
         logger.warning("MCP gate: invalid Origin %r (allowed=%s)", origin, origins)
         return False, 403, b"Invalid Origin header", None
 
-    if not is_oauth and method.upper() == "POST" and not content_type_ok_for_mcp_post(content_type):
+    if (
+        not is_oauth
+        and method.upper() == "POST"
+        and not content_type_ok_for_mcp_post(content_type)
+    ):
         return False, 400, b"Invalid Content-Type header", None
 
     return True, 0, b"", user
@@ -231,7 +256,11 @@ class McpHostGateASGI:
         # Starlette Mount sets root_path to the mount prefix; strip it for route-relative path
         raw_path = scope.get("path") or "/"
         root_path = scope.get("root_path") or ""
-        path = raw_path[len(root_path):] if root_path and raw_path.startswith(root_path) else raw_path
+        path = (
+            raw_path[len(root_path) :]
+            if root_path and raw_path.startswith(root_path)
+            else raw_path
+        )
         path = path or "/"
 
         ok, status_code, body, user = await asyncio.to_thread(
@@ -248,11 +277,13 @@ class McpHostGateASGI:
             # 401: 인증 실패 → login_url을 포함한 JSON 응답
             if status_code == 401:
                 login_url = _build_login_url(scope)
-                error_body = json.dumps({
-                    "error": "authentication_required",
-                    "message": body.decode("utf-8"),
-                    "login_url": login_url,
-                }).encode("utf-8")
+                error_body = json.dumps(
+                    {
+                        "error": "authentication_required",
+                        "message": body.decode("utf-8"),
+                        "login_url": login_url,
+                    }
+                ).encode("utf-8")
                 await send(
                     {
                         "type": "http.response.start",

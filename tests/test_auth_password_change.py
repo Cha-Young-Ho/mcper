@@ -8,14 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.service import hash_password, validate_password, verify_password
 from app.db.auth_models import User
-from app.db.database import get_db
 from tests.conftest import auth_disabled_skip
 
 
 class TestPasswordChangedAtField:
     """Unit tests: password_changed_at field behavior."""
 
-    def test_admin_user_with_password_changed(self, db_session: Session, admin_user: User):
+    def test_admin_user_with_password_changed(
+        self, db_session: Session, admin_user: User
+    ):
         """Verify password_changed_at is set for users who changed password."""
         assert admin_user.password_changed_at is not None
         assert isinstance(admin_user.password_changed_at, datetime)
@@ -136,7 +137,10 @@ class TestRequireAdminUserDependency:
     """Integration tests: require_admin_user dependency with password_changed_at."""
 
     def test_default_password_user_redirects_to_change_password(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """
         CRITICAL: Admin with default password (password_changed_at=None)
@@ -155,7 +159,9 @@ class TestRequireAdminUserDependency:
 
             # Should redirect to change-password-forced
             assert response.status_code in (303, 302)
-            assert "/auth/change-password-forced" in response.headers.get("location", "")
+            assert "/auth/change-password-forced" in response.headers.get(
+                "location", ""
+            )
 
     def test_changed_password_user_can_access_admin(
         self, test_client: TestClient, db_session: Session, admin_user: User
@@ -176,7 +182,9 @@ class TestRequireAdminUserDependency:
             # Should not be a redirect to change-password-forced
             # (may be 200, 403, or redirect to login, but not to change-password-forced)
             if response.status_code in (303, 302):
-                assert "/auth/change-password-forced" not in response.headers.get("location", "")
+                assert "/auth/change-password-forced" not in response.headers.get(
+                    "location", ""
+                )
 
     def test_already_changed_user_accesses_change_password_forced(
         self, test_client: TestClient, db_session: Session, admin_user: User
@@ -224,7 +232,10 @@ class TestPasswordChangeEndpoint:
     """Integration tests: POST /auth/change-password-forced endpoint."""
 
     def test_change_password_success(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Successfully change password from default."""
         from unittest.mock import patch
@@ -248,10 +259,15 @@ class TestPasswordChangeEndpoint:
             # Refresh user from DB and verify password changed
             db_session.refresh(admin_user_default_password)
             assert admin_user_default_password.password_changed_at is not None
-            assert verify_password("NewSecure@Pass1", admin_user_default_password.hashed_password)
+            assert verify_password(
+                "NewSecure@Pass1", admin_user_default_password.hashed_password
+            )
 
     def test_password_too_short_error(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Password < 12 characters should be rejected."""
         from unittest.mock import patch
@@ -276,7 +292,10 @@ class TestPasswordChangeEndpoint:
             assert admin_user_default_password.password_changed_at is None
 
     def test_password_no_special_char_error(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Password without special character should be rejected."""
         from unittest.mock import patch
@@ -288,7 +307,10 @@ class TestPasswordChangeEndpoint:
 
             response = test_client.post(
                 "/auth/change-password-forced",
-                data={"password": no_special_password, "password_confirm": no_special_password},
+                data={
+                    "password": no_special_password,
+                    "password_confirm": no_special_password,
+                },
                 cookies={"mcper_token": "dummy_token"},
             )
 
@@ -301,7 +323,10 @@ class TestPasswordChangeEndpoint:
             assert admin_user_default_password.password_changed_at is None
 
     def test_password_mismatch_error(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Password confirmation mismatch should be rejected."""
         from unittest.mock import patch
@@ -327,7 +352,10 @@ class TestPasswordChangeEndpoint:
             assert admin_user_default_password.password_changed_at is None
 
     def test_cannot_reuse_default_password_short(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Default 'changeme' (8 chars) is rejected by length policy first."""
         from unittest.mock import patch
@@ -348,7 +376,10 @@ class TestPasswordChangeEndpoint:
             assert admin_user_default_password.password_changed_at is None
 
     def test_cannot_reuse_default_password_env(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """If ADMIN_PASSWORD env is a long valid password, reusing it should be rejected."""
         from unittest.mock import patch
@@ -374,7 +405,10 @@ class TestPasswordChangeEndpoint:
                 assert admin_user_default_password.password_changed_at is None
 
     def test_login_without_password_change_redirects(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Accessing /admin without changing password should redirect."""
         from unittest.mock import patch
@@ -390,7 +424,9 @@ class TestPasswordChangeEndpoint:
 
             # Should redirect to change-password-forced
             assert response.status_code in (303, 302)
-            assert "/auth/change-password-forced" in response.headers.get("location", "")
+            assert "/auth/change-password-forced" in response.headers.get(
+                "location", ""
+            )
 
 
 @auth_disabled_skip
@@ -398,7 +434,10 @@ class TestEdgeCasesPasswordChange:
     """Edge case tests for password change flow."""
 
     def test_concurrent_password_change_requests(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Simulate two concurrent password change requests."""
         from unittest.mock import patch
@@ -434,7 +473,10 @@ class TestEdgeCasesPasswordChange:
             assert results["request2"] in (303, 200)
 
     def test_whitespace_in_password(
-        self, test_client: TestClient, db_session: Session, admin_user_default_password: User
+        self,
+        test_client: TestClient,
+        db_session: Session,
+        admin_user_default_password: User,
     ):
         """Password with leading/trailing whitespace should be trimmed."""
 
@@ -456,7 +498,9 @@ class TestEdgeCasesPasswordChange:
             if response.status_code in (303, 302):
                 db_session.refresh(admin_user_default_password)
                 # Verify trimmed password works
-                assert verify_password("NewSecure@Pass1", admin_user_default_password.hashed_password)
+                assert verify_password(
+                    "NewSecure@Pass1", admin_user_default_password.hashed_password
+                )
 
 
 @auth_disabled_skip
@@ -488,7 +532,10 @@ class TestUnauthenticatedAccess:
 
             response = test_client.post(
                 "/auth/change-password-forced",
-                data={"password": "NewSecure@Pass1", "password_confirm": "NewSecure@Pass1"},
+                data={
+                    "password": "NewSecure@Pass1",
+                    "password_confirm": "NewSecure@Pass1",
+                },
                 follow_redirects=False,
             )
 
@@ -533,7 +580,6 @@ class TestStartupConfigValidation:
         "app.main inside a subprocess or refactor to runtime env lookup."
     )
     def test_default_password_with_auth_enabled_logs_critical(self):
-        import logging
 
         with patch.dict(
             "os.environ",
@@ -541,6 +587,7 @@ class TestStartupConfigValidation:
         ):
             with patch("app.main.logger") as mock_logger:
                 from app.main import _validate_startup_config
+
                 _validate_startup_config()
                 error_calls = [str(call) for call in mock_logger.error.call_args_list]
                 assert any("CRITICAL" in c for c in error_calls)
@@ -553,8 +600,9 @@ class TestStartupConfigValidation:
         ):
             with patch("app.main.logger") as mock_logger:
                 from app.main import _validate_startup_config
+
                 _validate_startup_config()
-                error_calls = [
-                    str(call) for call in mock_logger.error.call_args_list
-                ]
-                assert not any("CRITICAL" in c and "ADMIN_PASSWORD" in c for c in error_calls)
+                error_calls = [str(call) for call in mock_logger.error.call_args_list]
+                assert not any(
+                    "CRITICAL" in c and "ADMIN_PASSWORD" in c for c in error_calls
+                )

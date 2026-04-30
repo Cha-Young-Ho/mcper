@@ -82,6 +82,7 @@ class PostgresBackend(DataSourceBackend):
 
     def health_check(self) -> bool:
         import sqlalchemy as sa
+
         try:
             engine = sa.create_engine(self._url)
             with engine.connect() as conn:

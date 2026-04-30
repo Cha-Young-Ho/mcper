@@ -15,7 +15,6 @@ def _eq_or_null(col, value):
 
 
 class SqlAlchemyWorkflowChunkRepository:
-
     def __init__(self, db: Session) -> None:
         self._db = db
 
@@ -91,25 +90,27 @@ class SqlAlchemyWorkflowChunkRepository:
             if record.parent_chunk_index is not None:
                 parent_db_id = parent_db_ids.get(record.parent_chunk_index)
 
-            self._db.add(WorkflowChunk(
-                workflow_type=workflow_type,
-                workflow_entity_id=workflow_entity_id,
-                app_name=app_name,
-                pattern=pattern,
-                domain=domain,
-                section_name=section_name,
-                chunk_index=record.chunk_index,
-                content=record.content,
-                embedding=list(vec),
-                chunk_metadata={
-                    **record.metadata,
-                    "chunk_type": "child",
-                    "section_heading": record.section_heading,
-                    "chunk_index": record.chunk_index,
-                },
-                chunk_type="child",
-                parent_chunk_id=parent_db_id,
-            ))
+            self._db.add(
+                WorkflowChunk(
+                    workflow_type=workflow_type,
+                    workflow_entity_id=workflow_entity_id,
+                    app_name=app_name,
+                    pattern=pattern,
+                    domain=domain,
+                    section_name=section_name,
+                    chunk_index=record.chunk_index,
+                    content=record.content,
+                    embedding=list(vec),
+                    chunk_metadata={
+                        **record.metadata,
+                        "chunk_type": "child",
+                        "section_heading": record.section_heading,
+                        "chunk_index": record.chunk_index,
+                    },
+                    chunk_type="child",
+                    parent_chunk_id=parent_db_id,
+                )
+            )
 
     def commit(self) -> None:
         self._db.commit()

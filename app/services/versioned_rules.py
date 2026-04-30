@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any
 from urllib.parse import quote
@@ -71,12 +70,8 @@ _FALLBACK_GLOBAL = (
     "# Global rule\n\n"
     "(DB에 global_rule_versions 행이 없습니다. 어드민 또는 publish_global_rule 로 등록하세요.)\n"
 )
-_FALLBACK_APP = (
-    "(이 앱에 대한 app_rule_versions 가 없습니다. 어드민 또는 publish_app_rule 로 등록하세요.)\n"
-)
-_FALLBACK_REPO = (
-    "(이 origin URL에 맞는 repository_rule_versions 가 없습니다. 어드민 또는 publish_repo_rule 로 등록하세요.)\n"
-)
+_FALLBACK_APP = "(이 앱에 대한 app_rule_versions 가 없습니다. 어드민 또는 publish_app_rule 로 등록하세요.)\n"
+_FALLBACK_REPO = "(이 origin URL에 맞는 repository_rule_versions 가 없습니다. 어드민 또는 publish_repo_rule 로 등록하세요.)\n"
 
 _GLOBAL_REPO_PREAMBLE = """## Repository 룰에 대해 (알림)
 
@@ -224,7 +219,9 @@ def get_mcp_include_repo_default(session: Session) -> bool:
     return bool(row.include_repo_default)
 
 
-def get_mcp_include_repo_default_for_pattern(session: Session, pattern: str | None) -> bool:
+def get_mcp_include_repo_default_for_pattern(
+    session: Session, pattern: str | None
+) -> bool:
     """패턴별로 repository `default`(빈 패턴) 스트림 병합 여부. 행 없으면 전역 플래그 폴백."""
     key = pattern if pattern is not None else ""
     row = session.get(McpRepoPatternPullOption, key)
@@ -296,7 +293,9 @@ def get_mcp_include_app_default_for_app(session: Session, app_name: str) -> bool
     return get_mcp_include_app_default_global(session)
 
 
-def set_mcp_include_app_default_for_app(session: Session, app_name: str, value: bool) -> None:
+def set_mcp_include_app_default_for_app(
+    session: Session, app_name: str, value: bool
+) -> None:
     key = (app_name or "").strip().lower()
     if not key or key == "__default__":
         raise ValueError("invalid app_name for pull option")
@@ -406,7 +405,9 @@ def _global_all_sections_latest(
     if df is not None:
         q = q.where(_domain_filter(GlobalRuleVersion.domain, domain))
     rows = session.scalars(q).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _global_exact(
@@ -476,9 +477,7 @@ def _app_latest(
     return row
 
 
-def _app_all_sections_latest(
-    session: Session, app_name: str
-) -> list[AppRuleVersion]:
+def _app_all_sections_latest(session: Session, app_name: str) -> list[AppRuleVersion]:
     """앱의 모든 섹션 × 최신 버전 행 목록 (섹션 이름 알파벳순, main 우선)."""
     key = app_name.lower().strip()
     subq = (
@@ -498,7 +497,9 @@ def _app_all_sections_latest(
             & (AppRuleVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _app_exact(
@@ -642,7 +643,10 @@ def _repo_all_sections_latest_for_pattern(
             seen.add(row.section_name)
             unique_rows.append(row)
 
-    return sorted(unique_rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        unique_rows,
+        key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name,
+    )
 
 
 def _repo_latest_rows_ordered(
@@ -740,9 +744,7 @@ def build_markdown_response(
 
     # global 메타
     if global_rows:
-        sections_meta = ",".join(
-            f"{r.section_name}:{r.version}" for r in global_rows
-        )
+        sections_meta = ",".join(f"{r.section_name}:{r.version}" for r in global_rows)
         meta_parts.append(f"global_served={sections_meta}")
     else:
         meta_parts.append("global_served=(none)")
@@ -769,7 +771,9 @@ def build_markdown_response(
                 meta_parts.append(f"app_served={app_meta}")
             else:
                 meta_parts.append("app_named_served=(none)")
-                default_meta = ",".join(f"{r.section_name}:{r.version}" for r in app_rows)
+                default_meta = ",".join(
+                    f"{r.section_name}:{r.version}" for r in app_rows
+                )
                 meta_parts.append(f"app_default_served={default_meta}")
                 meta_parts.append("app_stream_resolved=__default__")
         else:
@@ -784,7 +788,11 @@ def build_markdown_response(
     # ── Global 섹션들 ──────────────────────────────────────────────────────
     if global_rows:
         for gr in global_rows:
-            sec_label = "" if gr.section_name == DEFAULT_SECTION else f" — 섹션: {gr.section_name}"
+            sec_label = (
+                ""
+                if gr.section_name == DEFAULT_SECTION
+                else f" — 섹션: {gr.section_name}"
+            )
             body = gr.body
             if three_layer and gr == global_rows[0]:
                 body = _GLOBAL_REPO_PREAMBLE.strip() + "\n\n" + body
@@ -800,7 +808,11 @@ def build_markdown_response(
         if repo_rows:
             for rr in repo_rows:
                 disp = repo_pattern_card_display(rr.pattern)
-                sec_label = "" if rr.section_name == DEFAULT_SECTION else f" — 섹션: {rr.section_name}"
+                sec_label = (
+                    ""
+                    if rr.section_name == DEFAULT_SECTION
+                    else f" — 섹션: {rr.section_name}"
+                )
                 chunks.append(
                     f"# Repository rule — pattern `{disp}`{sec_label} (version {rr.version})\n\n{rr.body}"
                 )
@@ -809,7 +821,11 @@ def build_markdown_response(
 
         for rdr in repo_default_rows:
             if not any(rdr.id == r.id for r in repo_rows):
-                sec_label = "" if rdr.section_name == DEFAULT_SECTION else f" — 섹션: {rdr.section_name}"
+                sec_label = (
+                    ""
+                    if rdr.section_name == DEFAULT_SECTION
+                    else f" — 섹션: {rdr.section_name}"
+                )
                 chunks.append(
                     f"# Repository rule — pattern `default`{sec_label} (version {rdr.version})\n\n"
                     f"{rdr.body}"
@@ -828,7 +844,11 @@ def build_markdown_response(
                     f"**default** (`__default__`) 스트림 본문이 적용됩니다.*\n"
                 )
                 for dr in app_rows:
-                    sec_label = "" if dr.section_name == DEFAULT_SECTION else f" — 섹션: {dr.section_name}"
+                    sec_label = (
+                        ""
+                        if dr.section_name == DEFAULT_SECTION
+                        else f" — 섹션: {dr.section_name}"
+                    )
                     body = dr.body
                     if uncertain_git:
                         body = body + _APP_UNCLEAR_FOOTER
@@ -837,7 +857,11 @@ def build_markdown_response(
                     )
             else:
                 for ar in named:
-                    sec_label = "" if ar.section_name == DEFAULT_SECTION else f" — 섹션: {ar.section_name}"
+                    sec_label = (
+                        ""
+                        if ar.section_name == DEFAULT_SECTION
+                        else f" — 섹션: {ar.section_name}"
+                    )
                     body = ar.body
                     if uncertain_git:
                         body = body + _APP_UNCLEAR_FOOTER
@@ -852,7 +876,11 @@ def build_markdown_response(
 
         for adr in app_default_rows:
             if req_l != "__default__" and not any(adr.id == r.id for r in app_rows):
-                sec_label = "" if adr.section_name == DEFAULT_SECTION else f" — 섹션: {adr.section_name}"
+                sec_label = (
+                    ""
+                    if adr.section_name == DEFAULT_SECTION
+                    else f" — 섹션: {adr.section_name}"
+                )
                 chunks.append(
                     f"# App rule: default{sec_label} (version {adr.version})\n\n{adr.body}"
                 )
@@ -916,7 +944,7 @@ def get_rules_markdown(
             notices.append(
                 "Git `origin` URL 또는 현재 브랜치를 **MCP 서버**가 읽지 못했다. "
                 "**에이전트는 워크스페이스에서 `git remote -v` 를 실행한 뒤**, "
-                "`get_global_rule(..., origin_url=\"origin의_fetch_URL\")` 로 **재호출**하여 Repository 룰을 맞춘다."
+                '`get_global_rule(..., origin_url="origin의_fetch_URL")` 로 **재호출**하여 Repository 룰을 맞춘다.'
             )
 
     uncertain = server_uncertain and not agent_origin
@@ -933,14 +961,18 @@ def get_rules_markdown(
         repo_rows = _repo_all_sections_latest_for_pattern(session, matched_pattern)
 
     inc_repo = get_mcp_include_repo_default_for_pattern(session, matched_pattern or "")
-    meta_extra.append(f"mcp_include_app_default={get_mcp_include_app_default_for_app(session, trimmed)}")
+    meta_extra.append(
+        f"mcp_include_app_default={get_mcp_include_app_default_for_app(session, trimmed)}"
+    )
     meta_extra.append(f"mcp_include_repo_default={'true' if inc_repo else 'false'}")
 
     # 레포 default (빈 패턴) 섹션들
     repo_default_rows: list[RepoRuleVersion] = []
     if inc_repo:
         default_rows = _repo_all_sections_latest_for_pattern(session, "")
-        repo_default_rows = [r for r in default_rows if not any(r.id == x.id for x in repo_rows)]
+        repo_default_rows = [
+            r for r in default_rows if not any(r.id == x.id for x in repo_rows)
+        ]
 
     # 앱 모든 섹션 최신
     inc_app = get_mcp_include_app_default_for_app(session, trimmed)
@@ -949,7 +981,9 @@ def get_rules_markdown(
     if inc_app and trimmed.lower() != "__default__":
         app_rows = _app_all_sections_latest(session, trimmed)
         app_default_rows_raw = _app_all_sections_latest(session, "__default__")
-        app_default_rows = [r for r in app_default_rows_raw if not any(r.id == x.id for x in app_rows)]
+        app_default_rows = [
+            r for r in app_default_rows_raw if not any(r.id == x.id for x in app_rows)
+        ]
     else:
         app_rows = _app_all_sections_latest(session, trimmed)
         # __default__ 폴백: 앱 전용 행이 없으면 __default__ 사용
@@ -1029,7 +1063,9 @@ def get_rule_version_snapshot(
     app_section_rows = _app_all_sections_latest(session, key)
     if app_section_rows:
         app_sections = {r.section_name: r.version for r in app_section_rows}
-        an_main = next((r for r in app_section_rows if r.section_name == DEFAULT_SECTION), None)
+        an_main = next(
+            (r for r in app_section_rows if r.section_name == DEFAULT_SECTION), None
+        )
         out["app_version"] = an_main.version if an_main else app_section_rows[0].version
         out["app_default_version"] = None
     else:
@@ -1042,11 +1078,19 @@ def get_rule_version_snapshot(
     out["app_sections"] = app_sections or None
 
     if matched_pattern is not None:
-        repo_section_rows = _repo_all_sections_latest_for_pattern(session, matched_pattern)
+        repo_section_rows = _repo_all_sections_latest_for_pattern(
+            session, matched_pattern
+        )
         repo_sections = {r.section_name: r.version for r in repo_section_rows}
-        r_main = next((r for r in repo_section_rows if r.section_name == DEFAULT_SECTION), None)
+        r_main = next(
+            (r for r in repo_section_rows if r.section_name == DEFAULT_SECTION), None
+        )
         out["repo_pattern"] = repo_pattern_card_display(matched_pattern)
-        out["repo_version"] = r_main.version if r_main else (repo_section_rows[0].version if repo_section_rows else None)
+        out["repo_version"] = (
+            r_main.version
+            if r_main
+            else (repo_section_rows[0].version if repo_section_rows else None)
+        )
         out["repo_sections"] = repo_sections or None
     else:
         out["repo_pattern"] = None
@@ -1071,7 +1115,9 @@ def next_global_version(session: Session, section_name: str = DEFAULT_SECTION) -
     return int(m or 0) + 1
 
 
-def next_app_version(session: Session, app_name: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_app_version(
+    session: Session, app_name: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = app_name.lower().strip()
     m = session.scalar(
         select(func.max(AppRuleVersion.version)).where(
@@ -1082,7 +1128,9 @@ def next_app_version(session: Session, app_name: str, section_name: str = DEFAUL
     return int(m or 0) + 1
 
 
-def next_repo_version(session: Session, pattern: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_repo_version(
+    session: Session, pattern: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = pattern.strip()
     m = session.scalar(
         select(func.coalesce(func.max(RepoRuleVersion.version), 0)).where(
@@ -1116,23 +1164,41 @@ def _try_index_rule(
             section_name=section_name,
         )
     except Exception:
-        logger.warning("rule indexing failed type=%s id=%s", rule_type, rule_entity_id, exc_info=True)
+        logger.warning(
+            "rule indexing failed type=%s id=%s",
+            rule_type,
+            rule_entity_id,
+            exc_info=True,
+        )
 
 
 def publish_global(
-    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> int:
     """섹션별 다음 버전 번호를 자동 할당해 글로벌 룰 추가."""
     nv = next_global_version(session, section_name)
-    row = GlobalRuleVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    row = GlobalRuleVersion(
+        section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
-    _try_index_rule(session, "global", row.id, body, domain=domain, section_name=section_name)
+    _try_index_rule(
+        session, "global", row.id, body, domain=domain, section_name=section_name
+    )
     return nv
 
 
 def publish_app(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    app_name: str,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     """(app_name, section_name) 스트림의 다음 버전 자동 할당. 반환: (app_name, section_name, version)."""
     key = app_name.lower().strip()
@@ -1140,10 +1206,14 @@ def publish_app(
         raise ValueError("app_name is required")
     sn = (section_name or DEFAULT_SECTION).strip()
     nv = next_app_version(session, key, sn)
-    row = AppRuleVersion(app_name=key, section_name=sn, version=nv, body=body, domain=domain)
+    row = AppRuleVersion(
+        app_name=key, section_name=sn, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
-    _try_index_rule(session, "app", row.id, body, app_name=key, domain=domain, section_name=sn)
+    _try_index_rule(
+        session, "app", row.id, body, app_name=key, domain=domain, section_name=sn
+    )
     return key, sn, nv
 
 
@@ -1206,11 +1276,20 @@ def publish_repo(
             select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
         ).first()
         so = any_prev.sort_order if any_prev else 100
-    row = RepoRuleVersion(pattern=key, section_name=sn, version=nv, body=body.strip(), sort_order=so, domain=domain)
+    row = RepoRuleVersion(
+        pattern=key,
+        section_name=sn,
+        version=nv,
+        body=body.strip(),
+        sort_order=so,
+        domain=domain,
+    )
     session.add(row)
     session.commit()
     ensure_mcp_repo_pattern_pull_option(session, key)
-    _try_index_rule(session, "repo", row.id, body, pattern=key, domain=domain, section_name=sn)
+    _try_index_rule(
+        session, "repo", row.id, body, pattern=key, domain=domain, section_name=sn
+    )
     return key, sn, nv
 
 
@@ -1220,12 +1299,19 @@ def patch_global_rule(
     """global 룰 섹션 최신 버전에 patch_markdown 덧붙여 새 버전 생성."""
     latest = _global_latest(session, section_name)
     base = latest.body if latest else ""
-    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    new_body = (
+        base.rstrip() + "\n\n" + patch_markdown.strip()
+        if base
+        else patch_markdown.strip()
+    )
     return "global", publish_global(session, new_body, section_name)
 
 
 def patch_app_rule(
-    session: Session, app_name: str, patch_markdown: str, section_name: str = DEFAULT_SECTION
+    session: Session,
+    app_name: str,
+    patch_markdown: str,
+    section_name: str = DEFAULT_SECTION,
 ) -> tuple[str, str, int]:
     """app 룰 섹션 최신 버전에 patch_markdown 병합 후 새 버전 생성."""
     key = (app_name or "").strip().lower()
@@ -1233,18 +1319,29 @@ def patch_app_rule(
         raise ValueError("app_name is required")
     latest = _app_latest(session, key, section_name)
     base = latest.body if latest else ""
-    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    new_body = (
+        base.rstrip() + "\n\n" + patch_markdown.strip()
+        if base
+        else patch_markdown.strip()
+    )
     return publish_app(session, key, new_body, section_name)
 
 
 def patch_repo_rule(
-    session: Session, pattern: str, patch_markdown: str, section_name: str = DEFAULT_SECTION
+    session: Session,
+    pattern: str,
+    patch_markdown: str,
+    section_name: str = DEFAULT_SECTION,
 ) -> tuple[str, str, int]:
     """repo 룰 섹션 최신 버전에 patch_markdown 병합 후 새 버전 생성."""
     key = (pattern or "").strip()
     latest = _repo_latest_for_pattern(session, key, section_name)
     base = latest.body if latest else ""
-    new_body = base.rstrip() + "\n\n" + patch_markdown.strip() if base else patch_markdown.strip()
+    new_body = (
+        base.rstrip() + "\n\n" + patch_markdown.strip()
+        if base
+        else patch_markdown.strip()
+    )
     return publish_repo(session, key, new_body, section_name=section_name)
 
 
@@ -1259,12 +1356,17 @@ def rollback_global_rule(
         )
     )
     if row is None:
-        raise ValueError(f"global rule section={section_name} version {target_version} not found")
+        raise ValueError(
+            f"global rule section={section_name} version {target_version} not found"
+        )
     return publish_global(session, row.body, section_name)
 
 
 def rollback_app_rule(
-    session: Session, app_name: str, target_version: int, section_name: str = DEFAULT_SECTION
+    session: Session,
+    app_name: str,
+    target_version: int,
+    section_name: str = DEFAULT_SECTION,
 ) -> tuple[str, str, int]:
     """app 룰 섹션 특정 버전으로 롤백."""
     key = (app_name or "").strip().lower()
@@ -1276,12 +1378,17 @@ def rollback_app_rule(
         )
     )
     if row is None:
-        raise ValueError(f"app rule '{key}' section={section_name} version {target_version} not found")
+        raise ValueError(
+            f"app rule '{key}' section={section_name} version {target_version} not found"
+        )
     return publish_app(session, key, row.body, section_name)
 
 
 def rollback_repo_rule(
-    session: Session, pattern: str, target_version: int, section_name: str = DEFAULT_SECTION
+    session: Session,
+    pattern: str,
+    target_version: int,
+    section_name: str = DEFAULT_SECTION,
 ) -> tuple[str, str, int]:
     """repo 룰 섹션 특정 버전으로 롤백."""
     key = (pattern or "").strip()
@@ -1293,7 +1400,9 @@ def rollback_repo_rule(
         )
     )
     if row is None:
-        raise ValueError(f"repo rule pattern '{key}' section={section_name} version {target_version} not found")
+        raise ValueError(
+            f"repo rule pattern '{key}' section={section_name} version {target_version} not found"
+        )
     return publish_repo(session, key, row.body, section_name=section_name)
 
 
@@ -1348,8 +1457,7 @@ def export_rules_json(session: Session) -> dict:
         app_rows = _app_all_sections_latest(session, app)
         if app_rows:
             app_rules[app] = {
-                r.section_name: {"version": r.version, "body": r.body}
-                for r in app_rows
+                r.section_name: {"version": r.version, "body": r.body} for r in app_rows
             }
 
     repo_rules: dict[str, dict] = {}
@@ -1363,8 +1471,7 @@ def export_rules_json(session: Session) -> dict:
 
     return {
         "global": {
-            r.section_name: {"version": r.version, "body": r.body}
-            for r in global_rows
+            r.section_name: {"version": r.version, "body": r.body} for r in global_rows
         },
         "apps": app_rules,
         "repos": repo_rules,
@@ -1457,8 +1564,7 @@ def get_latest_app_rules(
     subq = base.group_by(AppRuleVersion.app_name).subquery()
     q = select(AppRuleVersion).join(
         subq,
-        (AppRuleVersion.app_name == subq.c.an)
-        & (AppRuleVersion.version == subq.c.mv),
+        (AppRuleVersion.app_name == subq.c.an) & (AppRuleVersion.version == subq.c.mv),
     )
     if df is not None:
         q = q.where(_domain_filter(AppRuleVersion.domain, domain))
@@ -1490,8 +1596,7 @@ def get_latest_repo_rules(
     subq = base.group_by(RepoRuleVersion.pattern).subquery()
     q = select(RepoRuleVersion).join(
         subq,
-        (RepoRuleVersion.pattern == subq.c.pt)
-        & (RepoRuleVersion.version == subq.c.mv),
+        (RepoRuleVersion.pattern == subq.c.pt) & (RepoRuleVersion.version == subq.c.mv),
     )
     if df is not None:
         q = q.where(_domain_filter(RepoRuleVersion.domain, domain))

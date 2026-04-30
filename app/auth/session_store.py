@@ -19,6 +19,7 @@ Redis 미설정/미접속 시 InMemory 로 폴백.
 레이어에서 `.model_dump(mode='json')` / `.model_validate()` 로 변환한 뒤
 이 스토어에 넣는다.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,12 +35,12 @@ logger = logging.getLogger(__name__)
 _REDIS_PREFIX = "mcper:oauth:"
 
 # 기본 TTL (초). 호출 측에서 override 가능.
-DEFAULT_AUTH_CODE_TTL = 600          # OAuth authorization code
-DEFAULT_ACCESS_TOKEN_TTL = 3600      # access token (1h)
+DEFAULT_AUTH_CODE_TTL = 600  # OAuth authorization code
+DEFAULT_ACCESS_TOKEN_TTL = 3600  # access token (1h)
 DEFAULT_REFRESH_TOKEN_TTL = 2592000  # refresh token (30d)
-DEFAULT_PENDING_AUTH_TTL = 300       # pending auth request (5m)
-DEFAULT_CLIENT_TTL = 2592000         # DCR client (30d, None 이면 무기한)
-DEFAULT_CODE_USER_TTL = 600          # code→user 매핑
+DEFAULT_PENDING_AUTH_TTL = 300  # pending auth request (5m)
+DEFAULT_CLIENT_TTL = 2592000  # DCR client (30d, None 이면 무기한)
+DEFAULT_CODE_USER_TTL = 600  # code→user 매핑
 
 
 class SessionStore(Protocol):
@@ -51,7 +52,9 @@ class SessionStore(Protocol):
     def pop_auth_code(self, code: str) -> Optional[dict]: ...
 
     # ── Registered OAuth client (DCR) ─────────────────────────────────
-    def save_client(self, client_id: str, data: dict, ttl: Optional[int] = None) -> None: ...
+    def save_client(
+        self, client_id: str, data: dict, ttl: Optional[int] = None
+    ) -> None: ...
     def get_client(self, client_id: str) -> Optional[dict]: ...
 
     # ── Refresh token ─────────────────────────────────────────────────
@@ -143,7 +146,9 @@ class InMemorySessionStore:
         return self._codes.pop(code)
 
     # client
-    def save_client(self, client_id: str, data: dict, ttl: Optional[int] = None) -> None:
+    def save_client(
+        self, client_id: str, data: dict, ttl: Optional[int] = None
+    ) -> None:
         self._clients.set(client_id, data, ttl)
 
     def get_client(self, client_id: str) -> Optional[dict]:
@@ -241,7 +246,9 @@ class RedisSessionStore:
                 if raw is not None:
                     self._r.delete(key)
             except Exception:
-                logger.exception("RedisSessionStore: getdel fallback failed for %s", key)
+                logger.exception(
+                    "RedisSessionStore: getdel fallback failed for %s", key
+                )
                 return None
         if raw is None:
             return None
@@ -262,7 +269,9 @@ class RedisSessionStore:
         return self._getdel_json(self._K_CODE + code)
 
     # ── client ───────────────────────────────────────────────────────
-    def save_client(self, client_id: str, data: dict, ttl: Optional[int] = None) -> None:
+    def save_client(
+        self, client_id: str, data: dict, ttl: Optional[int] = None
+    ) -> None:
         self._set_json(self._K_CLIENT + client_id, data, ttl)
 
     def get_client(self, client_id: str) -> Optional[dict]:
@@ -345,6 +354,7 @@ def get_session_store() -> SessionStore:
         if mode == "redis":
             try:
                 from app.services.redis_pool import get_redis
+
                 client = get_redis()
             except Exception:  # noqa: BLE001
                 logger.exception("get_session_store: redis_pool import failed")

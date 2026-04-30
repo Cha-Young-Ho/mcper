@@ -23,7 +23,6 @@ class RuleIndexResult:
 
 
 class RuleIndexingService:
-
     def __init__(self, strategy, repository, embedding) -> None:
         self._strategy = strategy
         self._repo = repository
@@ -51,14 +50,18 @@ class RuleIndexingService:
 
         records: list[ChunkRecord] = self._strategy.chunk(body, base_meta)
         if not records:
-            return RuleIndexResult(ok=True, rule_type=rule_type, rule_entity_id=rule_entity_id)
+            return RuleIndexResult(
+                ok=True, rule_type=rule_type, rule_entity_id=rule_entity_id
+            )
 
         parents = [r for r in records if r.chunk_type == "parent"]
         children = [r for r in records if r.chunk_type == "child"]
 
         if not children:
             return RuleIndexResult(
-                ok=True, rule_type=rule_type, rule_entity_id=rule_entity_id,
+                ok=True,
+                rule_type=rule_type,
+                rule_entity_id=rule_entity_id,
                 parent_count=len(parents),
             )
 
@@ -74,21 +77,36 @@ class RuleIndexingService:
         parent_db_ids: dict[int, int] = {}
         for parent in parents:
             db_id = self._repo.save_parent(
-                rule_type, rule_entity_id, parent,
-                app_name=app_name, pattern=pattern, domain=domain, section_name=section_name,
+                rule_type,
+                rule_entity_id,
+                parent,
+                app_name=app_name,
+                pattern=pattern,
+                domain=domain,
+                section_name=section_name,
             )
             parent_db_ids[parent.chunk_index] = db_id
 
         self._repo.save_children(
-            rule_type, rule_entity_id, children, parent_db_ids, vectors,
-            app_name=app_name, pattern=pattern, domain=domain, section_name=section_name,
+            rule_type,
+            rule_entity_id,
+            children,
+            parent_db_ids,
+            vectors,
+            app_name=app_name,
+            pattern=pattern,
+            domain=domain,
+            section_name=section_name,
         )
 
         self._repo.commit()
 
         logger.info(
             "rule indexed type=%s id=%s parents=%d children=%d",
-            rule_type, rule_entity_id, len(parents), len(children),
+            rule_type,
+            rule_entity_id,
+            len(parents),
+            len(children),
         )
         return RuleIndexResult(
             ok=True,

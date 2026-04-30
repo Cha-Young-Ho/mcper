@@ -75,7 +75,11 @@ def insert_spec_chunks_with_embeddings(
             content = (ch.get("content") or "").strip()
             if not content:
                 db.rollback()
-                return {"ok": False, "error": f"chunk {i}: content empty", "spec_id": spec_id}
+                return {
+                    "ok": False,
+                    "error": f"chunk {i}: content empty",
+                    "spec_id": spec_id,
+                }
             raw_meta = ch.get("metadata")
             if raw_meta is None:
                 raw_meta = ch.get("chunk_metadata")

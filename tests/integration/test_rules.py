@@ -19,7 +19,9 @@ class TestRuleVersioning:
     def test_create_and_fetch_rule(self, db_session):
         """Create a rule version and verify it can be retrieved."""
         section = _unique_section()
-        db_session.add(GlobalRuleVersion(section_name=section, version=1, body="# Test rule"))
+        db_session.add(
+            GlobalRuleVersion(section_name=section, version=1, body="# Test rule")
+        )
         db_session.commit()
         row = (
             db_session.query(GlobalRuleVersion)
@@ -32,8 +34,12 @@ class TestRuleVersioning:
     def test_rollback_creates_new_version(self, db_session):
         """Verify rollback creates new version with old content."""
         section = _unique_section()
-        db_session.add(GlobalRuleVersion(section_name=section, version=1, body="Original"))
-        db_session.add(GlobalRuleVersion(section_name=section, version=2, body="Updated"))
+        db_session.add(
+            GlobalRuleVersion(section_name=section, version=1, body="Original")
+        )
+        db_session.add(
+            GlobalRuleVersion(section_name=section, version=2, body="Updated")
+        )
         db_session.commit()
 
         # Simulate rollback: create v3 with v1 content
@@ -52,5 +58,6 @@ class TestRuleVersioning:
         )
         assert v3.body == "Original"
         assert (
-            db_session.query(GlobalRuleVersion).filter_by(section_name=section).count() == 3
+            db_session.query(GlobalRuleVersion).filter_by(section_name=section).count()
+            == 3
         )

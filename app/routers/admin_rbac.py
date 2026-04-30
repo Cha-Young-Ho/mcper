@@ -154,9 +154,7 @@ def list_content_restrictions(
     _user: str = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
-    rows = db.scalars(
-        select(ContentRestriction).order_by(ContentRestriction.id)
-    ).all()
+    rows = db.scalars(select(ContentRestriction).order_by(ContentRestriction.id)).all()
     return {
         "restrictions": [
             {

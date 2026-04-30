@@ -16,13 +16,14 @@ from app.spec.interfaces import IChunkingStrategy  # noqa: F401 (re-export)
 from app.spec.models import ChunkRecord
 
 # ── 크기 상수 ──────────────────────────────────────────────────────────────────
-PARENT_CHARS = 1500   # 섹션 원문 최대 길이 (반환용 컨텍스트)
-CHILD_CHARS = 400     # 임베딩 대상 청크 최대 길이
+PARENT_CHARS = 1500  # 섹션 원문 최대 길이 (반환용 컨텍스트)
+CHILD_CHARS = 400  # 임베딩 대상 청크 최대 길이
 LEGACY_CHUNK_CHARS = 1800
 LEGACY_OVERLAP_CHARS = 180
 
 
 # ── 내부 유틸 ─────────────────────────────────────────────────────────────────
+
 
 def _split_text(text: str, chunk_size: int) -> list[str]:
     """단락/줄/문장 경계를 우선해서 chunk_size 로 분할. 오버랩 없음."""
@@ -91,6 +92,7 @@ def _enrich(text: str, meta: dict[str, Any]) -> str:
 
 # ── 전략 1: HeadingAwareParentChildChunker ─────────────────────────────────────
 
+
 class HeadingAwareParentChildChunker:
     """H1/H2 헤딩 경계 분리 + Parent-Child 구조.
 
@@ -105,8 +107,8 @@ class HeadingAwareParentChildChunker:
     def chunk(self, text: str, base_metadata: dict[str, Any]) -> list[ChunkRecord]:
         sections = self._split_by_headings(text)
         records: list[ChunkRecord] = []
-        parent_seq = -1   # -1, -2, -3 … (음수)
-        child_seq = 0     # 0, 1, 2 … (양수)
+        parent_seq = -1  # -1, -2, -3 … (음수)
+        child_seq = 0  # 0, 1, 2 … (양수)
 
         for heading, section_text in sections:
             section_text = section_text.strip()
@@ -137,15 +139,17 @@ class HeadingAwareParentChildChunker:
                 records.append(parent_record)
 
             for child_text in raw_children:
-                records.append(ChunkRecord(
-                    content=child_text,
-                    embed_text=_enrich(child_text, meta),
-                    chunk_type="child",
-                    chunk_index=child_seq,
-                    section_heading=heading,
-                    parent_chunk_index=parent_seq if needs_parent else None,
-                    metadata=dict(meta),
-                ))
+                records.append(
+                    ChunkRecord(
+                        content=child_text,
+                        embed_text=_enrich(child_text, meta),
+                        chunk_type="child",
+                        chunk_index=child_seq,
+                        section_heading=heading,
+                        parent_chunk_index=parent_seq if needs_parent else None,
+                        metadata=dict(meta),
+                    )
+                )
                 child_seq += 1
 
             if needs_parent:
@@ -177,6 +181,7 @@ class HeadingAwareParentChildChunker:
 
 # ── 전략 2: FixedSizeChunker ──────────────────────────────────────────────────
 
+
 class FixedSizeChunker:
     """기존 고정 크기 재귀 분할. Parent-Child 없이 모든 청크를 child 로 생성.
 
@@ -195,13 +200,15 @@ class FixedSizeChunker:
         raw = _split_recursive(text, self._chunk_size, self._overlap)
         records: list[ChunkRecord] = []
         for i, piece in enumerate(raw):
-            records.append(ChunkRecord(
-                content=piece,
-                embed_text=_enrich(piece, base_metadata),
-                chunk_type="child",
-                chunk_index=i,
-                section_heading=None,
-                parent_chunk_index=None,
-                metadata={**base_metadata},
-            ))
+            records.append(
+                ChunkRecord(
+                    content=piece,
+                    embed_text=_enrich(piece, base_metadata),
+                    chunk_type="child",
+                    chunk_index=i,
+                    section_heading=None,
+                    parent_chunk_index=None,
+                    metadata={**base_metadata},
+                )
+            )
         return records

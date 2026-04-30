@@ -61,13 +61,15 @@ def load_markdown_files():
             if filepath.exists():
                 with open(filepath, "r", encoding="utf-8") as f:
                     body = f.read()
-                results.append({
-                    "filename": filename,
-                    "category": category,  # section_name으로 사용
-                    "pattern": "my-repo",
-                    "body": body,
-                    "description": description,
-                })
+                results.append(
+                    {
+                        "filename": filename,
+                        "category": category,  # section_name으로 사용
+                        "pattern": "my-repo",
+                        "body": body,
+                        "description": description,
+                    }
+                )
                 print(f"✅ 로드: [{category}] {filename}")
             else:
                 print(f"⚠️ 없음: {filename}")
@@ -103,7 +105,9 @@ def publish_to_db(rules):
             )
             print(f"📝 저장: [{category}] → repo_rule_versions")
             print(f"   pattern={pattern}, category={section}, version={version}")
-            print(f"   포함 파일: {', '.join([r['filename'] for r in category_rules])}\n")
+            print(
+                f"   포함 파일: {', '.join([r['filename'] for r in category_rules])}\n"
+            )
     finally:
         session.close()
 

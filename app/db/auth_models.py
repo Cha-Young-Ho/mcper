@@ -44,7 +44,9 @@ class ApiKey(Base):
         Integer, ForeignKey("mcper_users.id", ondelete="CASCADE")
     )
     key_hash: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)  # 예: "Cursor laptop"
+    name: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # 예: "Cursor laptop"
     last_used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

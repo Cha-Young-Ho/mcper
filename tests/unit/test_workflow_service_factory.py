@@ -13,9 +13,13 @@ from app.workflow.service import (
 class TestFactory:
     def test_make_default_wires_dependencies(self):
         db = MagicMock()
-        with patch("app.services.embeddings.embed_texts") as mock_embed, \
-             patch("app.spec.chunking.HeadingAwareParentChildChunker") as mock_chunker, \
-             patch("app.workflow.repository.SqlAlchemyWorkflowChunkRepository") as mock_repo_cls:
+        with (
+            patch("app.services.embeddings.embed_texts") as mock_embed,
+            patch("app.spec.chunking.HeadingAwareParentChildChunker") as mock_chunker,
+            patch(
+                "app.workflow.repository.SqlAlchemyWorkflowChunkRepository"
+            ) as mock_repo_cls,
+        ):
             mock_embed.return_value = [[0.0] * 384]
             svc = make_default_workflow_service(db)
 
@@ -26,9 +30,11 @@ class TestFactory:
     def test_embedding_adapter_delegates_to_embed_texts(self):
         """The internal _EmbeddingAdapter.embed_texts must call embed_texts()."""
         db = MagicMock()
-        with patch("app.services.embeddings.embed_texts") as mock_embed, \
-             patch("app.spec.chunking.HeadingAwareParentChildChunker"), \
-             patch("app.workflow.repository.SqlAlchemyWorkflowChunkRepository"):
+        with (
+            patch("app.services.embeddings.embed_texts") as mock_embed,
+            patch("app.spec.chunking.HeadingAwareParentChildChunker"),
+            patch("app.workflow.repository.SqlAlchemyWorkflowChunkRepository"),
+        ):
             mock_embed.return_value = [[1.0] * 384, [2.0] * 384]
             svc = make_default_workflow_service(db)
 

@@ -75,7 +75,9 @@ class JavaScriptCodeParser(CodeParserBase):
         symbols: list[CodeSymbol] = []
 
         # Pattern 1: Arrow function assignments (const foo = () => {})
-        arrow_pattern = r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(\s*[^)]*\s*\)\s*=>"
+        arrow_pattern = (
+            r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(\s*[^)]*\s*\)\s*=>"
+        )
         for match in re.finditer(arrow_pattern, content):
             try:
                 source = _extract_function_body(content, match)
@@ -115,7 +117,9 @@ class JavaScriptCodeParser(CodeParserBase):
                 continue
 
         # Pattern 3: Class declarations (class Foo {})
-        class_pattern = r"(?:export\s+)?(?:default\s+)?class\s+(\w+)(?:\s+extends\s+\w+)?"
+        class_pattern = (
+            r"(?:export\s+)?(?:default\s+)?class\s+(\w+)(?:\s+extends\s+\w+)?"
+        )
         for match in re.finditer(class_pattern, content):
             try:
                 source = _extract_class_body(content, match)

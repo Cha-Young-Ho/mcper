@@ -3,7 +3,7 @@
 import os
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
 
@@ -179,7 +179,7 @@ def valid_jwt_token(admin_user: User) -> str:
     """Create a valid JWT token for admin user."""
     return create_access_token(
         data={"sub": str(admin_user.id), "type": "access"},
-        expires_delta=timedelta(minutes=15)
+        expires_delta=timedelta(minutes=15),
     )
 
 
@@ -188,7 +188,7 @@ def expired_jwt_token(admin_user: User) -> str:
     """Create an expired JWT token."""
     return create_access_token(
         data={"sub": str(admin_user.id), "type": "access"},
-        expires_delta=timedelta(hours=-1)  # Expired 1 hour ago
+        expires_delta=timedelta(hours=-1),  # Expired 1 hour ago
     )
 
 
@@ -197,7 +197,7 @@ def refresh_token_valid(admin_user: User) -> str:
     """Create a valid refresh token."""
     return create_access_token(
         data={"sub": str(admin_user.id), "type": "refresh"},
-        expires_delta=timedelta(days=7)
+        expires_delta=timedelta(days=7),
     )
 
 
@@ -206,7 +206,7 @@ def refresh_token_expired(admin_user: User) -> str:
     """Create an expired refresh token."""
     return create_access_token(
         data={"sub": str(admin_user.id), "type": "refresh"},
-        expires_delta=timedelta(days=-1)  # Expired 1 day ago
+        expires_delta=timedelta(days=-1),  # Expired 1 day ago
     )
 
 
@@ -252,6 +252,7 @@ def api_key_expired(db_session: Session, admin_user: User) -> tuple[str, ApiKey]
 def csrf_token():
     """Create a dummy CSRF token."""
     import secrets
+
     return secrets.token_hex(16)
 
 

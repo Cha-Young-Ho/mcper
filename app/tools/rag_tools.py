@@ -103,7 +103,9 @@ def analyze_code_impact_impl(query: str, app_target: str) -> str:
             app_target=app_target,
             seed_ids=seeds,
         )
-        return json.dumps({"ok": True, "seed_ids": seeds, "graph": graph}, ensure_ascii=False)
+        return json.dumps(
+            {"ok": True, "seed_ids": seeds, "graph": graph}, ensure_ascii=False
+        )
     except Exception as exc:
         return json.dumps(
             {
@@ -166,7 +168,9 @@ def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str
         db.close()
 
 
-def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: int = 5) -> str:
+def find_historical_reference_impl(
+    new_spec_text: str, app_target: str, top_n: int = 5
+) -> str:
     record_mcp_tool_call("find_historical_reference")
     db: Session = SessionLocal()
     try:
@@ -176,7 +180,11 @@ def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: i
         snippet = (new_spec_text or "")[:8000]
         if not snippet.strip():
             return json.dumps(
-                {"ok": False, "error": "new_spec_text empty", "action_required": "pass spec body"},
+                {
+                    "ok": False,
+                    "error": "new_spec_text empty",
+                    "action_required": "pass spec body",
+                },
                 ensure_ascii=False,
             )
         try:
@@ -209,7 +217,9 @@ def find_historical_reference_impl(new_spec_text: str, app_target: str, top_n: i
         chunks = db.scalars(select(SpecChunk).where(SpecChunk.id.in_(ranked))).all()
         by_id = {c.id: c for c in chunks}
         spec_ids = {c.spec_id for c in chunks}
-        specs = {s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()}
+        specs = {
+            s.id: s for s in db.scalars(select(Spec).where(Spec.id.in_(spec_ids))).all()
+        }
         matches: list[dict[str, Any]] = []
         for cid in ranked:
             ch = by_id.get(cid)
@@ -294,7 +304,9 @@ def register_rag_tools(mcp: FastMCP) -> None:
         return analyze_code_impact_impl(query, app_target)
 
     @mcp.tool()
-    def find_historical_reference(new_spec_text: str, app_target: str, top_n: int = 5) -> str:
+    def find_historical_reference(
+        new_spec_text: str, app_target: str, top_n: int = 5
+    ) -> str:
         """
         지금 작성하려는 기획서 초안과 의미적으로 유사한 과거 기획서를 찾는다.
 

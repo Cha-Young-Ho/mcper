@@ -1,10 +1,7 @@
 """Integration tests for auth router + service + dependencies working together."""
 
-import os
 import pytest
-from unittest.mock import patch
-from datetime import datetime, timedelta, timezone
-from fastapi.testclient import TestClient
+from datetime import timedelta
 
 from app.auth.service import (
     create_access_token,
@@ -14,7 +11,6 @@ from app.auth.service import (
     hash_api_key,
     validate_password,
 )
-from app.db.auth_models import User, ApiKey
 
 
 @pytest.mark.integration

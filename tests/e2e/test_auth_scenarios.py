@@ -1,14 +1,7 @@
 """E2E tests: authentication user scenarios."""
 
-import os
 import pytest
-from unittest.mock import patch
-from datetime import datetime, timedelta, timezone
-from fastapi.testclient import TestClient
 
-from app.auth.service import create_access_token, hash_password
-from app.db.auth_models import User
-from app.main import app
 
 
 @pytest.mark.e2e
@@ -65,7 +58,9 @@ class TestPasswordChangeScenario:
 
     def test_change_password_forced_redirect_when_auth_disabled(self, test_client):
         """When auth disabled, forced password change redirects."""
-        response = test_client.get("/auth/change-password-forced", follow_redirects=False)
+        response = test_client.get(
+            "/auth/change-password-forced", follow_redirects=False
+        )
         assert response.status_code == 303
 
     def test_logout_flow(self, test_client):

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import ast
-import inspect
 import logging
-from typing import Any
 
 from app.services.code_parser import CodeParserBase, CodeSymbol
 
@@ -19,7 +17,7 @@ def _extract_source_lines(content: str, node: ast.AST) -> str:
         return ""
 
     start = node.lineno - 1
-    end = (node.end_lineno or node.lineno)
+    end = node.end_lineno or node.lineno
 
     if start < 0 or start >= len(lines):
         return ""
@@ -78,7 +76,9 @@ class PythonCodeParser(CodeParserBase):
             return []
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+            if isinstance(node, ast.FunctionDef) or isinstance(
+                node, ast.AsyncFunctionDef
+            ):
                 try:
                     source = _extract_source_lines(content, node)
                     if not source.strip():

@@ -18,7 +18,11 @@ from app.prompts.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
-_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 
 def _default_app_body() -> str:
@@ -154,7 +158,10 @@ def seed_admin_user_if_empty(session: Session) -> None:
             )
         )
         session.commit()
-        logger.info("Initial admin user '%s' created (password change required on first login).", username)
+        logger.info(
+            "Initial admin user '%s' created (password change required on first login).",
+            username,
+        )
     except Exception as exc:
         logger.exception("seed_admin_user_if_empty failed: %s", exc)
         session.rollback()

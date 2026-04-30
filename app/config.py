@@ -39,6 +39,7 @@ class AuthSettings(BaseModel):
     github_client_id: str | None = None
     github_client_secret: str | None = None
 
+
 _ENV_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
@@ -279,7 +280,9 @@ def _load_yaml_dict(path: Path) -> dict[str, Any]:
 
 def _load_yaml_config_data() -> dict[str, Any]:
     """explicit MCPER_CONFIG 또는 config.yaml + config.<env>.yaml 병합."""
-    raw = (os.environ.get("MCPER_CONFIG") or os.environ.get("MCPER_CONFIG_PATH") or "").strip()
+    raw = (
+        os.environ.get("MCPER_CONFIG") or os.environ.get("MCPER_CONFIG_PATH") or ""
+    ).strip()
     root = _repo_root()
     if raw:
         explicit = Path(raw)

@@ -9,8 +9,12 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials, HTTPBasic
+from fastapi.security import (
+    HTTPBasicCredentials,
+    HTTPBearer,
+    HTTPAuthorizationCredentials,
+    HTTPBasic,
+)
 from jose import ExpiredSignatureError, JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,9 +32,14 @@ def _raise_redirect(url: str) -> None:
         headers={"Location": url},
     )
 
+
 logger = logging.getLogger(__name__)
 
-_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 bearer_scheme = HTTPBearer(auto_error=False)
 basic_scheme = HTTPBasic(auto_error=False)
@@ -120,9 +129,7 @@ async def get_current_user_optional(
     # API 키 검증 (Bearer 헤더만)
     if credentials and credentials.credentials:
         key_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
-        api_key = db.scalar(
-            select(ApiKey).where(ApiKey.key_hash == key_hash)
-        )
+        api_key = db.scalar(select(ApiKey).where(ApiKey.key_hash == key_hash))
         if api_key:
             # API 키 만료 검증
             if api_key.expires_at is not None:
@@ -160,7 +167,9 @@ async def require_admin_user(
         # 토큰이 있지만 만료된 경우 명시적 메시지
         token = request.cookies.get("mcper_token")
         if not token and request.headers.get("authorization"):
-            token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            token = (
+                request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            )
 
         if token:
             try:

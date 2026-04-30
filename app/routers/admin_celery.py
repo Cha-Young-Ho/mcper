@@ -28,10 +28,16 @@ def admin_celery_dashboard(
     offset = (page - 1) * per_page
 
     failed_tasks = CeleryMonitoring.get_failed_tasks(
-        db, status=status, entity_type=entity_type, limit=per_page, offset=offset,
+        db,
+        status=status,
+        entity_type=entity_type,
+        limit=per_page,
+        offset=offset,
     )
     total_count = CeleryMonitoring.get_failed_tasks_count(
-        db, status=status, entity_type=entity_type,
+        db,
+        status=status,
+        entity_type=entity_type,
     )
     task_stats = CeleryMonitoring.get_task_stats(db)
 
@@ -102,26 +108,30 @@ def admin_celery_active_api(
         from app.worker.celery_app import celery_app
 
         inspector = celery_app.control.inspect(timeout=1.5)
-        active_raw   = inspector.active()   or {}
+        active_raw = inspector.active() or {}
         reserved_raw = inspector.reserved() or {}
 
         def _flatten(raw: dict) -> list[dict]:
             out = []
             for worker, tasks in raw.items():
-                for t in (tasks or []):
-                    out.append({
-                        "worker": worker,
-                        "task_id": t.get("id", ""),
-                        "name": t.get("name", ""),
-                        "args": str(t.get("args", []))[:120],
-                        "time_start": t.get("time_start"),
-                    })
+                for t in tasks or []:
+                    out.append(
+                        {
+                            "worker": worker,
+                            "task_id": t.get("id", ""),
+                            "name": t.get("name", ""),
+                            "args": str(t.get("args", []))[:120],
+                            "time_start": t.get("time_start"),
+                        }
+                    )
             return out
 
-        return JSONResponse({
-            "active":   _flatten(active_raw),
-            "reserved": _flatten(reserved_raw),
-        })
+        return JSONResponse(
+            {
+                "active": _flatten(active_raw),
+                "reserved": _flatten(reserved_raw),
+            }
+        )
     except Exception as exc:
         logger.warning("Celery Inspect 실패: %s", exc)
         return JSONResponse({"active": [], "reserved": [], "error": str(exc)})
@@ -134,27 +144,37 @@ def admin_celery_stats_api(
 ):
     """JSON API for polling task stats."""
     task_stats = CeleryMonitoring.get_task_stats(db)
-    stats_list = task_stats if isinstance(task_stats, list) else ([task_stats] if task_stats else [])
+    stats_list = (
+        task_stats
+        if isinstance(task_stats, list)
+        else ([task_stats] if task_stats else [])
+    )
 
     pending_count = CeleryMonitoring.get_failed_tasks_count(db, status="pending")
     retrying_count = CeleryMonitoring.get_failed_tasks_count(db, status="retrying")
     failed_count = CeleryMonitoring.get_failed_tasks_count(db, status="failed")
     resolved_count = CeleryMonitoring.get_failed_tasks_count(db, status="resolved")
 
-    return JSONResponse({
-        "pending": pending_count,
-        "retrying": retrying_count,
-        "failed": failed_count,
-        "resolved": resolved_count,
-        "task_stats": [
-            {
-                "task_name": s.task_name,
-                "success_count": s.success_count,
-                "failure_count": s.failure_count,
-                "total_duration_seconds": s.total_duration_seconds,
-                "last_success_at": s.last_success_at.isoformat() if s.last_success_at else None,
-                "last_failure_at": s.last_failure_at.isoformat() if s.last_failure_at else None,
-            }
-            for s in stats_list
-        ],
-    })
+    return JSONResponse(
+        {
+            "pending": pending_count,
+            "retrying": retrying_count,
+            "failed": failed_count,
+            "resolved": resolved_count,
+            "task_stats": [
+                {
+                    "task_name": s.task_name,
+                    "success_count": s.success_count,
+                    "failure_count": s.failure_count,
+                    "total_duration_seconds": s.total_duration_seconds,
+                    "last_success_at": s.last_success_at.isoformat()
+                    if s.last_success_at
+                    else None,
+                    "last_failure_at": s.last_failure_at.isoformat()
+                    if s.last_failure_at
+                    else None,
+                }
+                for s in stats_list
+            ],
+        }
+    )

@@ -15,7 +15,11 @@ from fastapi.staticfiles import StaticFiles
 from app.asgi.csrf_middleware import CSRFMiddleware
 from app.config import settings
 from app.db.database import SessionLocal, check_db_connection, init_db
-from app.db.seed_defaults import seed_if_empty, seed_repo_if_empty, seed_admin_user_if_empty
+from app.db.seed_defaults import (
+    seed_if_empty,
+    seed_repo_if_empty,
+    seed_admin_user_if_empty,
+)
 from app.db.seed_specs import seed_sample_spec_if_empty
 from app.logging_config import configure_logging
 from app.mcp_app import mcp
@@ -23,20 +27,45 @@ from app.services.embeddings import configure_embedding_backend
 from app.services.mcp_auto_hosts import sync_mcp_allowed_hosts
 from app.services.rag_health import rag_health_payload
 from app.mcp_dynamic_mount import mcp_dynamic_asgi
-from app.routers import admin_base, admin_celery, admin_dashboard, admin_docs, admin_rbac, admin_specs, admin_rules, admin_skills, admin_workflows, admin_tools, admin_users
+from app.routers import (
+    admin_base,
+    admin_celery,
+    admin_dashboard,
+    admin_docs,
+    admin_rbac,
+    admin_specs,
+    admin_rules,
+    admin_skills,
+    admin_workflows,
+    admin_tools,
+    admin_users,
+)
 
 logger = logging.getLogger("mcper.startup")
 
 MCP_MOUNT_PATH = settings.mcp.mount_path.rstrip("/") or "/mcp"
 
 # ── Feature Flags (환경변수 기반, 배포 환경과 무관) ─────────────────
-_ADMIN_ENABLED = os.environ.get("MCPER_ADMIN_ENABLED", "true").lower() not in ("0", "false", "no")
-_MCP_ENABLED   = os.environ.get("MCPER_MCP_ENABLED",   "true").lower() not in ("0", "false", "no")
-_AUTH_ENABLED  = os.environ.get("MCPER_AUTH_ENABLED",  "false").lower() in ("1", "true", "yes")
+_ADMIN_ENABLED = os.environ.get("MCPER_ADMIN_ENABLED", "true").lower() not in (
+    "0",
+    "false",
+    "no",
+)
+_MCP_ENABLED = os.environ.get("MCPER_MCP_ENABLED", "true").lower() not in (
+    "0",
+    "false",
+    "no",
+)
+_AUTH_ENABLED = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 # MCP OAuth 는 HTTPS 필수 (RFC). HTTP 개발환경에서는 끈다. 미설정 시 _AUTH_ENABLED 따라감.
 _MCP_AUTH_RAW = os.environ.get("MCPER_MCP_AUTH_ENABLED")
 _MCP_AUTH_ENABLED = (
-    _AUTH_ENABLED if _MCP_AUTH_RAW is None
+    _AUTH_ENABLED
+    if _MCP_AUTH_RAW is None
     else _MCP_AUTH_RAW.lower() in ("1", "true", "yes")
 )
 
@@ -49,7 +78,9 @@ def _validate_startup_config() -> None:
     - 인증 비활성(로컬 개발) 상태에서는 기본값 허용하고 INFO 로그만 남긴다.
     """
     password = os.environ.get("ADMIN_PASSWORD", "")
-    secret_key = os.environ.get("AUTH_SECRET_KEY", "") or (settings.auth.secret_key or "")
+    secret_key = os.environ.get("AUTH_SECRET_KEY", "") or (
+        settings.auth.secret_key or ""
+    )
 
     if _AUTH_ENABLED:
         if not password:
@@ -70,9 +101,7 @@ def _validate_startup_config() -> None:
     else:
         # 로컬 개발 편의: 인증 꺼진 상태에서는 INFO 로그만.
         if not password:
-            logger.info(
-                "ADMIN_PASSWORD is not set (auth disabled; local dev mode)."
-            )
+            logger.info("ADMIN_PASSWORD is not set (auth disabled; local dev mode).")
         elif password == "changeme":
             logger.info(
                 "ADMIN_PASSWORD is default 'changeme' (auth disabled; local dev mode)."
@@ -173,6 +202,7 @@ if _AUTH_ENABLED or _ADMIN_ENABLED:
                 "auth.secret_key 가 비어 있습니다. AUTH_SECRET_KEY 를 설정하세요."
             )
         import secrets as _secrets
+
         _csrf_secret = _secrets.token_urlsafe(32)
         logger.info(
             "auth.secret_key not configured; generated ephemeral CSRF key "
@@ -205,6 +235,7 @@ if _ADMIN_ENABLED:
 if _AUTH_ENABLED:
     from app.auth.router import router as auth_router
     from app.auth.oauth import router as oauth_router
+
     app.include_router(auth_router)
     # Google/GitHub OAuth: client_id 설정 시에만 등록
     if settings.auth.google_client_id or settings.auth.github_client_id:
@@ -232,28 +263,29 @@ if _MCP_ENABLED:
 
         @app.post("/register")
         @app.get("/register")
-        def _oauth_register_disabled(): return _oauth_disabled_response()
+        def _oauth_register_disabled():
+            return _oauth_disabled_response()
 
         @app.post("/token")
         @app.get("/token")
-        def _oauth_token_disabled(): return _oauth_disabled_response()
+        def _oauth_token_disabled():
+            return _oauth_disabled_response()
 
         @app.post("/revoke")
         @app.get("/revoke")
-        def _oauth_revoke_disabled(): return _oauth_disabled_response()
+        def _oauth_revoke_disabled():
+            return _oauth_disabled_response()
 
         @app.post("/authorize")
         @app.get("/authorize")
-        def _oauth_authorize_disabled(): return _oauth_disabled_response()
+        def _oauth_authorize_disabled():
+            return _oauth_disabled_response()
 
     # ── MCP OAuth well-known + endpoint proxies at root ──────────────
     # RFC 9728/8414 require well-known URLs at the root, not inside the mount.
     # Also, some MCP clients resolve OAuth endpoints relative to the root.
     if _MCP_AUTH_ENABLED:
         from app.auth.mcp_oauth_provider import MCP_SCOPES
-        from fastapi import Request as _Req
-        from fastapi.responses import Response as _Resp
-        import httpx
 
         def _mcp_base_url() -> tuple[str, str]:
             _port = os.environ.get("PORT") or os.environ.get("UVICORN_PORT") or "8001"
@@ -280,7 +312,7 @@ if _MCP_ENABLED:
             """RFC 8414 Authorization Server Metadata (proxy to MCP mount)."""
             _base, _mount = _mcp_base_url()
             from app.auth.mcp_oauth_provider import MCP_SCOPES
-            from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+
             return {
                 "issuer": f"{_base}{_mount}",
                 "authorization_endpoint": f"{_base}{_mount}/authorize",
@@ -289,9 +321,15 @@ if _MCP_ENABLED:
                 "scopes_supported": MCP_SCOPES,
                 "response_types_supported": ["code"],
                 "grant_types_supported": ["authorization_code", "refresh_token"],
-                "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+                "token_endpoint_auth_methods_supported": [
+                    "client_secret_post",
+                    "client_secret_basic",
+                ],
                 "revocation_endpoint": f"{_base}{_mount}/revoke",
-                "revocation_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+                "revocation_endpoint_auth_methods_supported": [
+                    "client_secret_post",
+                    "client_secret_basic",
+                ],
                 "code_challenge_methods_supported": ["S256"],
             }
 

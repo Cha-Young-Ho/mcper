@@ -34,25 +34,35 @@ from sqlalchemy import delete, func, select  # noqa: E402
 def _latest_versions(db, model, group_cols):
     """Get latest version rows for each group."""
     subq = (
-        select(*[getattr(model, c).label(c) for c in group_cols], func.max(model.version).label("mv"))
+        select(
+            *[getattr(model, c).label(c) for c in group_cols],
+            func.max(model.version).label("mv"),
+        )
         .group_by(*[getattr(model, c) for c in group_cols])
         .subquery()
     )
     conditions = [getattr(model, c) == subq.c[c] for c in group_cols]
     conditions.append(model.version == subq.c.mv)
-    return db.scalars(select(model).join(subq, *conditions)).all() if len(conditions) == 1 else (
-        db.scalars(
-            select(model).join(
-                subq,
-                conditions[0] & conditions[1] if len(conditions) == 2 else
-                conditions[0] & conditions[1] & conditions[2]
-            )
-        ).all()
+    return (
+        db.scalars(select(model).join(subq, *conditions)).all()
+        if len(conditions) == 1
+        else (
+            db.scalars(
+                select(model).join(
+                    subq,
+                    conditions[0] & conditions[1]
+                    if len(conditions) == 2
+                    else conditions[0] & conditions[1] & conditions[2],
+                )
+            ).all()
+        )
     )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Reindex all skill versions into skill_chunks.")
+    parser = argparse.ArgumentParser(
+        description="Reindex all skill versions into skill_chunks."
+    )
     parser.add_argument(
         "--purge-old",
         action="store_true",
@@ -77,11 +87,16 @@ def main():
     for row in global_rows:
         try:
             result = svc.index_skill(
-                "global", row.id, row.body, section_name=row.section_name,
+                "global",
+                row.id,
+                row.body,
+                section_name=row.section_name,
             )
             if result.ok:
                 total += 1
-                print(f"  global/{row.section_name} v{row.version} -> {result.child_count} children")
+                print(
+                    f"  global/{row.section_name} v{row.version} -> {result.child_count} children"
+                )
             else:
                 errors += 1
                 print(f"  FAIL global/{row.section_name}: {result.error}")
@@ -94,12 +109,17 @@ def main():
     for row in app_rows:
         try:
             result = svc.index_skill(
-                "app", row.id, row.body,
-                app_name=row.app_name, section_name=row.section_name,
+                "app",
+                row.id,
+                row.body,
+                app_name=row.app_name,
+                section_name=row.section_name,
             )
             if result.ok:
                 total += 1
-                print(f"  app/{row.app_name}/{row.section_name} v{row.version} -> {result.child_count} children")
+                print(
+                    f"  app/{row.app_name}/{row.section_name} v{row.version} -> {result.child_count} children"
+                )
             else:
                 errors += 1
                 print(f"  FAIL app/{row.app_name}/{row.section_name}: {result.error}")
@@ -112,12 +132,17 @@ def main():
     for row in repo_rows:
         try:
             result = svc.index_skill(
-                "repo", row.id, row.body, section_name=row.section_name,
+                "repo",
+                row.id,
+                row.body,
+                section_name=row.section_name,
             )
             if result.ok:
                 total += 1
                 pat = row.pattern or "(default)"
-                print(f"  repo/{pat}/{row.section_name} v{row.version} -> {result.child_count} children")
+                print(
+                    f"  repo/{pat}/{row.section_name} v{row.version} -> {result.child_count} children"
+                )
             else:
                 errors += 1
                 print(f"  FAIL repo/{row.pattern}/{row.section_name}: {result.error}")

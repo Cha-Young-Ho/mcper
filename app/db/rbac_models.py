@@ -50,7 +50,9 @@ class UserPermission(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "domain_slug", "app_name",
+            "user_id",
+            "domain_slug",
+            "app_name",
             name="uq_user_perm_user_domain_app",
         ),
     )
@@ -78,7 +80,10 @@ class ContentRestriction(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "domain_slug", "app_name", "section_name", "restricted_role",
+            "domain_slug",
+            "app_name",
+            "section_name",
+            "restricted_role",
             name="uq_content_restriction",
         ),
     )

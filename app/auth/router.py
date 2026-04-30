@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import secrets
@@ -14,7 +13,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_optional, require_admin_user
-from app.auth.service import create_access_token, decode_token, hash_api_key, hash_password, validate_password, verify_password
+from app.auth.service import (
+    create_access_token,
+    decode_token,
+    hash_api_key,
+    hash_password,
+    validate_password,
+    verify_password,
+)
 from app.config import settings
 from app.db.auth_models import ApiKey, User
 from app.db.database import get_db
@@ -22,7 +28,11 @@ from app.routers.admin_base import templates
 
 logger = logging.getLogger(__name__)
 
-_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+_auth_enabled = os.environ.get("MCPER_AUTH_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,7 +77,11 @@ def login_submit(
         return RedirectResponse("/admin", status_code=303)
 
     user = db.scalar(select(User).where(User.username == username))
-    if not user or not user.is_active or not verify_password(password, user.hashed_password or ""):
+    if (
+        not user
+        or not user.is_active
+        or not verify_password(password, user.hashed_password or "")
+    ):
         return templates.TemplateResponse(
             request,
             "auth/login.html",
@@ -138,6 +152,7 @@ def me(
 
 # ── API 키 관리 (어드민 전용) ──────────────────────────────────────
 
+
 @router.post("/api-keys")
 def create_api_key(
     name: str = Form(...),
@@ -152,7 +167,11 @@ def create_api_key(
         raise HTTPException(status_code=404, detail="User not found")
     db.add(ApiKey(user_id=user.id, key_hash=key_hash, name=name))
     db.commit()
-    return {"key": raw_key, "name": name, "note": "이 키는 한 번만 표시됩니다. 안전하게 보관하세요."}
+    return {
+        "key": raw_key,
+        "name": name,
+        "note": "이 키는 한 번만 표시됩니다. 안전하게 보관하세요.",
+    }
 
 
 @router.get("/api-keys")
@@ -165,7 +184,12 @@ def list_api_keys(
         return []
     keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id)).all()
     return [
-        {"id": k.id, "name": k.name, "created_at": k.created_at, "last_used_at": k.last_used_at}
+        {
+            "id": k.id,
+            "name": k.name,
+            "created_at": k.created_at,
+            "last_used_at": k.last_used_at,
+        }
         for k in keys
     ]
 
@@ -336,8 +360,7 @@ async def refresh_access_token(
 
     # 새 access 토큰 발급 (짧은 수명)
     access_token = create_access_token(
-        {"sub": str(user.id), "type": "access"},
-        expires_delta=timedelta(minutes=15)
+        {"sub": str(user.id), "type": "access"}, expires_delta=timedelta(minutes=15)
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
@@ -416,7 +439,11 @@ def mcp_authorize_submit(
         return RedirectResponse("/admin", status_code=303)
 
     user = db.scalar(select(User).where(User.username == username))
-    if not user or not user.is_active or not verify_password(password, user.hashed_password or ""):
+    if (
+        not user
+        or not user.is_active
+        or not verify_password(password, user.hashed_password or "")
+    ):
         return templates.TemplateResponse(
             request,
             "auth/mcp_authorize.html",
@@ -430,6 +457,7 @@ def mcp_authorize_submit(
 
     # complete_authorization: auth code 생성 → redirect_uri 반환
     from app.auth.mcp_oauth_provider import complete_authorization
+
     redirect_url = complete_authorization(request_id, user.id)
     if redirect_url is None:
         return templates.TemplateResponse(

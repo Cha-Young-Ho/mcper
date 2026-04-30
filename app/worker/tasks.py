@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db.database import SessionLocal
 from app.db.models import Spec
-from app.db.rag_models import CodeEdge, CodeNode, SpecChunk
+from app.db.rag_models import CodeEdge, CodeNode
 from app.services.document_parser import parse_uploaded_file
 from app.services.embeddings import embed_texts
 from app.services.celery_monitoring import CeleryMonitoring
@@ -58,7 +58,9 @@ def index_spec_task(self, spec_id: int) -> dict[str, Any]:
         )
         logger.exception("index_spec_task failed spec_id=%s", spec_id)
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc, countdown=10 * (self.request.retries + 1)) from exc
+            raise self.retry(
+                exc=exc, countdown=10 * (self.request.retries + 1)
+            ) from exc
         return {"ok": False, "error": str(exc), "spec_id": spec_id}
     finally:
         db.close()
@@ -101,7 +103,11 @@ def parse_and_index_upload_task(
         text = parse_uploaded_file(filename, raw)
         if not text.strip():
             rdb.delete(redis_key)
-            return {"ok": False, "filename": filename, "error": "파일 내용이 비어 있습니다"}
+            return {
+                "ok": False,
+                "filename": filename,
+                "error": "파일 내용이 비어 있습니다",
+            }
 
         title = Path(filename).stem
         app_key = (app_target or "").strip().lower()
@@ -120,6 +126,7 @@ def parse_and_index_upload_task(
 
         # 청킹·임베딩은 SpecIndexingService 로 위임 (Spec 행은 이미 flush 완료)
         from app.spec.service import make_default_service
+
         try:
             result = make_default_service(db).index(
                 spec_id=spec_id,
@@ -133,7 +140,12 @@ def parse_and_index_upload_task(
             db.rollback()
             raise self.retry(exc=exc, countdown=10) from exc
         rdb.delete(redis_key)  # 성공 시 정리
-        return {"ok": True, "filename": filename, "spec_id": spec_id, "chunks": result.child_count}
+        return {
+            "ok": True,
+            "filename": filename,
+            "spec_id": spec_id,
+            "chunks": result.child_count,
+        }
 
     except Exception as exc:
         db.rollback()
@@ -156,7 +168,9 @@ def parse_and_index_upload_task(
 
 
 @celery_app.task(name="index_code_batch", bind=True, max_retries=3)
-def index_code_batch_task(self, app_target: str, payload: dict[str, Any]) -> dict[str, Any]:
+def index_code_batch_task(
+    self, app_target: str, payload: dict[str, Any]
+) -> dict[str, Any]:
     """
     payload: {
       "file_paths": ["src/a.py"],  # nodes under these paths are removed first (incident edges)
@@ -256,7 +270,12 @@ def index_code_batch_task(self, app_target: str, payload: dict[str, Any]) -> dic
             if si is None or ti is None:
                 continue
             edge_values.append(
-                {"app_target": app_key, "source_id": si, "target_id": ti, "relation": rel}
+                {
+                    "app_target": app_key,
+                    "source_id": si,
+                    "target_id": ti,
+                    "relation": rel,
+                }
             )
 
         n_edges = len(edge_values)

@@ -26,7 +26,9 @@ class BedrockBackend:
         try:
             import boto3
         except ImportError as exc:
-            raise RuntimeError("Bedrock 임베딩: pip install boto3 가 필요합니다") from exc
+            raise RuntimeError(
+                "Bedrock 임베딩: pip install boto3 가 필요합니다"
+            ) from exc
 
         region = (
             cfg.bedrock_region

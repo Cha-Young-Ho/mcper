@@ -6,7 +6,7 @@ import secrets
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 import jinja2
 from fastapi.templating import Jinja2Templates
@@ -52,9 +52,13 @@ ADMIN_UPLOAD_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 
 # ── 도메인 설정 ─────────────────────────────────────────────────────────────
 DOMAIN_CONFIG: dict[str, dict] = {
-    "planning":    {"slug": "planning",    "display": "기획", "scopes": ["app"]},
-    "analysis":    {"slug": "analysis",    "display": "분석", "scopes": ["app"]},
-    "development": {"slug": "development", "display": "개발", "scopes": ["global", "repo", "app"]},
+    "planning": {"slug": "planning", "display": "기획", "scopes": ["app"]},
+    "analysis": {"slug": "analysis", "display": "분석", "scopes": ["app"]},
+    "development": {
+        "slug": "development",
+        "display": "개발",
+        "scopes": ["global", "repo", "app"],
+    },
 }
 
 DOMAIN_ORDER = ["planning", "analysis", "development"]
@@ -174,7 +178,13 @@ def api_keys_page(
 ):
     """API 키 관리 페이지."""
     user = db.scalar(select(User).where(User.username == username))
-    keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())).all() if user else []
+    keys = (
+        db.scalars(
+            select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())
+        ).all()
+        if user
+        else []
+    )
     return templates.TemplateResponse(
         request,
         "admin/api_keys.html",
@@ -202,7 +212,9 @@ def api_keys_create(
     raw_key = secrets.token_urlsafe(32)
     db.add(ApiKey(user_id=user.id, key_hash=hash_api_key(raw_key), name=name.strip()))
     db.commit()
-    keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())).all()
+    keys = db.scalars(
+        select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.id.desc())
+    ).all()
     return templates.TemplateResponse(
         request,
         "admin/api_keys.html",

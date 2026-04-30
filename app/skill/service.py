@@ -53,14 +53,18 @@ class SkillIndexingService:
 
         records: list[ChunkRecord] = self._strategy.chunk(body, base_meta)
         if not records:
-            return SkillIndexResult(ok=True, skill_type=skill_type, skill_entity_id=skill_entity_id)
+            return SkillIndexResult(
+                ok=True, skill_type=skill_type, skill_entity_id=skill_entity_id
+            )
 
         parents = [r for r in records if r.chunk_type == "parent"]
         children = [r for r in records if r.chunk_type == "child"]
 
         if not children:
             return SkillIndexResult(
-                ok=True, skill_type=skill_type, skill_entity_id=skill_entity_id,
+                ok=True,
+                skill_type=skill_type,
+                skill_entity_id=skill_entity_id,
                 parent_count=len(parents),
             )
 
@@ -75,21 +79,34 @@ class SkillIndexingService:
         parent_db_ids: dict[int, int] = {}
         for parent in parents:
             db_id = self._repo.save_parent(
-                skill_type, skill_entity_id, parent,
-                app_name=app_name, domain=domain, section_name=section_name,
+                skill_type,
+                skill_entity_id,
+                parent,
+                app_name=app_name,
+                domain=domain,
+                section_name=section_name,
             )
             parent_db_ids[parent.chunk_index] = db_id
 
         self._repo.save_children(
-            skill_type, skill_entity_id, children, parent_db_ids, vectors,
-            app_name=app_name, domain=domain, section_name=section_name,
+            skill_type,
+            skill_entity_id,
+            children,
+            parent_db_ids,
+            vectors,
+            app_name=app_name,
+            domain=domain,
+            section_name=section_name,
         )
 
         self._repo.commit()
 
         logger.info(
             "skill indexed type=%s id=%s parents=%d children=%d",
-            skill_type, skill_entity_id, len(parents), len(children),
+            skill_type,
+            skill_entity_id,
+            len(parents),
+            len(children),
         )
         return SkillIndexResult(
             ok=True,

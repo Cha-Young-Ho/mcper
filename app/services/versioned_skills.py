@@ -91,10 +91,14 @@ def _global_skill_all_sections_latest(
     if df is not None:
         q = q.where(_domain_filter(GlobalSkillVersion.domain, domain))
     rows = session.scalars(q).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
-def _global_skill_latest(session: Session, section_name: str = DEFAULT_SECTION) -> GlobalSkillVersion | None:
+def _global_skill_latest(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> GlobalSkillVersion | None:
     max_v = (
         select(func.max(GlobalSkillVersion.version))
         .where(GlobalSkillVersion.section_name == section_name)
@@ -108,7 +112,9 @@ def _global_skill_latest(session: Session, section_name: str = DEFAULT_SECTION) 
     ).first()
 
 
-def next_global_skill_version(session: Session, section_name: str = DEFAULT_SECTION) -> int:
+def next_global_skill_version(
+    session: Session, section_name: str = DEFAULT_SECTION
+) -> int:
     cur = session.scalar(
         select(func.max(GlobalSkillVersion.version)).where(
             GlobalSkillVersion.section_name == section_name
@@ -139,21 +145,36 @@ def _try_index_skill(
             section_name=section_name,
         )
     except Exception:
-        logger.warning("skill indexing failed type=%s id=%s", skill_type, skill_entity_id, exc_info=True)
+        logger.warning(
+            "skill indexing failed type=%s id=%s",
+            skill_type,
+            skill_entity_id,
+            exc_info=True,
+        )
 
 
 def publish_global_skill(
-    session: Session, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> int:
     nv = next_global_skill_version(session, section_name)
-    row = GlobalSkillVersion(section_name=section_name, version=nv, body=body, domain=domain)
+    row = GlobalSkillVersion(
+        section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
-    _try_index_skill(session, "global", row.id, body, domain=domain, section_name=section_name)
+    _try_index_skill(
+        session, "global", row.id, body, domain=domain, section_name=section_name
+    )
     return nv
 
 
-def delete_global_skill_version(session: Session, section_name: str, version: int) -> None:
+def delete_global_skill_version(
+    session: Session, section_name: str, version: int
+) -> None:
     session.execute(
         delete(GlobalSkillVersion).where(
             GlobalSkillVersion.section_name == section_name,
@@ -165,7 +186,9 @@ def delete_global_skill_version(session: Session, section_name: str, version: in
 
 def delete_global_skill_section(session: Session, section_name: str) -> int:
     res = session.execute(
-        delete(GlobalSkillVersion).where(GlobalSkillVersion.section_name == section_name)
+        delete(GlobalSkillVersion).where(
+            GlobalSkillVersion.section_name == section_name
+        )
     )
     session.commit()
     return res.rowcount
@@ -194,7 +217,9 @@ def list_distinct_apps_with_skills(
     return names
 
 
-def count_distinct_apps_with_skills(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_apps_with_skills(
+    session: Session, *, domain: str | None = None
+) -> int:
     """AppSkill 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(AppSkillVersion.app_name)))
     df = _domain_filter(AppSkillVersion.domain, domain)
@@ -216,7 +241,9 @@ def list_sections_for_app_skill(session: Session, app_name: str) -> list[str]:
     return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
-def _app_skill_all_sections_latest(session: Session, app_name: str) -> list[AppSkillVersion]:
+def _app_skill_all_sections_latest(
+    session: Session, app_name: str
+) -> list[AppSkillVersion]:
     key = (app_name or "").lower().strip()
     subq = (
         select(
@@ -235,7 +262,9 @@ def _app_skill_all_sections_latest(session: Session, app_name: str) -> list[AppS
             & (AppSkillVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _app_skill_latest(
@@ -244,7 +273,10 @@ def _app_skill_latest(
     key = (app_name or "").lower().strip()
     max_v = (
         select(func.max(AppSkillVersion.version))
-        .where(AppSkillVersion.app_name == key, AppSkillVersion.section_name == section_name)
+        .where(
+            AppSkillVersion.app_name == key,
+            AppSkillVersion.section_name == section_name,
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -256,7 +288,9 @@ def _app_skill_latest(
     ).first()
 
 
-def next_app_skill_version(session: Session, app_name: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_app_skill_version(
+    session: Session, app_name: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (app_name or "").lower().strip()
     cur = session.scalar(
         select(func.max(AppSkillVersion.version)).where(
@@ -268,18 +302,35 @@ def next_app_skill_version(session: Session, app_name: str, section_name: str = 
 
 
 def publish_app_skill(
-    session: Session, app_name: str, body: str, section_name: str = DEFAULT_SECTION, *, domain: str | None = None
+    session: Session,
+    app_name: str,
+    body: str,
+    section_name: str = DEFAULT_SECTION,
+    *,
+    domain: str | None = None,
 ) -> tuple[str, str, int]:
     key = (app_name or "").lower().strip()
     nv = next_app_skill_version(session, key, section_name)
-    row = AppSkillVersion(app_name=key, section_name=section_name, version=nv, body=body, domain=domain)
+    row = AppSkillVersion(
+        app_name=key, section_name=section_name, version=nv, body=body, domain=domain
+    )
     session.add(row)
     session.commit()
-    _try_index_skill(session, "app", row.id, body, app_name=key, domain=domain, section_name=section_name)
+    _try_index_skill(
+        session,
+        "app",
+        row.id,
+        body,
+        app_name=key,
+        domain=domain,
+        section_name=section_name,
+    )
     return key, section_name, nv
 
 
-def delete_app_skill_version(session: Session, app_name: str, section_name: str, version: int) -> None:
+def delete_app_skill_version(
+    session: Session, app_name: str, section_name: str, version: int
+) -> None:
     key = (app_name or "").lower().strip()
     session.execute(
         delete(AppSkillVersion).where(
@@ -305,7 +356,9 @@ def delete_app_skill_section(session: Session, app_name: str, section_name: str)
 
 def delete_app_skill_stream(session: Session, app_name: str) -> int:
     key = (app_name or "").lower().strip()
-    res = session.execute(delete(AppSkillVersion).where(AppSkillVersion.app_name == key))
+    res = session.execute(
+        delete(AppSkillVersion).where(AppSkillVersion.app_name == key)
+    )
     session.commit()
     return res.rowcount
 
@@ -340,7 +393,7 @@ def list_distinct_repo_patterns_with_skills(
     if df is not None:
         q = q.where(df)
     rows = session.scalars(q).all()
-    patterns = sorted({r or "" for r in rows}, key=lambda p: ("" if not p else p.lower()))
+    patterns = sorted({r or "" for r in rows}, key=lambda p: "" if not p else p.lower())
     if offset:
         patterns = patterns[offset:]
     if limit is not None:
@@ -348,7 +401,9 @@ def list_distinct_repo_patterns_with_skills(
     return patterns
 
 
-def count_distinct_repo_patterns_with_skills(session: Session, *, domain: str | None = None) -> int:
+def count_distinct_repo_patterns_with_skills(
+    session: Session, *, domain: str | None = None
+) -> int:
     """RepoSkill 스트림 수. 페이지네이션 UI 용."""
     q = select(func.count(func.distinct(RepoSkillVersion.pattern)))
     df = _domain_filter(RepoSkillVersion.domain, domain)
@@ -370,7 +425,9 @@ def list_sections_for_repo_skill(session: Session, pattern: str) -> list[str]:
     return [r[0] for r in rows if r[0]] or [DEFAULT_SECTION]
 
 
-def _repo_skill_all_sections_latest(session: Session, pattern: str) -> list[RepoSkillVersion]:
+def _repo_skill_all_sections_latest(
+    session: Session, pattern: str
+) -> list[RepoSkillVersion]:
     key = (pattern or "").strip()
     subq = (
         select(
@@ -389,7 +446,9 @@ def _repo_skill_all_sections_latest(session: Session, pattern: str) -> list[Repo
             & (RepoSkillVersion.version == subq.c.mv),
         )
     ).all()
-    return sorted(rows, key=lambda r: ("" if r.section_name == DEFAULT_SECTION else r.section_name))
+    return sorted(
+        rows, key=lambda r: "" if r.section_name == DEFAULT_SECTION else r.section_name
+    )
 
 
 def _repo_skill_latest(
@@ -398,7 +457,10 @@ def _repo_skill_latest(
     key = (pattern or "").strip()
     max_v = (
         select(func.max(RepoSkillVersion.version))
-        .where(RepoSkillVersion.pattern == key, RepoSkillVersion.section_name == section_name)
+        .where(
+            RepoSkillVersion.pattern == key,
+            RepoSkillVersion.section_name == section_name,
+        )
         .scalar_subquery()
     )
     return session.scalars(
@@ -410,7 +472,9 @@ def _repo_skill_latest(
     ).first()
 
 
-def next_repo_skill_version(session: Session, pattern: str, section_name: str = DEFAULT_SECTION) -> int:
+def next_repo_skill_version(
+    session: Session, pattern: str, section_name: str = DEFAULT_SECTION
+) -> int:
     key = (pattern or "").strip()
     cur = session.scalar(
         select(func.max(RepoSkillVersion.version)).where(
@@ -432,14 +496,25 @@ def publish_repo_skill(
 ) -> tuple[str, str, int]:
     key = (pattern or "").strip()
     nv = next_repo_skill_version(session, key, section_name)
-    row = RepoSkillVersion(pattern=key, section_name=section_name, version=nv, body=body, sort_order=sort_order, domain=domain)
+    row = RepoSkillVersion(
+        pattern=key,
+        section_name=section_name,
+        version=nv,
+        body=body,
+        sort_order=sort_order,
+        domain=domain,
+    )
     session.add(row)
     session.commit()
-    _try_index_skill(session, "repo", row.id, body, domain=domain, section_name=section_name)
+    _try_index_skill(
+        session, "repo", row.id, body, domain=domain, section_name=section_name
+    )
     return key, section_name, nv
 
 
-def delete_repo_skill_version(session: Session, pattern: str, section_name: str, version: int) -> None:
+def delete_repo_skill_version(
+    session: Session, pattern: str, section_name: str, version: int
+) -> None:
     key = (pattern or "").strip()
     session.execute(
         delete(RepoSkillVersion).where(
@@ -465,7 +540,9 @@ def delete_repo_skill_section(session: Session, pattern: str, section_name: str)
 
 def delete_repo_skill_stream(session: Session, pattern: str) -> int:
     key = (pattern or "").strip()
-    res = session.execute(delete(RepoSkillVersion).where(RepoSkillVersion.pattern == key))
+    res = session.execute(
+        delete(RepoSkillVersion).where(RepoSkillVersion.pattern == key)
+    )
     session.commit()
     return res.rowcount
 
@@ -531,7 +608,9 @@ def get_skills_markdown(
             repo_rows = _repo_skill_all_sections_latest(session, pattern)
             for row in repo_rows:
                 path = _repo_skill_save_path(pattern, row.section_name)
-                display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                display = (
+                    "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+                )
                 blocks.append(_skill_file_block(path, display, row.body))
 
     # 3. App skills
@@ -540,7 +619,9 @@ def get_skills_markdown(
         app_rows = _app_skill_all_sections_latest(session, key)
         for row in app_rows:
             path = _app_skill_save_path(key, row.section_name)
-            display = "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            display = (
+                "기본" if row.section_name == DEFAULT_SECTION else row.section_name
+            )
             blocks.append(_skill_file_block(path, display, row.body))
 
     if not blocks:

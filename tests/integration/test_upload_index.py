@@ -1,5 +1,7 @@
 """Integration tests for document upload → indexing pipeline."""
+
 import pytest
+
 
 @pytest.mark.integration
 class TestUploadIndex:

@@ -130,7 +130,9 @@ def _parse_and_index_sync(
             ]
             if pairs:
                 vectors = embed_texts([p[0] for p in pairs])
-                for i, ((chunk_text, meta), vec) in enumerate(zip(pairs, vectors, strict=True)):
+                for i, ((chunk_text, meta), vec) in enumerate(
+                    zip(pairs, vectors, strict=True)
+                ):
                     meta = dict(meta)
                     meta["chunk_index"] = i
                     db.add(
@@ -143,7 +145,12 @@ def _parse_and_index_sync(
                         )
                     )
             db.commit()
-            return {"queued": False, "ok": True, "spec_id": spec_id, "chunks": len(pairs)}
+            return {
+                "queued": False,
+                "ok": True,
+                "spec_id": spec_id,
+                "chunks": len(pairs),
+            }
         finally:
             db.close()
     except Exception as exc:

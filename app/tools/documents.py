@@ -99,7 +99,9 @@ def search_documents_impl(query: str, app_target: str) -> str:
         denied = check_read(db)
         if denied:
             return denied
-        chunks, mode = hybrid_spec_search(db, query=query, app_target=app_target, top_n=15)
+        chunks, mode = hybrid_spec_search(
+            db, query=query, app_target=app_target, top_n=15
+        )
         if mode == "hybrid_ok" and chunks:
             return json.dumps(
                 {

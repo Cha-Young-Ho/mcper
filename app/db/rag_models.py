@@ -24,7 +24,9 @@ class SpecChunk(Base):
 
     __tablename__ = "spec_chunks"
     __table_args__ = (
-        UniqueConstraint("spec_id", "chunk_index", name="uq_spec_chunks_spec_chunk_index"),
+        UniqueConstraint(
+            "spec_id", "chunk_index", name="uq_spec_chunks_spec_chunk_index"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -41,7 +43,9 @@ class SpecChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim), nullable=True
     )
-    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
 
     # Parent-Child 관계 컬럼 (마이그레이션 필요: scripts/migrate_spec_chunks_parent_child.sql)
     chunk_type: Mapped[str] = mapped_column(
@@ -68,7 +72,9 @@ class SkillChunk(Base):
     __tablename__ = "skill_chunks"
     __table_args__ = (
         UniqueConstraint(
-            "skill_type", "skill_entity_id", "chunk_index",
+            "skill_type",
+            "skill_entity_id",
+            "chunk_index",
             name="uq_skill_chunks_type_entity_idx",
         ),
     )
@@ -84,7 +90,9 @@ class SkillChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim), nullable=True
     )
-    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
     chunk_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="child", index=True
     )
@@ -107,7 +115,9 @@ class RuleChunk(Base):
     __tablename__ = "rule_chunks"
     __table_args__ = (
         UniqueConstraint(
-            "rule_type", "rule_entity_id", "chunk_index",
+            "rule_type",
+            "rule_entity_id",
+            "chunk_index",
             name="uq_rule_chunks_type_entity_idx",
         ),
     )
@@ -124,7 +134,9 @@ class RuleChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim), nullable=True
     )
-    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
     chunk_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="child", index=True
     )
@@ -147,7 +159,9 @@ class WorkflowChunk(Base):
     __tablename__ = "workflow_chunks"
     __table_args__ = (
         UniqueConstraint(
-            "workflow_type", "workflow_entity_id", "chunk_index",
+            "workflow_type",
+            "workflow_entity_id",
+            "chunk_index",
             name="uq_workflow_chunks_type_entity_idx",
         ),
     )
@@ -164,7 +178,9 @@ class WorkflowChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim), nullable=True
     )
-    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
     chunk_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="child", index=True
     )
@@ -187,7 +203,9 @@ class DocChunk(Base):
     __tablename__ = "doc_chunks"
     __table_args__ = (
         UniqueConstraint(
-            "doc_type", "doc_entity_id", "chunk_index",
+            "doc_type",
+            "doc_entity_id",
+            "chunk_index",
             name="uq_doc_chunks_type_entity_idx",
         ),
     )
@@ -204,7 +222,9 @@ class DocChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim), nullable=True
     )
-    chunk_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
     chunk_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="child", index=True
     )
@@ -220,7 +240,9 @@ class CodeNode(Base):
     """AST-level or symbol-level code unit for GraphRAG search."""
 
     __tablename__ = "code_nodes"
-    __table_args__ = (UniqueConstraint("app_target", "stable_id", name="uq_code_nodes_app_stable"),)
+    __table_args__ = (
+        UniqueConstraint("app_target", "stable_id", name="uq_code_nodes_app_stable"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     app_target: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -229,8 +251,12 @@ class CodeNode(Base):
     symbol_name: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     kind: Mapped[str] = mapped_column(String(64), nullable=False, default="fragment")
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(Vector(settings.embedding_dim), nullable=False)
-    node_metadata: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(settings.embedding_dim), nullable=False
+    )
+    node_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False
+    )
 
 
 class CodeEdge(Base):
@@ -239,7 +265,10 @@ class CodeEdge(Base):
     __tablename__ = "code_edges"
     __table_args__ = (
         UniqueConstraint(
-            "app_target", "source_id", "target_id", "relation",
+            "app_target",
+            "source_id",
+            "target_id",
+            "relation",
             name="uq_code_edges_app_src_tgt_rel",
         ),
     )

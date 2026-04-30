@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import pytest
 
 from app.workflow.service import WorkflowIndexingService
 
@@ -63,24 +62,36 @@ class _FakeRepository:
     def save_parent(self, workflow_type, workflow_entity_id, record, **kw):
         db_id = self._next_id
         self._next_id += 1
-        self.parents.append({
-            "workflow_type": workflow_type,
-            "workflow_entity_id": workflow_entity_id,
-            "record": record,
-            "db_id": db_id,
-            **kw,
-        })
+        self.parents.append(
+            {
+                "workflow_type": workflow_type,
+                "workflow_entity_id": workflow_entity_id,
+                "record": record,
+                "db_id": db_id,
+                **kw,
+            }
+        )
         return db_id
 
-    def save_children(self, workflow_type, workflow_entity_id, records, parent_db_ids, embeddings, **kw):
-        self.children_calls.append({
-            "workflow_type": workflow_type,
-            "workflow_entity_id": workflow_entity_id,
-            "records": list(records),
-            "parent_db_ids": dict(parent_db_ids),
-            "embeddings": list(embeddings),
-            **kw,
-        })
+    def save_children(
+        self,
+        workflow_type,
+        workflow_entity_id,
+        records,
+        parent_db_ids,
+        embeddings,
+        **kw,
+    ):
+        self.children_calls.append(
+            {
+                "workflow_type": workflow_type,
+                "workflow_entity_id": workflow_entity_id,
+                "records": list(records),
+                "parent_db_ids": dict(parent_db_ids),
+                "embeddings": list(embeddings),
+                **kw,
+            }
+        )
 
     def commit(self) -> None:
         self.committed = True
@@ -109,7 +120,9 @@ class TestWorkflowIndexingService:
 
     def test_parent_only_skips_embedding(self):
         records = [
-            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="root", embed_text=""),
+            _FakeChunkRecord(
+                chunk_type="parent", chunk_index=-1, content="root", embed_text=""
+            ),
         ]
         svc, _strategy, repo, embed = _make_service(records)
         result = svc.index_workflow("global", 42, "body")
@@ -121,20 +134,32 @@ class TestWorkflowIndexingService:
 
     def test_parent_child_indexing_full_flow(self):
         records = [
-            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="parent 1", embed_text=""),
             _FakeChunkRecord(
-                chunk_type="child", chunk_index=0, content="child A",
-                embed_text="child A", parent_chunk_index=-1,
+                chunk_type="parent", chunk_index=-1, content="parent 1", embed_text=""
             ),
             _FakeChunkRecord(
-                chunk_type="child", chunk_index=1, content="child B",
-                embed_text="child B", parent_chunk_index=-1,
+                chunk_type="child",
+                chunk_index=0,
+                content="child A",
+                embed_text="child A",
+                parent_chunk_index=-1,
+            ),
+            _FakeChunkRecord(
+                chunk_type="child",
+                chunk_index=1,
+                content="child B",
+                embed_text="child B",
+                parent_chunk_index=-1,
             ),
         ]
         svc, _strategy, repo, embed = _make_service(records)
         result = svc.index_workflow(
-            "app", 7, "body",
-            app_name="adventure", domain="development", section_name="spec-implementation",
+            "app",
+            7,
+            "body",
+            app_name="adventure",
+            domain="development",
+            section_name="spec-implementation",
         )
         assert result.ok is True
         assert result.parent_count == 1
@@ -160,16 +185,24 @@ class TestWorkflowIndexingService:
 
     def test_pattern_passed_through_for_repo_workflows(self):
         records = [
-            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="p", embed_text=""),
             _FakeChunkRecord(
-                chunk_type="child", chunk_index=0, content="c",
-                embed_text="c", parent_chunk_index=-1,
+                chunk_type="parent", chunk_index=-1, content="p", embed_text=""
+            ),
+            _FakeChunkRecord(
+                chunk_type="child",
+                chunk_index=0,
+                content="c",
+                embed_text="c",
+                parent_chunk_index=-1,
             ),
         ]
         svc, strategy, repo, _embed = _make_service(records)
         svc.index_workflow(
-            "repo", 5, "body",
-            pattern="github.com/me/repo", section_name="review",
+            "repo",
+            5,
+            "body",
+            pattern="github.com/me/repo",
+            section_name="review",
         )
         # base_meta includes pattern
         assert strategy.calls[0][1]["pattern"] == "github.com/me/repo"
@@ -180,10 +213,15 @@ class TestWorkflowIndexingService:
 
     def test_delete_called_before_save_for_reindexing(self):
         records = [
-            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="p", embed_text=""),
             _FakeChunkRecord(
-                chunk_type="child", chunk_index=0, content="c",
-                embed_text="c", parent_chunk_index=-1,
+                chunk_type="parent", chunk_index=-1, content="p", embed_text=""
+            ),
+            _FakeChunkRecord(
+                chunk_type="child",
+                chunk_index=0,
+                content="c",
+                embed_text="c",
+                parent_chunk_index=-1,
             ),
         ]
         svc, _strategy, repo, _embed = _make_service(records)
@@ -195,23 +233,36 @@ class TestWorkflowIndexingService:
         """재발행 시 delete가 (type, app, pattern, section) 기준으로 호출되어야,
         entity_id가 달라져도 같은 섹션의 구버전 청크가 정리된다."""
         records = [
-            _FakeChunkRecord(chunk_type="parent", chunk_index=-1, content="p", embed_text=""),
             _FakeChunkRecord(
-                chunk_type="child", chunk_index=0, content="c",
-                embed_text="c", parent_chunk_index=-1,
+                chunk_type="parent", chunk_index=-1, content="p", embed_text=""
+            ),
+            _FakeChunkRecord(
+                chunk_type="child",
+                chunk_index=0,
+                content="c",
+                embed_text="c",
+                parent_chunk_index=-1,
             ),
         ]
         svc, _strategy, repo, _embed = _make_service(records)
         # v1 publish → entity_id=10
         svc.index_workflow(
-            "app", 10, "body v1", app_name="myapp", section_name="main",
+            "app",
+            10,
+            "body v1",
+            app_name="myapp",
+            section_name="main",
         )
         # 새 서비스 인스턴스 대신 같은 repo 재사용
         svc._strategy = _FakeStrategy(records)
         svc._embedding = _FakeEmbedding()
         # v2 publish → entity_id=11 (다른 ID, 같은 section)
         svc.index_workflow(
-            "app", 11, "body v2", app_name="myapp", section_name="main",
+            "app",
+            11,
+            "body v2",
+            app_name="myapp",
+            section_name="main",
         )
         # 두 번의 delete 모두 같은 section basis를 사용해야 함
         assert repo.deleted == [

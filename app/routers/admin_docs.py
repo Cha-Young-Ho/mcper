@@ -4,16 +4,20 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
 from app.db.doc_models import AppDocVersion, GlobalDocVersion, RepoDocVersion
 from app.routers.admin_base import DOMAIN_CONFIG, templates
-from app.routers.admin_common import _sort_app_names, _sort_repo_patterns, _section_display as _section_display_base
+from app.routers.admin_common import (
+    _sort_app_names,
+    _sort_repo_patterns,
+    _section_display as _section_display_base,
+)
 from app.services import versioned_docs as vw
 
 router = APIRouter(prefix="/admin", tags=["admin-docs"])
@@ -67,7 +71,9 @@ def global_docs_board(
         "admin/docs/global_docs_board.html",
         {
             "request": request,
-            "title": f"Global 문서 — {domain_cfg['display']}" if domain_cfg else "Global 문서",
+            "title": f"Global 문서 — {domain_cfg['display']}"
+            if domain_cfg
+            else "Global 문서",
             "sections": sections,
             "domain": domain_filter or "",
         },
@@ -120,11 +126,16 @@ def global_doc_category_new_submit(
     existing = vw.list_sections_for_global_doc(db)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     nv = vw.publish_global_doc(db, body, sn)
-    return RedirectResponse(f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.get("/global-docs/s/{section_name}")
@@ -218,7 +229,9 @@ def global_doc_category_publish_submit(
 ):
     sn = section_name.strip()
     nv = vw.publish_global_doc(db, body, sn)
-    return RedirectResponse(f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.post("/global-docs/s/{section_name}/save-as-new")
@@ -230,7 +243,9 @@ def global_doc_save_as_new(
 ):
     sn = section_name.strip()
     nv = vw.publish_global_doc(db, body, sn)
-    return RedirectResponse(f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303)
+    return RedirectResponse(
+        f"/admin/global-docs/s/{quote(sn, safe='')}/v/{nv}", status_code=303
+    )
 
 
 @router.get("/global-docs/s/{section_name}/v/{version}")
@@ -250,7 +265,9 @@ def global_doc_version_view(
     ).first()
     if row is None:
         raise HTTPException(404, "Not found")
-    n = int(db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0)
+    n = int(
+        db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0
+    )
     can_delete = n > 1 if sn == vw.DEFAULT_SECTION else n >= 1
     return templates.TemplateResponse(
         request,
@@ -279,13 +296,19 @@ def global_doc_version_delete(
     db: Session = Depends(get_db),
 ):
     sn = section_name.strip()
-    n = int(db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0)
+    n = int(
+        db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0
+    )
     if sn == vw.DEFAULT_SECTION and n <= 1:
         raise HTTPException(400, "기본(main) 카테고리는 최소 1개 버전이 필요합니다.")
     vw.delete_global_doc_version(db, sn, version)
-    n_after = int(db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0)
+    n_after = int(
+        db.scalar(select(func.count()).where(GlobalDocVersion.section_name == sn)) or 0
+    )
     if n_after > 0:
-        return RedirectResponse(f"/admin/global-docs/s/{quote(sn, safe='')}", status_code=303)
+        return RedirectResponse(
+            f"/admin/global-docs/s/{quote(sn, safe='')}", status_code=303
+        )
     return RedirectResponse("/admin/global-docs", status_code=303)
 
 
@@ -304,11 +327,17 @@ def app_docs_cards(
 ):
     """앱 문서 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    all_names = _sort_app_names(vw.list_distinct_apps_with_docs(db, domain=domain_filter))
+    all_names = _sort_app_names(
+        vw.list_distinct_apps_with_docs(db, domain=domain_filter)
+    )
     if q.strip():
         all_names = [n for n in all_names if q.strip().lower() in n.lower()]
 
-    total = len(all_names) if q.strip() else vw.count_distinct_apps_with_docs(db, domain=domain_filter)
+    total = (
+        len(all_names)
+        if q.strip()
+        else vw.count_distinct_apps_with_docs(db, domain=domain_filter)
+    )
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     names = all_names[offset : offset + limit]
@@ -323,14 +352,16 @@ def app_docs_cards(
         ).first()
         if latest is None:
             continue
-        cards.append({
-            "name": name,
-            "display": name,
-            "latest_version": latest.version,
-            "app_url_encoded": quote(name, safe=""),
-            "url": f"/admin/app-docs/app/{quote(name, safe='')}",
-            "can_delete_stream": True,
-        })
+        cards.append(
+            {
+                "name": name,
+                "display": name,
+                "latest_version": latest.version,
+                "app_url_encoded": quote(name, safe=""),
+                "url": f"/admin/app-docs/app/{quote(name, safe='')}",
+                "can_delete_stream": True,
+            }
+        )
 
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
@@ -338,7 +369,9 @@ def app_docs_cards(
         "admin/docs/app_docs_cards.html",
         {
             "request": request,
-            "title": f"App 문서 — {domain_cfg['display']}" if domain_cfg else "App 문서",
+            "title": f"App 문서 — {domain_cfg['display']}"
+            if domain_cfg
+            else "App 문서",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -378,10 +411,16 @@ def new_app_doc_submit(
         return templates.TemplateResponse(
             request,
             "admin/docs/app_doc_new.html",
-            {"request": request, "title": "새 앱 문서", "error": "앱 이름은 필수입니다."},
+            {
+                "request": request,
+                "title": "새 앱 문서",
+                "error": "앱 이름은 필수입니다.",
+            },
             status_code=400,
         )
-    existing = db.scalars(select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)).first()
+    existing = db.scalars(
+        select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)
+    ).first()
     if existing is not None:
         return JSONResponse(
             {"error": "already_exists", "message": f"'{key}' 앱이 이미 존재합니다."},
@@ -402,7 +441,9 @@ def app_doc_board(
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
-    if not db.scalars(select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)).first():
+    if not db.scalars(
+        select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown app")
     section_rows = vw._app_doc_all_sections_latest(db, key)
     sections = [
@@ -450,7 +491,9 @@ def app_doc_category_new_form(
     db: Session = Depends(get_db),
 ):
     key = app_name.lower().strip()
-    if not db.scalars(select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)).first():
+    if not db.scalars(
+        select(AppDocVersion).where(AppDocVersion.app_name == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown app")
     return templates.TemplateResponse(
         request,
@@ -494,7 +537,10 @@ def app_doc_category_new_submit(
     existing = vw.list_sections_for_app_doc(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     _, _sn, nv = vw.publish_app_doc(db, key, body, sn)
@@ -561,7 +607,9 @@ def app_doc_category_delete(
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
     if vw.delete_app_doc_section(db, key, sn) == 0:
         raise HTTPException(404, "삭제할 카테고리가 없습니다.")
-    return RedirectResponse(f"/admin/app-docs/app/{quote(key, safe='')}", status_code=303)
+    return RedirectResponse(
+        f"/admin/app-docs/app/{quote(key, safe='')}", status_code=303
+    )
 
 
 @router.get("/app-docs/app/{app_name}/s/{section_name}/publish")
@@ -652,7 +700,8 @@ def app_doc_version_view(
                 AppDocVersion.app_name == key,
                 AppDocVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     return templates.TemplateResponse(
         request,
@@ -690,14 +739,17 @@ def app_doc_version_delete(
                 AppDocVersion.app_name == key,
                 AppDocVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if n_after > 0:
         return RedirectResponse(
             f"/admin/app-docs/app/{quote(key, safe='')}/s/{quote(sn, safe='')}",
             status_code=303,
         )
-    return RedirectResponse(f"/admin/app-docs/app/{quote(key, safe='')}", status_code=303)
+    return RedirectResponse(
+        f"/admin/app-docs/app/{quote(key, safe='')}", status_code=303
+    )
 
 
 # ── Repo docs ───────────────────────────────────────────────────────────
@@ -715,12 +767,18 @@ def repo_docs_cards(
 ):
     """레포 문서 카드 목록 (서버사이드 페이지네이션: limit/offset)."""
     domain_filter = domain.strip() or None
-    all_patterns = _sort_repo_patterns(vw.list_distinct_repo_patterns_with_docs(db, domain=domain_filter))
+    all_patterns = _sort_repo_patterns(
+        vw.list_distinct_repo_patterns_with_docs(db, domain=domain_filter)
+    )
     if q.strip():
         qn = q.strip().lower()
         all_patterns = [p for p in all_patterns if qn in (p or "").lower()]
 
-    total = len(all_patterns) if q.strip() else vw.count_distinct_repo_patterns_with_docs(db, domain=domain_filter)
+    total = (
+        len(all_patterns)
+        if q.strip()
+        else vw.count_distinct_repo_patterns_with_docs(db, domain=domain_filter)
+    )
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     patterns = all_patterns[offset : offset + limit]
@@ -736,15 +794,17 @@ def repo_docs_cards(
         if latest is None:
             continue
         seg = vw.repo_doc_pat_href_segment(pat)
-        cards.append({
-            "pattern": pat,
-            "display": vw.repo_doc_pattern_card_display(pat),
-            "is_default": not (pat or "").strip(),
-            "can_delete_stream": bool((pat or "").strip()),
-            "latest_version": latest.version,
-            "url": f"/admin/repo-docs/pat/{seg}",
-            "pat_segment": seg,
-        })
+        cards.append(
+            {
+                "pattern": pat,
+                "display": vw.repo_doc_pattern_card_display(pat),
+                "is_default": not (pat or "").strip(),
+                "can_delete_stream": bool((pat or "").strip()),
+                "latest_version": latest.version,
+                "url": f"/admin/repo-docs/pat/{seg}",
+                "pat_segment": seg,
+            }
+        )
 
     domain_cfg = DOMAIN_CONFIG.get(domain_filter) if domain_filter else None
     return templates.TemplateResponse(
@@ -752,7 +812,9 @@ def repo_docs_cards(
         "admin/docs/repo_docs_cards.html",
         {
             "request": request,
-            "title": f"Repository 문서 — {domain_cfg['display']}" if domain_cfg else "Repository 문서",
+            "title": f"Repository 문서 — {domain_cfg['display']}"
+            if domain_cfg
+            else "Repository 문서",
             "cards": cards,
             "q": q,
             "domain": domain_filter or "",
@@ -788,13 +850,18 @@ def new_repo_doc_submit(
     body: str = Form(...),
 ):
     key = pattern.strip()
-    existing = db.scalars(select(RepoDocVersion).where(RepoDocVersion.pattern == key).limit(1)).first()
+    existing = db.scalars(
+        select(RepoDocVersion).where(RepoDocVersion.pattern == key).limit(1)
+    ).first()
     if existing is not None:
         return templates.TemplateResponse(
             request,
             "admin/docs/repo_doc_new.html",
-            {"request": request, "title": "새 Repository 패턴 문서",
-             "error": f"이미 존재하는 패턴: {key or '(기본)'}"},
+            {
+                "request": request,
+                "title": "새 Repository 패턴 문서",
+                "error": f"이미 존재하는 패턴: {key or '(기본)'}",
+            },
             status_code=400,
         )
     vw.publish_repo_doc(db, key, body)
@@ -810,7 +877,9 @@ def repo_doc_board(
     db: Session = Depends(get_db),
 ):
     key = vw.repo_doc_pattern_from_url_segment(pat_segment)
-    if not db.scalars(select(RepoDocVersion).where(RepoDocVersion.pattern == key).limit(1)).first():
+    if not db.scalars(
+        select(RepoDocVersion).where(RepoDocVersion.pattern == key).limit(1)
+    ).first():
         raise HTTPException(404, "Unknown repository pattern")
     pat_url = vw.repo_doc_pat_href_segment(key)
     display = vw.repo_doc_pattern_card_display(key)
@@ -908,7 +977,10 @@ def repo_doc_category_new_submit(
     existing = vw.list_sections_for_repo_doc(db, key)
     if sn in [s.lower() for s in existing]:
         return JSONResponse(
-            {"error": "already_exists", "message": f"카테고리 '{sn}' 이 이미 존재합니다."},
+            {
+                "error": "already_exists",
+                "message": f"카테고리 '{sn}' 이 이미 존재합니다.",
+            },
             status_code=409,
         )
     _, _sn, nv = vw.publish_repo_doc(db, key, body, sn)
@@ -1076,9 +1148,12 @@ def repo_doc_version_view(
                 RepoDocVersion.pattern == key,
                 RepoDocVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
-    can_delete = n > 1 if (not (key or "").strip() and sn == vw.DEFAULT_SECTION) else n >= 1
+    can_delete = (
+        n > 1 if (not (key or "").strip() and sn == vw.DEFAULT_SECTION) else n >= 1
+    )
     return templates.TemplateResponse(
         request,
         "admin/docs/version_view.html",
@@ -1115,10 +1190,13 @@ def repo_doc_version_delete(
                 RepoDocVersion.pattern == key,
                 RepoDocVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if not (key or "").strip() and sn == vw.DEFAULT_SECTION and n <= 1:
-        raise HTTPException(400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다.")
+        raise HTTPException(
+            400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다."
+        )
     vw.delete_repo_doc_version(db, key, sn, version)
     n_after = int(
         db.scalar(
@@ -1126,7 +1204,8 @@ def repo_doc_version_delete(
                 RepoDocVersion.pattern == key,
                 RepoDocVersion.section_name == sn,
             )
-        ) or 0
+        )
+        or 0
     )
     if n_after > 0:
         return RedirectResponse(

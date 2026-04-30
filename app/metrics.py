@@ -9,15 +9,12 @@ from __future__ import annotations
 import os
 import time
 import logging
-from typing import Any
 
 from prometheus_client import (
     CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
 )
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -121,11 +118,15 @@ def _collect_celery_metrics() -> None:
     """Scrape Celery queue depth from Redis broker."""
     try:
         from app.config import settings
-        broker = (settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or "").strip()
+
+        broker = (
+            settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or ""
+        ).strip()
         if not broker:
             return
         # redis_pool 싱글톤 재사용 — 메트릭 스크레이프마다 새 연결 생성을 피한다.
         from app.services.redis_pool import get_redis
+
         r = get_redis()
         if r is None:
             return
@@ -140,6 +141,7 @@ def _collect_celery_task_stats() -> None:
     try:
         from app.db.database import SessionLocal
         from app.db.celery_models import CeleryTaskStat
+
         db = SessionLocal()
         try:
             stats = db.query(CeleryTaskStat).all()
@@ -156,6 +158,7 @@ def _collect_db_pool_metrics() -> None:
     """Expose SQLAlchemy connection pool stats."""
     try:
         from app.db.database import engine
+
         pool = engine.pool
         DB_POOL_SIZE.set(pool.size())
         DB_POOL_CHECKED_IN.set(pool.checkedin())

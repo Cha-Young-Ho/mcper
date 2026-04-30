@@ -81,7 +81,9 @@ def register_workflow_tools(mcp: FastMCP) -> None:
         """
         record_mcp_tool_call("list_workflow_sections")
         with SessionLocal() as db:
-            denied = check_read(db, app_name=_normalize_app_name(app_name or "") or None)
+            denied = check_read(
+                db, app_name=_normalize_app_name(app_name or "") or None
+            )
             if denied:
                 return denied
             if scope == "app":
@@ -97,7 +99,9 @@ def register_workflow_tools(mcp: FastMCP) -> None:
                         patterns = [""]
                 sections_by_pat: dict[str, list[str]] = {}
                 for pat in patterns:
-                    sections_by_pat[pat or "(default)"] = list_sections_for_repo_workflow(db, pat)
+                    sections_by_pat[pat or "(default)"] = (
+                        list_sections_for_repo_workflow(db, pat)
+                    )
                 lines = []
                 for pat, secs in sections_by_pat.items():
                     lines.append(f"패턴: {pat}")
@@ -109,10 +113,14 @@ def register_workflow_tools(mcp: FastMCP) -> None:
 
             if not sections:
                 return f"{scope} Workflows 카테고리 없음"
-            return f"{scope} Workflows 카테고리:\n" + "\n".join(f"  - {s}" for s in sections)
+            return f"{scope} Workflows 카테고리:\n" + "\n".join(
+                f"  - {s}" for s in sections
+            )
 
     @mcp.tool()
-    def publish_global_workflow_tool(body: str, section_name: str = DEFAULT_SECTION) -> str:
+    def publish_global_workflow_tool(
+        body: str, section_name: str = DEFAULT_SECTION
+    ) -> str:
         """
         Global Workflow 새 버전을 발행한다.
 
@@ -173,7 +181,9 @@ def register_workflow_tools(mcp: FastMCP) -> None:
             denied = check_read(db, app_name=trimmed or None)
             if denied:
                 return denied
-            results = _search_workflows(db, query, app_name=trimmed or None, scope=scope, top_n=top_n)
+            results = _search_workflows(
+                db, query, app_name=trimmed or None, scope=scope, top_n=top_n
+            )
             if not results:
                 return f"'{query}' 검색 결과 없음"
             lines = [f"워크플로우 검색 결과: {len(results)}건\n"]

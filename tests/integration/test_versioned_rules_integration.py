@@ -1,7 +1,6 @@
 """Integration tests for versioned rules service with DB."""
 
 import pytest
-from sqlalchemy.orm import Session
 
 from app.db.rule_models import GlobalRuleVersion, AppRuleVersion, RepoRuleVersion
 from app.services.versioned_rules import (
@@ -117,16 +116,19 @@ class TestDisplayNameHelpers:
 
 def _unique_section() -> str:
     import uuid
+
     return f"test_{uuid.uuid4().hex[:8]}"
 
 
 def _unique_app() -> str:
     import uuid
+
     return f"app_{uuid.uuid4().hex[:8]}"
 
 
 def _unique_pattern() -> str:
     import uuid
+
     return f"pattern_{uuid.uuid4().hex[:8]}"
 
 
@@ -137,7 +139,9 @@ class TestRuleVersionsDB:
 
     def test_create_global_rule_version(self, db_session):
         section = _unique_section()
-        db_session.add(GlobalRuleVersion(section_name=section, version=1, body="# Global Rule v1"))
+        db_session.add(
+            GlobalRuleVersion(section_name=section, version=1, body="# Global Rule v1")
+        )
         db_session.commit()
         row = (
             db_session.query(GlobalRuleVersion)
@@ -152,7 +156,9 @@ class TestRuleVersionsDB:
         db_session.add(GlobalRuleVersion(section_name=section, version=1, body="v1"))
         db_session.add(GlobalRuleVersion(section_name=section, version=2, body="v2"))
         db_session.commit()
-        count = db_session.query(GlobalRuleVersion).filter_by(section_name=section).count()
+        count = (
+            db_session.query(GlobalRuleVersion).filter_by(section_name=section).count()
+        )
         assert count == 2
 
     def test_create_app_rule_version(self, db_session):
@@ -172,7 +178,9 @@ class TestRuleVersionsDB:
     def test_global_rule_version_ordering(self, db_session):
         section = _unique_section()
         for v in range(1, 6):
-            db_session.add(GlobalRuleVersion(section_name=section, version=v, body=f"v{v}"))
+            db_session.add(
+                GlobalRuleVersion(section_name=section, version=v, body=f"v{v}")
+            )
         db_session.commit()
         rows = (
             db_session.query(GlobalRuleVersion)

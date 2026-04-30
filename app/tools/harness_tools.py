@@ -47,7 +47,11 @@ HARNESS_REGISTRY: list[dict[str, str]] = [
     {"name": "tester.md", "scope": "agent", "path": ".agents/tester.md"},
     {"name": "infra.md", "scope": "agent", "path": ".agents/infra.md"},
     {"name": "archivist.md", "scope": "agent", "path": ".agents/archivist.md"},
-    {"name": "report_template.md", "scope": "agent", "path": ".agents/report_template.md"},
+    {
+        "name": "report_template.md",
+        "scope": "agent",
+        "path": ".agents/report_template.md",
+    },
     # Guide
     {"name": "PLANS.md", "scope": "guide", "path": "docs/PLANS.md"},
     {"name": "RELIABILITY.md", "scope": "guide", "path": "docs/RELIABILITY.md"},
@@ -57,11 +61,27 @@ HARNESS_REGISTRY: list[dict[str, str]] = [
     {"name": "FRONTEND.md", "scope": "guide", "path": "docs/FRONTEND.md"},
     # Design
     {"name": "DESIGN_SUMMARY.md", "scope": "design", "path": "docs/DESIGN_SUMMARY.md"},
-    {"name": "DESIGN_CRITICAL_SECURITY.md", "scope": "design", "path": "docs/DESIGN_CRITICAL_SECURITY.md"},
-    {"name": "DESIGN_HIGH_REFACTOR.md", "scope": "design", "path": "docs/DESIGN_HIGH_REFACTOR.md"},
+    {
+        "name": "DESIGN_CRITICAL_SECURITY.md",
+        "scope": "design",
+        "path": "docs/DESIGN_CRITICAL_SECURITY.md",
+    },
+    {
+        "name": "DESIGN_HIGH_REFACTOR.md",
+        "scope": "design",
+        "path": "docs/DESIGN_HIGH_REFACTOR.md",
+    },
     # Principles
-    {"name": "core-beliefs.md", "scope": "principles", "path": "docs/design-docs/core-beliefs.md"},
-    {"name": "design-index.md", "scope": "principles", "path": "docs/design-docs/index.md"},
+    {
+        "name": "core-beliefs.md",
+        "scope": "principles",
+        "path": "docs/design-docs/core-beliefs.md",
+    },
+    {
+        "name": "design-index.md",
+        "scope": "principles",
+        "path": "docs/design-docs/index.md",
+    },
 ]
 
 
@@ -195,9 +215,7 @@ def search_harness_docs_impl(query: str, scope: str | None = None) -> str:
             if scope:
                 scope_tag = f"scope:{scope}"
                 chunks = [
-                    c
-                    for c in chunks
-                    if scope_tag in (c.get("related_files") or [])
+                    c for c in chunks if scope_tag in (c.get("related_files") or [])
                 ]
             return json.dumps(
                 {
@@ -341,9 +359,7 @@ def list_harness_docs_impl() -> str:
         if denied:
             return denied
         stmt = (
-            select(Spec)
-            .where(Spec.app_target == HARNESS_APP_TARGET)
-            .order_by(Spec.id)
+            select(Spec).where(Spec.app_target == HARNESS_APP_TARGET).order_by(Spec.id)
         )
         rows = list(db.scalars(stmt).all())
         docs = []
@@ -436,49 +452,55 @@ def upload_harness_impl(
                         _, sn, v = publish_repo_rule_entry(
                             db, repo_pattern, content, section_name
                         )
-                        results.append({
-                            "path": path,
-                            "type": "rule",
-                            "scope": "repo",
-                            "pattern": repo_pattern,
-                            "section": sn,
-                            "version": v,
-                        })
+                        results.append(
+                            {
+                                "path": path,
+                                "type": "rule",
+                                "scope": "repo",
+                                "pattern": repo_pattern,
+                                "section": sn,
+                                "version": v,
+                            }
+                        )
                     else:
                         _, sn, v = publish_app(db, app_key, content, section_name)
-                        results.append({
-                            "path": path,
-                            "type": "rule",
-                            "scope": "app",
-                            "app_name": app_key,
-                            "section": sn,
-                            "version": v,
-                        })
+                        results.append(
+                            {
+                                "path": path,
+                                "type": "rule",
+                                "scope": "app",
+                                "app_name": app_key,
+                                "section": sn,
+                                "version": v,
+                            }
+                        )
                 else:  # skill
                     if scope == "repo" and repo_pattern:
                         _, sn, v = publish_repo_skill(
                             db, repo_pattern, content, section_name
                         )
-                        results.append({
-                            "path": path,
-                            "type": "skill",
-                            "scope": "repo",
-                            "pattern": repo_pattern,
-                            "section": sn,
-                            "version": v,
-                        })
-                    else:
-                        _, sn, v = publish_app_skill(
-                            db, app_key, content, section_name
+                        results.append(
+                            {
+                                "path": path,
+                                "type": "skill",
+                                "scope": "repo",
+                                "pattern": repo_pattern,
+                                "section": sn,
+                                "version": v,
+                            }
                         )
-                        results.append({
-                            "path": path,
-                            "type": "skill",
-                            "scope": "app",
-                            "app_name": app_key,
-                            "section": sn,
-                            "version": v,
-                        })
+                    else:
+                        _, sn, v = publish_app_skill(db, app_key, content, section_name)
+                        results.append(
+                            {
+                                "path": path,
+                                "type": "skill",
+                                "scope": "app",
+                                "app_name": app_key,
+                                "section": sn,
+                                "version": v,
+                            }
+                        )
 
             except Exception as exc:
                 errors.append(f"{path}: {exc}")
@@ -504,6 +526,7 @@ def publish_repo_rule_entry(
 ) -> tuple[str, str, int]:
     """Wrapper for publish_repo with keyword args."""
     from app.services.versioned_rules import publish_repo
+
     return publish_repo(db, pattern, body, section_name=section_name)
 
 

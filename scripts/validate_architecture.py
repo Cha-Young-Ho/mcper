@@ -11,7 +11,7 @@
 import ast
 import sys
 from pathlib import Path
-from typing import Set, Tuple
+from typing import Set
 
 # 계층 정의
 LAYERS = {
@@ -88,12 +88,14 @@ def check_violations() -> list:
                 target_idx = LAYER_ORDER.index(target_layer)
                 if target_idx < source_idx:
                     # 역방향 의존성 (위반)
-                    violations.append({
-                        "file": str(py_file),
-                        "layer": source_layer,
-                        "imports": imp,
-                        "target_layer": target_layer,
-                    })
+                    violations.append(
+                        {
+                            "file": str(py_file),
+                            "layer": source_layer,
+                            "imports": imp,
+                            "target_layer": target_layer,
+                        }
+                    )
 
     return violations
 

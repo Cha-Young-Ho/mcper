@@ -20,7 +20,9 @@ def rag_health_payload() -> dict[str, Any]:
         out["celery_note"] = "CELERY_BROKER_URL unset — no background index queue"
         return out
 
-    broker = (settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or "").strip()
+    broker = (
+        settings.celery.broker_url or os.environ.get("CELERY_BROKER_URL") or ""
+    ).strip()
     if not broker:
         out["celery_error"] = "broker URL empty"
         return out

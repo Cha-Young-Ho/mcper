@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from app.services.celery_monitoring import CeleryMonitoring
 
@@ -125,7 +124,12 @@ class TestRetryFailedTask:
 
     @patch("app.services.celery_monitoring.CeleryMonitoring.retry_failed_task")
     def test_successful_retry_spec(self, mock_retry):
-        mock_retry.return_value = {"ok": True, "retry_count": 1, "max_retries": 3, "task_id": "t1"}
+        mock_retry.return_value = {
+            "ok": True,
+            "retry_count": 1,
+            "max_retries": 3,
+            "task_id": "t1",
+        }
         result = mock_retry(MagicMock(), 1)
         assert result["ok"] is True
 
@@ -134,8 +138,10 @@ class TestRetryFailedTask:
         ft = _make_failed_task(entity_type="unknown_type", retry_count=0)
         db.query.return_value.filter_by.return_value.first.return_value = ft
 
-        with patch("app.services.celery_monitoring.CeleryMonitoring.retry_failed_task",
-                    wraps=CeleryMonitoring.retry_failed_task):
+        with patch(
+            "app.services.celery_monitoring.CeleryMonitoring.retry_failed_task",
+            wraps=CeleryMonitoring.retry_failed_task,
+        ):
             result = CeleryMonitoring.retry_failed_task(db, 1)
         # Will fail because celery_app import fails in test env, resulting in exception
         # The important assertion is that it doesn't crash with unhandled exception
@@ -176,8 +182,12 @@ class TestUpdateTaskStat:
 
         db.query.return_value.filter_by.return_value.first.return_value = None
 
-        with patch("app.services.celery_monitoring.CeleryTaskStat", return_value=new_stat):
-            stat = CeleryMonitoring.update_task_stat(db, "index_spec", success=True, duration_seconds=1.5)
+        with patch(
+            "app.services.celery_monitoring.CeleryTaskStat", return_value=new_stat
+        ):
+            stat = CeleryMonitoring.update_task_stat(
+                db, "index_spec", success=True, duration_seconds=1.5
+            )
         db.add.assert_called_once()
         db.commit.assert_called_once()
         assert new_stat.success_count == 1
@@ -190,7 +200,9 @@ class TestUpdateTaskStat:
         existing.total_duration_seconds = 100
         db.query.return_value.filter_by.return_value.first.return_value = existing
 
-        CeleryMonitoring.update_task_stat(db, "index_spec", success=True, duration_seconds=5.0)
+        CeleryMonitoring.update_task_stat(
+            db, "index_spec", success=True, duration_seconds=5.0
+        )
         assert existing.success_count == 11
         assert existing.last_success_at is not None
 
@@ -202,6 +214,8 @@ class TestUpdateTaskStat:
         existing.total_duration_seconds = 100
         db.query.return_value.filter_by.return_value.first.return_value = existing
 
-        CeleryMonitoring.update_task_stat(db, "index_spec", success=False, duration_seconds=0.5)
+        CeleryMonitoring.update_task_stat(
+            db, "index_spec", success=False, duration_seconds=0.5
+        )
         assert existing.failure_count == 3
         assert existing.last_failure_at is not None
