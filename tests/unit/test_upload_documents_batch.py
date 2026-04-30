@@ -526,7 +526,7 @@ class TestUploadDocumentsBatchDatabase:
             mock_session = MagicMock()
             mock_session_factory.return_value = mock_session
 
-            result_json = upload_document_impl(
+            upload_document_impl(
                 content="Test",
                 app_target="test",
                 base_branch="main",

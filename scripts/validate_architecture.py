@@ -50,7 +50,7 @@ def parse_imports(filepath: str) -> Set[str]:
                 if node.module:
                     imports.add(node.module)
         return imports
-    except:
+    except Exception:
         return set()
 
 

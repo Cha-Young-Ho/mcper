@@ -36,9 +36,7 @@ def _mock_db():
 class TestLogTaskFailure:
     def test_creates_and_commits(self):
         db = _mock_db()
-        result = CeleryMonitoring.log_task_failure(
-            db, "task-1", "spec", 5, "connection error"
-        )
+        CeleryMonitoring.log_task_failure(db, "task-1", "spec", 5, "connection error")
         db.add.assert_called_once()
         db.commit.assert_called_once()
 
@@ -51,7 +49,7 @@ class TestLogTaskFailure:
 
     def test_with_traceback(self):
         db = _mock_db()
-        result = CeleryMonitoring.log_task_failure(
+        CeleryMonitoring.log_task_failure(
             db, "task-3", "spec", 1, "err", traceback="Traceback ...\n"
         )
         db.add.assert_called_once()
@@ -185,7 +183,7 @@ class TestUpdateTaskStat:
         with patch(
             "app.services.celery_monitoring.CeleryTaskStat", return_value=new_stat
         ):
-            stat = CeleryMonitoring.update_task_stat(
+            CeleryMonitoring.update_task_stat(
                 db, "index_spec", success=True, duration_seconds=1.5
             )
         db.add.assert_called_once()

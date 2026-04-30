@@ -24,8 +24,8 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
-from app.config import settings as _settings
-from app.services.embeddings import configure_embedding_backend
+from app.config import settings as _settings  # noqa: E402  — celery_app 초기화 후 로드
+from app.services.embeddings import configure_embedding_backend  # noqa: E402
 
 configure_embedding_backend(_settings.embedding)
 

@@ -20,9 +20,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.db.database import SessionLocal
-from app.services.versioned_rules import publish_repo
-import os
+from app.db.database import SessionLocal  # noqa: E402  — sys.path 조작 후 로드
+from app.services.versioned_rules import publish_repo  # noqa: E402
+import os  # noqa: E402
 
 # 환경변수 로드
 os.environ.setdefault("DATABASE_URL", "postgresql://user:password@127.0.0.1:5433/mcpdb")

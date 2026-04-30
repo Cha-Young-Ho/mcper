@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -10,6 +12,8 @@ from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
 from app.routers.admin_base import templates
 from app.services.celery_monitoring import CeleryMonitoring
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

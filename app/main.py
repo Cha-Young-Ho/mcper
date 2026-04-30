@@ -341,8 +341,8 @@ if _MCP_ENABLED:
 #   /health/startup — lifespan 완료 여부 — startup
 # /health 는 기존 호환 alias (deprecated), /health/rag 는 관측용 그대로 유지.
 
-from fastapi import Request as _HealthReq
-from app.services.health import (
+from fastapi import Request as _HealthReq  # noqa: E402  — 헬스 블록 분리 위치
+from app.services.health import (  # noqa: E402
     liveness_payload as _liveness_payload,
     readiness_payload as _readiness_payload,
     startup_payload as _startup_payload,

@@ -229,12 +229,12 @@ class TestRefreshTokenPattern:
         self, test_client, admin_user: User
     ):
         """Refresh token should not work as access token."""
-        refresh_token = create_access_token(
+        _ = create_access_token(
             data={"sub": str(admin_user.id), "type": "refresh"},
             expires_delta=timedelta(days=7),
         )
 
-        with patch("app.auth.dependencies.get_current_user_optional") as mock_get:
+        with patch("app.auth.dependencies.get_current_user_optional"):
             with patch("app.auth.dependencies.decode_token") as mock_decode:
                 payload = {"sub": str(admin_user.id), "type": "refresh"}
                 mock_decode.return_value = payload
@@ -330,7 +330,7 @@ class TestAPIKeyExpiry:
         raw_key, api_key = api_key_valid
         original_last_used = api_key.last_used_at
 
-        with patch("app.auth.dependencies.get_current_user_optional") as mock_get:
+        with patch("app.auth.dependencies.get_current_user_optional"):
             # Simulate using the key
             db_session.refresh(api_key)
             api_key.last_used_at = datetime.now(timezone.utc)

@@ -73,7 +73,6 @@ def chunk_spec_text(
     Split spec body into (chunk_text, metadata) with heading hints.
     """
     base = dict(base_metadata or {})
-    lines = text.splitlines()
     headers = extract_markdown_headers(text)
     separators = ["\n\n", "\n", ". ", " ", ""]
     raw_chunks = _split_recursive(text, separators, chunk_size, overlap)

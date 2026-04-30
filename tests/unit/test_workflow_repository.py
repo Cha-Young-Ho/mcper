@@ -174,7 +174,7 @@ class TestSaveChildren:
         assert db.add.call_count == 3
 
         row0 = _extract_row_from_add(db, 0)
-        row1 = _extract_row_from_add(db, 1)
+        _ = _extract_row_from_add(db, 1)
         row2 = _extract_row_from_add(db, 2)
 
         # row0: parent mapped

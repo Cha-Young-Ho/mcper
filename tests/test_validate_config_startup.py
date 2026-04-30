@@ -13,7 +13,7 @@ import sys
 scripts_path = Path(__file__).parent.parent / "scripts"
 sys.path.insert(0, str(scripts_path))
 
-from validate_config_startup import ConfigValidator
+from validate_config_startup import ConfigValidator  # noqa: E402  — sys.path 조작 후 로드
 
 
 class TestAdminPasswordCheck:
@@ -313,7 +313,7 @@ class TestExitCodes:
         validator = ConfigValidator(verbose=False)
         validator.errors = []
         validator.warnings = []
-        exit_code = validator.run_all_checks()
+        _ = validator.run_all_checks()
         # Note: This test will fail if actual checks are called due to missing config
         # In integration, mocking would be needed for full test
 

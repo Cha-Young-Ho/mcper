@@ -19,10 +19,9 @@ class TestCSRFMiddleware:
         # /health bypasses CSRF but other GET endpoints set the cookie
         # Test with admin (if accessible)
         response = test_client.get("/admin", follow_redirects=False)
-        # Should have csrf_token cookie set (even on redirect)
-        csrf_cookie = response.cookies.get("csrf_token")
-        # May or may not have it depending on middleware ordering
-        # The important thing is no 403
+        # Should have csrf_token cookie set (even on redirect).
+        # May or may not have it depending on middleware ordering — the important thing is no 403.
+        _ = response.cookies.get("csrf_token")
 
     def test_post_without_csrf_token_rejected(self, test_client: TestClient):
         """POST without CSRF token should be rejected with 403."""
