@@ -2,7 +2,7 @@
 
 **컨텍스트**: 2026-04-29 세션의 후속. 남겨둔 Phase 2(ruff), Q03/Q04, worktree 정리를 실행.
 
-## 이번 세션 추가 커밋 (origin/main 대비 37 커밋 ahead)
+## 이번 세션 추가 커밋 (origin/main 대비 44 커밋 ahead)
 
 ### 1차 — 자동화/리팩터링
 | 커밋 | 내용 | 규모 |
@@ -19,6 +19,18 @@
 | `4d3ceea` | Q07 `with SessionLocal() as db:` 통일 + Q12 `register_all_models()` | 5 파일, +568/-611 |
 | `52682e5` | P11 카드 목록에서 body TEXT 전체 로드 회피 (`SUBSTRING` 기반 preview) | 4 파일, +183/-38 |
 | `6f69df8` | P08 publish_repo 트랜잭션 단일화 · P09 import_rules 이중 순회+버그 제거 · P10 `ORDER BY CASE` 5 파일 · Q08 인덱싱 except 주석 · Q14 에러 스키마 규약 문서화 | 8 파일, +117/-61 |
+
+### 3차 — 에이전트 팀 병렬 실행
+| 커밋 | 내용 | 규모 |
+|---|---|---|
+| `192a0f5` | Q10 tools/common + admin_rules_service + embeddings 단위 테스트 41개 | 4 파일 신규 |
+| `d68486f` | S08 pdfminer.six / python-multipart / authlib CVE bump + deps audit 리포트 | 2 파일, +119/-3 |
+| `40c7fca` | P12 rule_cache.py 신설 + versioned_rules Redis LRU 캐시 + publish invalidate | 2 파일, +184/-2 |
+| `6ec40cd` | Q09 ConfigMerger 추출 (app/config.py 373→153, app/config_merger.py 349줄 신설) | 2 파일, +388/-271 |
+| `9354992` | Q13 vulture 데드코드 8건 제거 + 리포트 | 5 파일, +136/-24 |
+| `ba56f95` | config EmbeddingProvider Literal 에 `sidecar` 추가 (Q10 테스트 호환) | 1 파일 |
+
+**Skip 항목 (충돌 심함, 다음 세션 재작업)**: Q06 타입힌트 187개 · Q11 docstring 56건 — 각 worktree 브랜치 `worktree-agent-af0cce950105ba66c` / `worktree-agent-a1938aecad845ec45` 에 보존.
 
 ## admin_rules 구조 변화
 
@@ -49,19 +61,18 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 
 ### 즉시 가능
 
-1. **`git push origin main`** — 37 커밋 ahead
+1. **`git push origin main`** — 44 커밋 ahead
 2. **서비스 계층 단위 테스트 추가** — `admin_rules_service.py` 함수별 스텁/SQLite 기반 테스트. 기존 `tests/unit/` 에 이어서.
 
-### 남은 P2 감사 항목 (5건)
+### 남은 P2 감사 항목 (2건 + 권고 1건)
 
-| 그룹 | 항목 | 예상 소요 | 상태 |
-|---|---|---|---|
-| 성능 | P12 캐싱 (`versioned_*` Redis LRU + publish invalidate) | 1세션 | 대기 |
-| 성능 | P08 / P09 / P10 / P11 | — | ✅ 완료 (6f69df8 · 52682e5) |
-| 품질 | Q06 타입힌트 보강 · Q09 ConfigMerger 추출 · Q10 tools/backends 단위 테스트 · Q11 docstring · Q13 vulture 데드코드 스캔 | 2~3세션 | 대기 |
-| 품질 | Q07 · Q08 · Q12 · Q14 | — | ✅ 완료 |
-| 보안 | S08 구식 의존성 (`pdfminer.six` / `python-jose`) 최신화 | 반세션 | 대기 |
-| 보안 | S07 / S09 | — | ✅ 완료 |
+| 그룹 | 항목 | 상태 |
+|---|---|---|
+| 성능 | P08 / P09 / P10 / P11 / P12 | ✅ 완료 |
+| 품질 | Q07 / Q08 / Q09 / Q10 / Q12 / Q13 / Q14 | ✅ 완료 |
+| 품질 | **Q06 타입힌트 187개** · **Q11 docstring 56건** | ⏸ worktree 보존, 다음 세션 수동 재적용 |
+| 보안 | S07 / S08 (CVE 4건 해소) / S09 | ✅ 완료 |
+| 보안 | **python-jose → PyJWT 마이그레이션** (docs/deps_audit_2026-04-30.md §3.1) | ⏸ 다음 세션 P1 후보 |
 
 ### 스케일 후속 (필요 시)
 
@@ -74,7 +85,7 @@ Q04: 라우터에서 `select()/delete()/func.count()` 13개 지점을 서비스 
 ```bash
 cd /Users/wemadeplay/workspace/personal/mcper
 git status
-git log --oneline origin/main..HEAD | wc -l   # 37 이상이면 push 안 됨
+git log --oneline origin/main..HEAD | wc -l   # 44 이상이면 push 안 됨
 cat docs/session_2026-04-30_summary.md
 
 # 컨테이너/헬스
