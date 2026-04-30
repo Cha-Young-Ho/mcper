@@ -31,7 +31,8 @@ boto3==1.42.78
 httpx==0.28.1
 
 # ── Auth (MCPER_AUTH_ENABLED=true 시 사용) ─────────────────────
-python-jose[cryptography]==3.5.0
+# PyJWT: python-jose 대체 (python-jose 3.5.0 유지보수 불투명 — S08 리포트 §3.1).
+PyJWT[crypto]==2.11.0
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 authlib==1.6.11

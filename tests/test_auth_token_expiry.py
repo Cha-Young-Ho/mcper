@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 
 from app.auth.service import (
     create_access_token,
@@ -486,7 +486,7 @@ class TestTokenIntegrity:
 
     def test_token_with_wrong_algorithm_rejected(self, admin_user: User):
         """Token signed with different key should be rejected."""
-        from jose import jwt
+        import jwt
 
         token = jwt.encode(
             {"sub": str(admin_user.id), "type": "access"},

@@ -15,7 +15,7 @@ from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBasic,
 )
-from jose import ExpiredSignatureError, JWTError
+from jwt import ExpiredSignatureError, InvalidTokenError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException

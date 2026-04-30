@@ -7,9 +7,14 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 from app.config import settings
+
+# `jose.JWTError` 호환: 기존 코드/테스트에서 `from app.auth.service import JWTError`
+# 를 쓸 수 있도록 PyJWT 의 `InvalidTokenError` 를 동일 이름으로 재노출한다.
+JWTError = InvalidTokenError
 
 
 def hash_password(password: str) -> str:
@@ -38,7 +43,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 def decode_token(token: str, allow_expired: bool = False) -> dict:
     """
-    JWT 검증. 만료 시 기본적으로 JWTError 발생.
+    JWT 검증. 만료 시 기본적으로 InvalidTokenError(=JWTError) 발생.
     allow_expired=True → 만료된 토큰도 payload 반환 (refresh 토큰 갱신용).
     """
     try:
@@ -48,8 +53,8 @@ def decode_token(token: str, allow_expired: bool = False) -> dict:
             algorithms=["HS256"],
             options={"verify_exp": not allow_expired},
         )
-    except Exception as e:
-        if allow_expired and "expired" in str(e).lower():
+    except ExpiredSignatureError:
+        if allow_expired:
             # 만료된 토큰의 payload 반환 (refresh 토큰에서 유저ID 추출용)
             return jwt.decode(
                 token,
@@ -57,7 +62,9 @@ def decode_token(token: str, allow_expired: bool = False) -> dict:
                 algorithms=["HS256"],
                 options={"verify_exp": False},
             )
-        raise JWTError("Token validation failed") from e
+        raise
+    except InvalidTokenError as e:
+        raise InvalidTokenError("Token validation failed") from e
 
 
 def verify_token_not_expired(token: str) -> bool:

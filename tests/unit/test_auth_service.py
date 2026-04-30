@@ -6,7 +6,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 
 from app.auth.service import (
     create_access_token,
