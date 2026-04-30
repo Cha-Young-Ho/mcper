@@ -63,14 +63,27 @@
       var card = btn.closest('.app-card');
       if (!card) return;
 
+      // `form.submit()` (native) 은 'submit' 이벤트를 발생시키지 않아
+      // base.html 의 CSRF gateway 가 헤더를 붙이지 못한다 → 서버에서
+      // "CSRF token missing or invalid" 거절. `requestSubmit()` 은 이벤트를
+      // 정상 발생시키므로 gateway 가 X-CSRF-Token 헤더를 주입해 준다.
+      function submitViaEvent(form) {
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          // 매우 오래된 브라우저 폴백.
+          form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }
+      }
+
       if (action === 'delete') {
         if (!window.confirm('진짜 ' + app + '을 삭제하겠습니까?')) return;
         var f = card.querySelector('.js-app-delete-form');
-        if (f) f.submit();
+        if (f) submitViaEvent(f);
       } else if (action === 'clear') {
         if (!window.confirm(app + '의 모든 기획서 내용을 비우시겠습니까? (앱/메타는 유지)')) return;
         var f = card.querySelector('.js-app-clear-form');
-        if (f) f.submit();
+        if (f) submitViaEvent(f);
       } else if (action === 'rename') {
         var next = window.prompt('새 앱 이름을 입력하세요.', app);
         if (next === null) return;
@@ -79,7 +92,7 @@
         var f = card.querySelector('.js-app-rename-form');
         if (!f) return;
         f.querySelector('input[name="new_app_name"]').value = next;
-        f.submit();
+        submitViaEvent(f);
       }
     });
   })();
