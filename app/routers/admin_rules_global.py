@@ -6,13 +6,12 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
-from app.db.rule_models import GlobalRuleVersion
 from app.routers.admin_base import DOMAIN_CONFIG, templates
+from app.services import admin_rules_service as svc
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -134,11 +133,7 @@ def global_rule_category_board(
 ):
     """글로벌 룰 특정 카테고리의 버전 보드."""
     sn = section_name.strip()
-    rows = db.scalars(
-        select(GlobalRuleVersion)
-        .where(GlobalRuleVersion.section_name == sn)
-        .order_by(GlobalRuleVersion.version.desc())
-    ).all()
+    rows = svc.list_global_category_versions(db, sn)
     if not rows:
         raise HTTPException(404, "카테고리를 찾을 수 없습니다.")
 
@@ -175,11 +170,7 @@ def global_rule_category_delete(
     sn = section_name.strip()
     if sn == vr.DEFAULT_SECTION:
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
-    res = db.execute(
-        delete(GlobalRuleVersion).where(GlobalRuleVersion.section_name == sn)
-    )
-    db.commit()
-    if res.rowcount == 0:
+    if svc.delete_global_category(db, sn) == 0:
         raise HTTPException(404, "삭제할 카테고리가 없습니다.")
     return RedirectResponse("/admin/global-rules", status_code=303)
 
@@ -251,17 +242,9 @@ def global_rule_category_version_view(
 ):
     """글로벌 룰 카테고리 특정 버전 조회."""
     sn = section_name.strip()
-    row = db.scalars(
-        select(GlobalRuleVersion).where(
-            GlobalRuleVersion.section_name == sn,
-            GlobalRuleVersion.version == version,
-        )
-    ).first()
+    row, n = svc.get_global_category_version(db, sn, version)
     if row is None:
         raise HTTPException(404, "Not found")
-    n = int(
-        db.scalar(select(func.count()).where(GlobalRuleVersion.section_name == sn)) or 0
-    )
     can_delete_version = n > 1 if sn == vr.DEFAULT_SECTION else n >= 1
     return templates.TemplateResponse(
         request,
@@ -286,25 +269,12 @@ def global_rule_category_version_delete(
 ):
     """글로벌 룰 카테고리 특정 버전 삭제."""
     sn = section_name.strip()
-    n = int(
-        db.scalar(select(func.count()).where(GlobalRuleVersion.section_name == sn)) or 0
-    )
+    n = svc.count_global_category(db, sn)
     if sn == vr.DEFAULT_SECTION and n <= 1:
         raise HTTPException(400, "기본(main) 카테고리는 최소 1개 버전이 필요합니다.")
-    res = db.execute(
-        delete(GlobalRuleVersion).where(
-            and_(
-                GlobalRuleVersion.section_name == sn,
-                GlobalRuleVersion.version == version,
-            )
-        )
-    )
-    db.commit()
-    if res.rowcount == 0:
+    rowcount, n_after = svc.delete_global_category_version(db, sn, version)
+    if rowcount == 0:
         raise HTTPException(404, "Not found")
-    n_after = int(
-        db.scalar(select(func.count()).where(GlobalRuleVersion.section_name == sn)) or 0
-    )
     if n_after > 0:
         return RedirectResponse(
             f"/admin/global-rules/s/{quote(sn, safe='')}",

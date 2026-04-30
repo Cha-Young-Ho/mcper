@@ -28,14 +28,13 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
-from app.db.rule_models import AppRuleVersion, GlobalRuleVersion, RepoRuleVersion
 from app.routers.admin_base import templates
 from app.routers.admin_common import _sort_repo_patterns
+from app.services import admin_rules_service as svc
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -108,10 +107,7 @@ def new_app_wizard_submit(
     if not app_key:
         return _wizard_error(request, db, "앱 이름은 필수입니다.")
 
-    existing_app = db.scalars(
-        select(AppRuleVersion).where(AppRuleVersion.app_name == app_key).limit(1)
-    ).first()
-    if existing_app is not None:
+    if svc.app_exists(db, app_key):
         return JSONResponse(
             {
                 "error": "already_exists",
@@ -123,12 +119,7 @@ def new_app_wizard_submit(
     repo_pattern = (repo_new_pattern if repo_mode == "new" else repo_existing).strip()
 
     if repo_mode == "new" and repo_pattern:
-        exists_repo = db.scalars(
-            select(RepoRuleVersion)
-            .where(RepoRuleVersion.pattern == repo_pattern)
-            .limit(1)
-        ).first()
-        if exists_repo is None:
+        if not svc.repo_pattern_exists(db, repo_pattern):
             placeholder = f"# {repo_pattern}\n\n업무 지침 내용을 여기에 추가하세요.\n"
             vr.publish_repo(db, repo_pattern, placeholder)
 
@@ -177,12 +168,8 @@ def rule_diff(
     rule_id is accepted for API consistency but global rules use a single stream.
     Returns JSON: {"v1": int, "v2": int, "diff": str}
     """
-    row1 = db.scalars(
-        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v1)
-    ).first()
-    row2 = db.scalars(
-        select(GlobalRuleVersion).where(GlobalRuleVersion.version == v2)
-    ).first()
+    row1 = svc.get_global_version_row(db, v1)
+    row2 = svc.get_global_version_row(db, v2)
 
     if row1 is None:
         raise HTTPException(

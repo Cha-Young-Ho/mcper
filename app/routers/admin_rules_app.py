@@ -6,14 +6,13 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
-from app.db.rule_models import AppRuleVersion, McpAppPullOption
 from app.routers.admin_base import DOMAIN_CONFIG, templates
 from app.routers.admin_common import _sort_app_names
+from app.services import admin_rules_service as svc
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -134,10 +133,7 @@ def new_app_submit(
             },
             status_code=400,
         )
-    existing = db.scalars(
-        select(AppRuleVersion).where(AppRuleVersion.app_name == key).limit(1)
-    ).first()
-    if existing is not None:
+    if svc.app_exists(db, key):
         return templates.TemplateResponse(
             request,
             "admin/app_rule_new_app.html",
@@ -164,11 +160,7 @@ def app_rule_board(
 ):
     """앱 규칙 섹션 오버뷰 (섹션 카드 목록)."""
     key = app_name.lower().strip()
-    # 앱 존재 확인
-    any_row = db.scalars(
-        select(AppRuleVersion).where(AppRuleVersion.app_name == key).limit(1)
-    ).first()
-    if not any_row:
+    if not svc.app_exists(db, key):
         raise HTTPException(404, "Unknown app")
 
     # 모든 섹션의 최신 버전 행
@@ -224,9 +216,7 @@ def app_rule_pull_default_toggle(
             status.HTTP_400_BAD_REQUEST,
             "default 스트림만 조회할 때는 이 옵션이 적용되지 않습니다.",
         )
-    if not db.scalars(
-        select(AppRuleVersion).where(AppRuleVersion.app_name == key).limit(1)
-    ).first():
+    if not svc.app_exists(db, key):
         raise HTTPException(404, "Unknown app")
     cur = vr.get_mcp_include_app_default_for_app(db, key)
     vr.set_mcp_include_app_default_for_app(db, key, not cur)
@@ -251,10 +241,7 @@ def app_rule_delete_stream(
             status.HTTP_400_BAD_REQUEST,
             "__default__(default) 앱 스트림은 삭제할 수 없습니다.",
         )
-    res = db.execute(delete(AppRuleVersion).where(AppRuleVersion.app_name == key))
-    db.execute(delete(McpAppPullOption).where(McpAppPullOption.app_name == key))
-    db.commit()
-    if res.rowcount == 0:
+    if svc.delete_app_stream(db, key) == 0:
         raise HTTPException(404, "삭제할 행이 없습니다.")
     return RedirectResponse("/admin/app-rules", status_code=303)
 
@@ -341,9 +328,7 @@ def app_section_new_form(
 ):
     """새 섹션 생성 폼."""
     key = app_name.lower().strip()
-    if not db.scalars(
-        select(AppRuleVersion).where(AppRuleVersion.app_name == key).limit(1)
-    ).first():
+    if not svc.app_exists(db, key):
         raise HTTPException(404, "Unknown app")
     existing_sections = vr.list_sections_for_app(db, key)
     return templates.TemplateResponse(
@@ -416,14 +401,7 @@ def app_rule_section_board(
     """앱 규칙 특정 섹션의 버전 보드."""
     key = app_name.lower().strip()
     sn = section_name.strip()
-    rows = db.scalars(
-        select(AppRuleVersion)
-        .where(
-            AppRuleVersion.app_name == key,
-            AppRuleVersion.section_name == sn,
-        )
-        .order_by(AppRuleVersion.version.desc())
-    ).all()
+    rows = svc.list_app_section_versions(db, key, sn)
     if not rows:
         raise HTTPException(404, "카테고리를 찾을 수 없습니다.")
 
@@ -467,13 +445,7 @@ def app_rule_section_delete(
     sn = section_name.strip()
     if sn == vr.DEFAULT_SECTION:
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
-    res = db.execute(
-        delete(AppRuleVersion).where(
-            and_(AppRuleVersion.app_name == key, AppRuleVersion.section_name == sn)
-        )
-    )
-    db.commit()
-    if res.rowcount == 0:
+    if svc.delete_app_section(db, key, sn) == 0:
         raise HTTPException(404, "삭제할 카테고리가 없습니다.")
     return RedirectResponse(
         f"/admin/app-rules/app/{quote(key, safe='')}",
@@ -558,24 +530,9 @@ def app_rule_section_version_view(
     """앱 규칙 섹션 특정 버전 조회."""
     key = app_name.lower().strip()
     sn = section_name.strip()
-    row = db.scalars(
-        select(AppRuleVersion).where(
-            AppRuleVersion.app_name == key,
-            AppRuleVersion.section_name == sn,
-            AppRuleVersion.version == version,
-        )
-    ).first()
+    row, n = svc.get_app_section_version(db, key, sn, version)
     if row is None:
         raise HTTPException(404, "Not found")
-    n = int(
-        db.scalar(
-            select(func.count()).where(
-                AppRuleVersion.app_name == key,
-                AppRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
     can_delete_version = n >= 1 and (
         (key != "__default__" or sn != vr.DEFAULT_SECTION) or n > 1
     )
@@ -606,40 +563,14 @@ def app_rule_section_version_delete(
     """앱 규칙 섹션 특정 버전 삭제."""
     key = app_name.lower().strip()
     sn = section_name.strip()
-    n = int(
-        db.scalar(
-            select(func.count()).where(
-                AppRuleVersion.app_name == key,
-                AppRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
+    _, n = svc.get_app_section_version(db, key, sn, version)
     if key == "__default__" and sn == vr.DEFAULT_SECTION and n <= 1:
         raise HTTPException(
             400, "default 앱 기본(main) 카테고리는 최소 1개 버전이 필요합니다."
         )
-    res = db.execute(
-        delete(AppRuleVersion).where(
-            and_(
-                AppRuleVersion.app_name == key,
-                AppRuleVersion.section_name == sn,
-                AppRuleVersion.version == version,
-            )
-        )
-    )
-    db.commit()
-    if res.rowcount == 0:
+    rowcount, n_after = svc.delete_app_section_version(db, key, sn, version)
+    if rowcount == 0:
         raise HTTPException(404, "Not found")
-    n_after = int(
-        db.scalar(
-            select(func.count()).where(
-                AppRuleVersion.app_name == key,
-                AppRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
     if n_after > 0:
         return RedirectResponse(
             f"/admin/app-rules/app/{quote(key, safe='')}/s/{quote(sn, safe='')}",

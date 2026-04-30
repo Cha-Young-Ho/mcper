@@ -6,14 +6,13 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin_user
 from app.db.database import get_db
-from app.db.rule_models import RepoRuleVersion
 from app.routers.admin_base import DOMAIN_CONFIG, templates
 from app.routers.admin_common import _sort_repo_patterns
+from app.services import admin_rules_service as svc
 from app.services import versioned_rules as vr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -27,9 +26,7 @@ def repo_pattern_include_repo_default_toggle(
 ):
     """패턴(카드)마다 repository default 스트림 병합 여부."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
-    if not db.scalars(
-        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
-    ).first():
+    if not svc.repo_pattern_exists(db, key):
         raise HTTPException(404, "Unknown repository pattern")
     cur = vr.get_mcp_include_repo_default_for_pattern(db, key)
     vr.set_mcp_include_repo_default_for_pattern(db, key, not cur)
@@ -163,10 +160,7 @@ def new_repo_pattern_submit(
             },
             status_code=400,
         )
-    existing = db.scalars(
-        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
-    ).first()
-    if existing is not None:
+    if svc.repo_pattern_exists(db, key):
         return templates.TemplateResponse(
             request,
             "admin/repo_rule_new_pattern.html",
@@ -191,10 +185,7 @@ def repo_rule_board(
 ):
     """레포 규칙 카테고리 오버뷰."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
-    any_row = db.scalars(
-        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
-    ).first()
-    if not any_row:
+    if not svc.repo_pattern_exists(db, key):
         raise HTTPException(404, "Unknown repository pattern")
     pat_url = vr.repo_pat_href_segment(key)
     display = vr.repo_pattern_card_display(key)
@@ -242,9 +233,7 @@ def repo_rule_delete_pattern_stream(
             status.HTTP_400_BAD_REQUEST,
             "default(빈 패턴) Repository 스트림은 삭제할 수 없습니다.",
         )
-    res = db.execute(delete(RepoRuleVersion).where(RepoRuleVersion.pattern == key))
-    db.commit()
-    if res.rowcount == 0:
+    if svc.delete_repo_stream(db, key) == 0:
         raise HTTPException(404, "삭제할 행이 없습니다.")
     return RedirectResponse("/admin/repo-rules", status_code=303)
 
@@ -261,9 +250,7 @@ def repo_category_new_form(
 ):
     """레포 룰 새 카테고리 생성 폼."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
-    if not db.scalars(
-        select(RepoRuleVersion).where(RepoRuleVersion.pattern == key).limit(1)
-    ).first():
+    if not svc.repo_pattern_exists(db, key):
         raise HTTPException(404, "Unknown repository pattern")
     pat_url = vr.repo_pat_href_segment(key)
     display = vr.repo_pattern_card_display(key)
@@ -340,11 +327,7 @@ def repo_rule_category_board(
     """레포 룰 특정 카테고리의 버전 보드."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
-    rows = db.scalars(
-        select(RepoRuleVersion)
-        .where(RepoRuleVersion.pattern == key, RepoRuleVersion.section_name == sn)
-        .order_by(RepoRuleVersion.version.desc())
-    ).all()
+    rows = svc.list_repo_category_versions(db, key, sn)
     if not rows:
         raise HTTPException(404, "카테고리를 찾을 수 없습니다.")
     pat_url = vr.repo_pat_href_segment(key)
@@ -389,13 +372,7 @@ def repo_rule_category_delete(
     sn = section_name.strip()
     if sn == vr.DEFAULT_SECTION:
         raise HTTPException(400, "'기본(main)' 카테고리는 삭제할 수 없습니다.")
-    res = db.execute(
-        delete(RepoRuleVersion).where(
-            and_(RepoRuleVersion.pattern == key, RepoRuleVersion.section_name == sn)
-        )
-    )
-    db.commit()
-    if res.rowcount == 0:
+    if svc.delete_repo_category(db, key, sn) == 0:
         raise HTTPException(404, "삭제할 카테고리가 없습니다.")
     pat_url = vr.repo_pat_href_segment(key)
     return RedirectResponse(f"/admin/repo-rules/pat/{pat_url}", status_code=303)
@@ -483,24 +460,9 @@ def repo_rule_category_version_view(
     """레포 룰 카테고리 특정 버전 조회."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
-    row = db.scalars(
-        select(RepoRuleVersion).where(
-            RepoRuleVersion.pattern == key,
-            RepoRuleVersion.section_name == sn,
-            RepoRuleVersion.version == version,
-        )
-    ).first()
+    row, n = svc.get_repo_category_version(db, key, sn, version)
     if row is None:
         raise HTTPException(404, "Not found")
-    n = int(
-        db.scalar(
-            select(func.count()).where(
-                RepoRuleVersion.pattern == key,
-                RepoRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
     can_delete_version = n >= 1 and (
         (key or "").strip() != "" or sn != vr.DEFAULT_SECTION or n > 1
     )
@@ -534,40 +496,14 @@ def repo_rule_category_version_delete(
     """레포 룰 카테고리 특정 버전 삭제."""
     key = vr.repo_pattern_from_url_segment(pat_segment)
     sn = section_name.strip()
-    n = int(
-        db.scalar(
-            select(func.count()).where(
-                RepoRuleVersion.pattern == key,
-                RepoRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
+    _, n = svc.get_repo_category_version(db, key, sn, version)
     if not (key or "").strip() and sn == vr.DEFAULT_SECTION and n <= 1:
         raise HTTPException(
             400, "default 패턴 기본 카테고리는 최소 1개 버전이 필요합니다."
         )
-    res = db.execute(
-        delete(RepoRuleVersion).where(
-            and_(
-                RepoRuleVersion.pattern == key,
-                RepoRuleVersion.section_name == sn,
-                RepoRuleVersion.version == version,
-            )
-        )
-    )
-    db.commit()
-    if res.rowcount == 0:
+    rowcount, n_after = svc.delete_repo_category_version(db, key, sn, version)
+    if rowcount == 0:
         raise HTTPException(404, "Not found")
-    n_after = int(
-        db.scalar(
-            select(func.count()).where(
-                RepoRuleVersion.pattern == key,
-                RepoRuleVersion.section_name == sn,
-            )
-        )
-        or 0
-    )
     pat_url = vr.repo_pat_href_segment(key)
     if n_after > 0:
         return RedirectResponse(
