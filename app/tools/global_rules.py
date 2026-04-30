@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from app.db.database import SessionLocal
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.tools._auth_check import check_read, check_write
-from app.tools._common import _normalize_app_name
+from app.tools._common import _normalize_app_name, error_json
 from app.services.versioned_rules import (
     DEFAULT_SECTION,
     append_to_app_rule as append_app_rule_body,
@@ -171,7 +171,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+            return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("publish_app_rule")
         db = SessionLocal()
@@ -206,7 +206,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+            return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("append_to_app_rule")
         db = SessionLocal()
@@ -226,7 +226,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 ensure_ascii=False,
             )
         except ValueError as e:
-            return json.dumps({"error": str(e)}, ensure_ascii=False)
+            return error_json(str(e))
         finally:
             db.close()
 
@@ -350,10 +350,10 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+            return error_json("app_name is required")
         sn = (section_name or "").strip()
         if not sn:
-            return json.dumps({"error": "section_name is required"}, ensure_ascii=False)
+            return error_json("section_name is required")
         record_mcp_tool_call("publish_section_rule")
         db = SessionLocal()
         try:
@@ -404,7 +404,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+            return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("patch_app_rule")
         db = SessionLocal()
@@ -467,7 +467,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
             v = rollback_global_rule(db, target_version)
             return json.dumps({"scope": "global", "version": v}, ensure_ascii=False)
         except ValueError as e:
-            return json.dumps({"error": str(e)}, ensure_ascii=False)
+            return error_json(str(e))
         finally:
             db.close()
 
@@ -484,7 +484,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
         """
         key = _normalize_app_name(app_name)
         if not key:
-            return json.dumps({"error": "app_name is required"}, ensure_ascii=False)
+            return error_json("app_name is required")
         sn = (section_name or DEFAULT_SECTION).strip() or DEFAULT_SECTION
         record_mcp_tool_call("rollback_app_rule")
         db = SessionLocal()
@@ -503,7 +503,7 @@ def register_global_rule_tool(mcp: FastMCP) -> None:
                 ensure_ascii=False,
             )
         except ValueError as e:
-            return json.dumps({"error": str(e)}, ensure_ascii=False)
+            return error_json(str(e))
         finally:
             db.close()
 

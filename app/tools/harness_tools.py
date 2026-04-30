@@ -23,6 +23,7 @@ from app.services.search_hybrid import hybrid_spec_search
 from app.services.versioned_rules import publish_app
 from app.services.versioned_skills import publish_app_skill, publish_repo_skill
 from app.tools._auth_check import check_read, check_write
+from app.tools._common import error_json
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,7 @@ def sync_harness_docs_impl() -> str:
         )
     except Exception as exc:
         db.rollback()
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 
@@ -273,7 +274,7 @@ def search_harness_docs_impl(query: str, scope: str | None = None) -> str:
             ensure_ascii=False,
         )
     except Exception as exc:
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 
@@ -329,7 +330,7 @@ def get_harness_config_impl(target: str) -> str:
             ensure_ascii=False,
         )
     except Exception as exc:
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 
@@ -379,7 +380,7 @@ def list_harness_docs_impl() -> str:
             ensure_ascii=False,
         )
     except Exception as exc:
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 
@@ -516,7 +517,7 @@ def upload_harness_impl(
         )
     except Exception as exc:
         db.rollback()
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 

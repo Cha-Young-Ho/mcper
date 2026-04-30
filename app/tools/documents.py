@@ -16,6 +16,7 @@ from app.services.celery_client import enqueue_index_spec
 from app.services.mcp_tool_stats import record_mcp_tool_call
 from app.services.search_hybrid import hybrid_spec_search
 from app.tools._auth_check import check_read, check_write
+from app.tools._common import error_json
 
 
 def _normalize_related_files(related_files: Any) -> list[str]:
@@ -86,7 +87,7 @@ def upload_document_impl(
         )
     except Exception as exc:
         db.rollback()
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 

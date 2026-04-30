@@ -22,6 +22,7 @@ from app.services.search_hybrid import (
 from app.services.embeddings import embed_query
 from app.services.spec_indexing import insert_spec_chunks_with_embeddings
 from app.tools._auth_check import check_read, check_write
+from app.tools._common import error_json
 
 
 def _parse_json_list(raw: Any) -> list[Any]:
@@ -163,7 +164,7 @@ def push_spec_chunks_with_embeddings_impl(spec_id: int, chunks_json: Any) -> str
         )
     except Exception as exc:
         db.rollback()
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 
@@ -239,7 +240,7 @@ def find_historical_reference_impl(
             )
         return json.dumps({"ok": True, "matches": matches}, ensure_ascii=False)
     except Exception as exc:
-        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        return error_json(str(exc))
     finally:
         db.close()
 

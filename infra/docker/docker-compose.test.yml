@@ -24,7 +24,9 @@ services:
       redis_test:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://user:testpassword@db_test:5432/mcpdb_test
+      # 테스트 격리 환경 — tmpfs DB/Redis, 외부 노출 없음.
+      # 기본값은 로컬 CI 편의용. 실제 CI/외부 환경에서는 TEST_* env 로 오버라이드.
+      - DATABASE_URL=postgresql://user:${TEST_DB_PASSWORD:-testpassword}@db_test:5432/mcpdb_test
       - CELERY_BROKER_URL=redis://redis_test:6379/0
       - CELERY_RESULT_BACKEND=redis://redis_test:6379/0
       - TESTING=true
@@ -32,9 +34,9 @@ services:
       - LOG_LEVEL=WARNING
       - MCPER_ADMIN_ENABLED=true
       - MCP_BYPASS_TRANSPORT_GATE=true
-      - ADMIN_USER=admin
-      - ADMIN_PASSWORD=testpassword
-      - AUTH_SECRET_KEY=test-secret-key-32-chars-long-here!
+      - ADMIN_USER=${TEST_ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD:-testpassword}
+      - AUTH_SECRET_KEY=${TEST_AUTH_SECRET_KEY:-test-secret-key-32-chars-long-here!}
       - EMBEDDING_PROVIDER=local
       - EMBEDDING_DIM=384
       - LOCAL_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
@@ -45,7 +47,7 @@ services:
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: testpassword
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-testpassword}
       POSTGRES_DB: mcpdb_test
     tmpfs:
       - /var/lib/postgresql/data   # 메모리 내 DB — 빠르고 테스트 후 자동 소멸

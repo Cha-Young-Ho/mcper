@@ -3,6 +3,7 @@
 
 from app.db.database import SessionLocal
 from app.tools._auth_check import check_read
+from app.tools._common import error_payload
 
 
 def register_data_tools(mcp) -> None:
@@ -27,20 +28,18 @@ def register_data_tools(mcp) -> None:
         with SessionLocal() as db:
             denied = check_read(db)
             if denied:
-                return {"error": denied}
+                return error_payload(denied)
             try:
                 backend = get(source)
                 records = backend.fetch(query, limit=limit)
                 return {
+                    "ok": True,
                     "source": source,
                     "count": len(records),
                     "records": records,
                 }
             except KeyError:
-                return {
-                    "error": f"Data source '{source}' not found.",
-                    "available": [],
-                }
+                return error_payload(f"Data source '{source}' not found.", available=[])
 
     @mcp.tool()
     def list_data_sources() -> dict:
@@ -55,5 +54,5 @@ def register_data_tools(mcp) -> None:
         with SessionLocal() as db:
             denied = check_read(db)
             if denied:
-                return {"error": denied}
-        return {"sources": list_sources()}
+                return error_payload(denied)
+        return {"ok": True, "sources": list_sources()}
