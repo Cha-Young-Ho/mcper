@@ -20,8 +20,20 @@ from app.main import app
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    """Create test database tables."""
-    Base.metadata.create_all(bind=engine)
+    """Create test database tables (integration/e2e 용).
+
+    `init_db()` 를 쓰면 pgvector CREATE EXTENSION + HNSW 인덱스까지 세팅되지만,
+    unit 테스트는 `tests/unit/conftest.py` 가 이 fixture 를 no-op 로 덮어써서
+    DB 접근 자체를 막는다. integration job 만 여기 도달.
+    """
+    from app.db.database import init_db
+
+    try:
+        init_db()
+    except Exception:
+        # pgvector 확장·인덱스 생성이 실패해도 `create_all` 로 최소한의
+        # 테이블은 생성. 일부 환경에서 superuser 아닌 경우 extension 권한 부족.
+        Base.metadata.create_all(bind=engine)
     yield
     # Optionally cleanup after all tests
     # Base.metadata.drop_all(bind=engine)

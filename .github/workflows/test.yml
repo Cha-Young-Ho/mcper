@@ -123,10 +123,12 @@ jobs:
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
           uv pip install --system -r requirements.txt pytest pytest-asyncio httpx
 
-      - name: Run integration tests (if exist)
+      - name: Run integration-marked unit tests + tests/integration/
+        # 기본 addopts 가 integration 을 제외하므로 명시적으로 override.
         run: |
+          pytest tests/unit/ -m integration -v --tb=short
           if [ -d tests/integration ] && [ -n "$(find tests/integration -name 'test_*.py' -print -quit)" ]; then
-            pytest tests/integration/ -v --tb=short
+            pytest tests/integration/ -v --tb=short -m ""
           else
             echo "tests/integration 비어있음 — skip"
           fi

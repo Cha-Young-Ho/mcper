@@ -17,13 +17,23 @@ from app.config import settings
 JWTError = InvalidTokenError
 
 
+# bcrypt 는 입력을 최대 72 bytes 로 제한한다. bcrypt 5.x 는 초과 시 ValueError.
+# 4.x 는 조용히 잘랐음. 동작 일관성을 위해 우리가 명시적으로 잘라서 넘긴다.
+# (보안 영향 없음 — 72 bytes 초과분은 bcrypt 가 어차피 사용하지 못함)
+_BCRYPT_MAX_BYTES = 72
+
+
+def _truncate_bcrypt(password: str) -> bytes:
+    return password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(_truncate_bcrypt(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+        return bcrypt.checkpw(_truncate_bcrypt(plain), hashed.encode("utf-8"))
     except Exception:
         return False
 

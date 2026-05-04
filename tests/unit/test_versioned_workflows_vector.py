@@ -20,7 +20,8 @@ class TestTryIndexWorkflow:
         db = MagicMock()
         fake_svc = MagicMock()
         with patch(
-            "app.workflow.service.make_default_workflow_service", return_value=fake_svc
+            "app.services.versioned_workflows.make_default_workflow_service",
+            return_value=fake_svc,
         ):
             vw._try_index_workflow(
                 db,
@@ -45,7 +46,7 @@ class TestTryIndexWorkflow:
     def test_failure_is_swallowed_and_logged(self, caplog):
         db = MagicMock()
         with patch(
-            "app.workflow.service.make_default_workflow_service",
+            "app.services.versioned_workflows.make_default_workflow_service",
             side_effect=RuntimeError("boom"),
         ):
             with caplog.at_level("WARNING"):
