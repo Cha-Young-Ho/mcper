@@ -14,7 +14,7 @@
             id="btn-mermaid-view"
             style="margin-left:0.5rem">한눈에 보기</button>
   </div>
-  <form method="post" action="{{ save_as_new_url }}" class="form-stack" id="edit-form">
+  <form method="post" action="{{ save_as_new_url }}" class="form-stack" id="edit-form" data-success-modal="새 버전으로 저장되었습니다.">
     {% set md_label = "본문 (Markdown) — 편집 후 '새 버전으로 저장'" %}
     {% set md_name = "body" %}
     {% set md_id = "body" %}

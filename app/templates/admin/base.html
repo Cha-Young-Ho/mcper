@@ -116,15 +116,60 @@
       </div>
     </div>
     <script src="/static/admin/admin.js?v=4" defer></script>
+
+    <!-- 공용 모달 (save-as-new 결과 안내) -->
+    <div id="admin-result-modal"
+         style="display:none;
+                position:fixed;
+                inset:0;
+                background:rgba(0,0,0,0.5);
+                z-index:1000;
+                align-items:center;
+                justify-content:center;
+                padding:1rem;">
+      <div style="background:#fff;
+                  border-radius:10px;
+                  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+                  max-width:420px;
+                  width:100%;
+                  padding:1.5rem;">
+        <h3 id="admin-result-title" style="margin:0 0 0.75rem; font-size:1.1rem;">저장되었습니다</h3>
+        <p id="admin-result-msg" style="margin:0 0 1.25rem; color:#374151; line-height:1.55;"></p>
+        <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+          <button type="button" id="admin-result-stay" class="btn btn-secondary">확인 (머무르기)</button>
+          <button type="button" id="admin-result-go"   class="btn btn-primary">이동</button>
+        </div>
+      </div>
+    </div>
+
     <script>
   // 모든 폼 제출을 fetch()로 가로채 X-CSRF-Token 헤더 전송
   // — body를 서버 미들웨어에서 소비하지 않아도 되며, multipart 업로드도 안전하게 처리
+  //
+  // 폼에 data-success-modal="새 버전으로 저장했습니다." 를 넣으면
+  // redirect 응답을 자동 따라가지 않고 "확인/이동" 모달을 띄운다.
   (function () {
     function getCsrfToken() {
       return document.cookie.split('; ').reduce(function (acc, part) {
         var kv = part.split('=');
         return kv[0].trim() === 'csrf_token' ? decodeURIComponent(kv[1]) : acc;
       }, '');
+    }
+
+    function showResultModal(msg, targetUrl) {
+      var modal = document.getElementById('admin-result-modal');
+      var msgEl = document.getElementById('admin-result-msg');
+      var stay  = document.getElementById('admin-result-stay');
+      var go    = document.getElementById('admin-result-go');
+      msgEl.textContent = msg + (targetUrl ? '\n\n새 버전으로 이동할까요?' : '');
+      msgEl.style.whiteSpace = 'pre-line';
+      modal.style.display = 'flex';
+      go.style.display = targetUrl ? '' : 'none';
+
+      function close() { modal.style.display = 'none'; }
+      stay.onclick = close;
+      go.onclick = function () { if (targetUrl) window.location.href = targetUrl; };
+      modal.onclick = function (e) { if (e.target === modal) close(); };
     }
 
     document.addEventListener('submit', function (e) {
@@ -137,14 +182,26 @@
 
       var url = form.action || window.location.href;
       var method = (form.getAttribute('method') || 'POST').toUpperCase();
+      var successModalMsg = form.getAttribute('data-success-modal');
 
+      // data-success-modal 이 있으면 redirect 를 자동 따라가지 않고 URL 만 얻는다.
+      // 이를 위해 redirect: 'manual' 사용 — opaqueredirect 응답에서 `Location` 은
+      // CORS 제한으로 읽히지 않으므로, 서버가 반환한 JSON body 의 `new_url` 또는
+      // fetch 응답 자체의 res.url 을 활용한다. 여기선 follow 로 두고, 최종 URL 을
+      // 모달에 전달하되 location.href 변경은 사용자 선택 시에만.
       fetch(url, {
         method: method,
         headers: { 'x-csrf-token': token },
         body: new FormData(form),
         credentials: 'include',
       }).then(function (res) {
+        if (successModalMsg && res.redirected) {
+          // redirect 된 최종 URL 을 "이동" 타겟으로만 저장하고 현재 페이지는 유지.
+          showResultModal(successModalMsg, res.url);
+          return;
+        }
         if (res.redirected) {
+          // 기본: 자동 follow (현재 페이지 즉시 전환).
           window.location.href = res.url;
           return;
         }
