@@ -28,10 +28,10 @@ AI 에이전트가 여러 저장소·프로젝트를 넘나들며 작업할 때 
 ## 아키텍처
 
 <p align="center">
-  <img src="docs/assets/architecture.svg" alt="MCPER architecture" width="800"/>
+  <img src="docs/assets/architecture.svg" alt="MCPER architecture" width="900"/>
 </p>
 
-**Client LLM ↔ MCPER ↔ RULE / SKILL / WORKFLOW** — MCP 프로토콜로 LLM 클라이언트가 버저닝된 컨텐츠 스토어에 접근.
+**Cursor AI · Claude Code · Codex · Copilot · Local LLM** 등 MCP 호환 클라이언트가 MCPER 를 통해 버저닝된 **RULE / SKILL / WORKFLOW** 스토어에 접근.
 
 ---
 

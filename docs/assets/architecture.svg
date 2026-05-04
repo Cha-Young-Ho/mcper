@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" width="1000" height="560">
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a"/>
@@ -34,37 +34,65 @@
     <marker id="arrow-both" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#4ab8ff"/>
     </marker>
+    <marker id="arrow-both-dim" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa" opacity="0.7"/>
+    </marker>
   </defs>
 
   <!-- 배경 -->
-  <rect width="900" height="400" fill="url(#bgGrad)" rx="12"/>
+  <rect width="1000" height="560" fill="url(#bgGrad)" rx="12"/>
 
-  <!-- 왼쪽: Client LLM -->
-  <g transform="translate(60, 160)">
-    <rect x="0" y="0" width="160" height="80" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
-    <text x="80" y="36" text-anchor="middle" fill="#93c5fd" font-size="28" font-family="sans-serif">💻</text>
-    <text x="80" y="62" text-anchor="middle" fill="#e0e7ff" font-size="15" font-weight="600" font-family="sans-serif">Client LLM</text>
+  <!-- ── 왼쪽: Client LLM 5개 (세로 스택) ── -->
+  <!-- 각 박스: 160 x 60, 좌측 여백 50, 세로 간격 90 (시작 y=40) -->
+  <g font-family="sans-serif" font-size="15" font-weight="600">
+    <!-- Cursor AI -->
+    <g transform="translate(50, 40)">
+      <rect width="170" height="64" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="85" y="40" text-anchor="middle" fill="#e0e7ff">💠 Cursor AI</text>
+    </g>
+    <!-- Claude Code -->
+    <g transform="translate(50, 140)">
+      <rect width="170" height="64" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="85" y="40" text-anchor="middle" fill="#e0e7ff">✳ Claude Code</text>
+    </g>
+    <!-- Codex -->
+    <g transform="translate(50, 240)">
+      <rect width="170" height="64" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="85" y="40" text-anchor="middle" fill="#e0e7ff">◈ Codex</text>
+    </g>
+    <!-- Copilot -->
+    <g transform="translate(50, 340)">
+      <rect width="170" height="64" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="85" y="40" text-anchor="middle" fill="#e0e7ff">🛩 Copilot</text>
+    </g>
+    <!-- Local LLM -->
+    <g transform="translate(50, 440)">
+      <rect width="170" height="64" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="85" y="40" text-anchor="middle" fill="#e0e7ff">🖥 Local LLM</text>
+    </g>
   </g>
 
-  <!-- 중앙: MCPER 원형 노드 (커스텀 아이콘) -->
-  <g transform="translate(370, 130)" filter="url(#glow)">
-    <circle cx="70" cy="70" r="68" fill="url(#mcperGrad)" stroke="#4ab8ff" stroke-width="3"/>
-    <circle cx="70" cy="70" r="55" fill="none" stroke="#4ab8ff" stroke-width="1" stroke-dasharray="3 5" opacity="0.5"/>
+  <!-- ── 중앙: MCPER (x≈430, y≈210, 원 반지름 80) ── -->
+  <g transform="translate(430, 210)" filter="url(#glow)">
+    <circle cx="80" cy="80" r="78" fill="url(#mcperGrad)" stroke="#4ab8ff" stroke-width="3"/>
+    <circle cx="80" cy="80" r="62" fill="none" stroke="#4ab8ff" stroke-width="1" stroke-dasharray="3 5" opacity="0.5"/>
     <!-- M 로고 -->
-    <path d="M 35 100 L 35 45 L 50 45 L 70 75 L 70 100" fill="none" stroke="#4ab8ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M 70 100 L 70 75 L 90 45 L 105 45 L 105 100" fill="none" stroke="#4ab8ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-    <!-- 외곽 연결 점 -->
-    <circle cx="70"  cy="10"  r="3" fill="#4ab8ff"/>
-    <circle cx="10"  cy="70"  r="3" fill="#4ab8ff"/>
-    <circle cx="130" cy="70"  r="3" fill="#4ab8ff"/>
-    <circle cx="70"  cy="130" r="3" fill="#4ab8ff"/>
+    <path d="M 40 115 L 40 52 L 57 52 L 80 88 L 80 115"
+          fill="none" stroke="#4ab8ff" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M 80 115 L 80 88 L 103 52 L 120 52 L 120 115"
+          fill="none" stroke="#4ab8ff" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- 허브 연결점 -->
+    <circle cx="80"  cy="12"  r="3" fill="#4ab8ff"/>
+    <circle cx="12"  cy="80"  r="3" fill="#4ab8ff"/>
+    <circle cx="148" cy="80"  r="3" fill="#4ab8ff"/>
+    <circle cx="80"  cy="148" r="3" fill="#4ab8ff"/>
   </g>
-  <text x="440" y="310" text-anchor="middle" fill="#e0e7ff" font-size="22" font-weight="700" font-family="sans-serif">MCPER</text>
+  <text x="510" y="405" text-anchor="middle" fill="#e0e7ff" font-size="24" font-weight="700" font-family="sans-serif">MCPER</text>
 
-  <!-- 오른쪽: 구름 3개 (RULE / SKILL / WORKFLOW) -->
-  <!-- 구름 공통 path: cloud shape -->
-  <!-- Cloud 1: RULE (위쪽) -->
-  <g transform="translate(640, 50)">
+  <!-- ── 오른쪽: 구름 3개 (RULE / SKILL / WORKFLOW) ── -->
+  <!-- 구름 cloud path (기준 크기: 약 180x100) -->
+  <!-- RULE (위) -->
+  <g transform="translate(760, 100)">
     <path d="M 30 50
              Q 30 25 55 25
              Q 65 5 90 15
@@ -76,12 +104,12 @@
              Q 50 95 35 75
              Q 15 70 30 50 Z"
           fill="url(#ruleGrad)" stroke="#0ea5e9" stroke-width="2" opacity="0.95"/>
-    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">RULE</text>
+    <text x="92" y="58" text-anchor="middle" fill="#fff" font-size="17" font-weight="700" font-family="sans-serif">RULE</text>
     <text x="92" y="78" text-anchor="middle" fill="#e0f2fe" font-size="10" font-family="sans-serif">행동 지침</text>
   </g>
 
-  <!-- Cloud 2: SKILL (중앙) -->
-  <g transform="translate(640, 160)">
+  <!-- SKILL (중앙) -->
+  <g transform="translate(760, 240)">
     <path d="M 30 50
              Q 30 25 55 25
              Q 65 5 90 15
@@ -93,12 +121,12 @@
              Q 50 95 35 75
              Q 15 70 30 50 Z"
           fill="url(#skillGrad)" stroke="#d97706" stroke-width="2" opacity="0.95"/>
-    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">SKILL</text>
+    <text x="92" y="58" text-anchor="middle" fill="#fff" font-size="17" font-weight="700" font-family="sans-serif">SKILL</text>
     <text x="92" y="78" text-anchor="middle" fill="#fef3c7" font-size="10" font-family="sans-serif">재사용 패턴</text>
   </g>
 
-  <!-- Cloud 3: WORKFLOW (아래쪽) -->
-  <g transform="translate(640, 270)">
+  <!-- WORKFLOW (아래) -->
+  <g transform="translate(760, 380)">
     <path d="M 30 50
              Q 30 25 55 25
              Q 65 5 90 15
@@ -110,23 +138,34 @@
              Q 50 95 35 75
              Q 15 70 30 50 Z"
           fill="url(#workflowGrad)" stroke="#16a34a" stroke-width="2" opacity="0.95"/>
-    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">WORKFLOW</text>
+    <text x="92" y="58" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">WORKFLOW</text>
     <text x="92" y="78" text-anchor="middle" fill="#dcfce7" font-size="10" font-family="sans-serif">작업 절차</text>
   </g>
 
-  <!-- 화살표: Client ↔ MCPER -->
-  <line x1="225" y1="200" x2="365" y2="200" stroke="#4ab8ff" stroke-width="2.5"
+  <!-- ── 화살표: 각 Client ↔ MCPER (5줄) ── -->
+  <!-- Client 박스 우측 중앙 (x=220, y=72/172/272/372/472), MCPER 좌측 (x≈438) -->
+  <!-- Cursor -->
+  <line x1="220" y1="72"  x2="438" y2="240" stroke="#4ab8ff" stroke-width="2" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+  <!-- Claude Code -->
+  <line x1="220" y1="172" x2="438" y2="270" stroke="#4ab8ff" stroke-width="2" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+  <!-- Codex -->
+  <line x1="220" y1="272" x2="438" y2="290" stroke="#4ab8ff" stroke-width="2" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+  <!-- Copilot -->
+  <line x1="220" y1="372" x2="438" y2="330" stroke="#4ab8ff" stroke-width="2" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+  <!-- Local LLM -->
+  <line x1="220" y1="472" x2="438" y2="360" stroke="#4ab8ff" stroke-width="2" opacity="0.85"
         marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
 
-  <!-- 화살표: MCPER ↔ RULE -->
-  <line x1="505" y1="180" x2="635" y2="100" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+  <!-- ── 화살표: MCPER ↔ RULE / SKILL / WORKFLOW ── -->
+  <!-- MCPER 우측 ~582 y=290. Cloud 좌측 대략 x=760 중심y 150/290/430 -->
+  <line x1="582" y1="265" x2="760" y2="155" stroke="#4ab8ff" stroke-width="2.5" opacity="0.9"
         marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
-
-  <!-- 화살표: MCPER ↔ SKILL -->
-  <line x1="510" y1="200" x2="635" y2="210" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+  <line x1="585" y1="290" x2="760" y2="295" stroke="#4ab8ff" stroke-width="2.5" opacity="0.9"
         marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
-
-  <!-- 화살표: MCPER ↔ WORKFLOW -->
-  <line x1="505" y1="220" x2="635" y2="320" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+  <line x1="582" y1="320" x2="760" y2="435" stroke="#4ab8ff" stroke-width="2.5" opacity="0.9"
         marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
 </svg>
