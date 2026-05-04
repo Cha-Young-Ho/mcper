@@ -35,10 +35,15 @@ services:
         required: false
     volumes:
       - ../..:/app
+    # --proxy-headers / --forwarded-allow-ips='*':
+    #   Caddy · LB · ALB 뒤에서 X-Forwarded-{Proto,For,Host} 를 신뢰해
+    #   request.url.scheme 를 https 로 복구. 컨테이너가 사설망에 있을 때 안전.
     command: >
       uvicorn main:app
       --host 0.0.0.0
       --port 8000
+      --proxy-headers
+      --forwarded-allow-ips=*
       ${UVICORN_EXTRA_OPTS:-}
     environment:
       - MCPER_ADMIN_ENABLED=${MCPER_ADMIN_ENABLED:-true}

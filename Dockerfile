@@ -39,5 +39,13 @@ print('mcp transport_security OK')"
 # 4) 소스 코드 (코드만 변경 시 가장 빠름)
 COPY . .
 
-# 프로덕션 기본 CMD (개발 환경은 docker-compose.override.yml에서 --reload 추가)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 프로덕션 기본 CMD (개발 환경은 docker-compose.override.yml에서 --reload 추가).
+#
+# --proxy-headers / --forwarded-allow-ips='*':
+#   LB · Caddy · ALB 등 리버스 프록시 뒤에서 X-Forwarded-Proto / X-Forwarded-For
+#   헤더를 신뢰해 `request.url.scheme`, `request.client.host` 를 실제 값으로
+#   복구. 이게 없으면 TLS 종료 후 HTTP 로 전달된 요청에 대해 FastAPI 가
+#   http:// 로 url_for/redirect 를 만들어 MixedContent · OAuth redirect 오류 발생.
+#   `--forwarded-allow-ips='*'` 는 컨테이너가 LB 뒤 사설망에 있을 때만 안전.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips=*"]
