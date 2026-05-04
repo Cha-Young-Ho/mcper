@@ -1,8 +1,13 @@
-# MCPER — MCP Harness Server for LLM Agents
+<p align="center">
+  <img src="docs/assets/mcper-logo.svg" alt="MCPER" width="180" height="180"/>
+</p>
 
-**FastAPI + FastMCP(Streamable HTTP) 서버.** LLM 에이전트(Cursor / Claude Code / Gemini / Antigravity 등)에 **규칙(Rules) · 스킬(Skills) · 워크플로우(Workflows) · 문서(Docs) · 기획서(Specs) · 코드 그래프**를 3계층(Global / Repository / App) 버전 관리 + 벡터·FTS 하이브리드 검색으로 서빙.
+<h1 align="center">MCPER</h1>
 
-> **한 줄 요약**: "LLM 에이전트에게 프로젝트별·팀별 행동 지침과 컨텍스트를 버저닝된 중앙 저장소에서 on-demand 로 공급하는 MCP 서버".
+<p align="center">
+  <b>MCP Harness Server for LLM Agents</b><br/>
+  <sub>Rules · Skills · Workflows 를 버저닝된 중앙 저장소에서 LLM 클라이언트에 on-demand 로 공급</sub>
+</p>
 
 ---
 
@@ -20,126 +25,13 @@ AI 에이전트가 여러 저장소·프로젝트를 넘나들며 작업할 때 
 
 ---
 
-## 아키텍처 다이어그램
+## 아키텍처
 
-### 1) 한눈에 보기 — 에이전트 허브
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="MCPER architecture" width="800"/>
+</p>
 
-```mermaid
-flowchart LR
-    Dev(("👤<br/>Developer"))
-
-    subgraph Hub[" "]
-        direction TB
-        MCPER(("🚄<br/><b>MCPER</b>"))
-    end
-
-    subgraph Agents["🤖 AI Agents"]
-        A1[Cursor]
-        A2[Claude Code]
-        A3[Gemini / etc.]
-    end
-
-    subgraph Stores["📦 Content Stores"]
-        S1[Rules]
-        S2[Skills]
-        S3[Workflows]
-        S4[Docs / Specs]
-    end
-
-    subgraph Backends["🧠 Embedding Backends"]
-        B1[sentence-transformers]
-        B2[OpenAI]
-        B3[Bedrock]
-    end
-
-    Dev ==> MCPER
-    MCPER ==> Agents
-    MCPER ==> Stores
-    MCPER ==> Backends
-
-    style MCPER fill:#1e3a5f,stroke:#4ab8ff,stroke-width:3px,color:#fff
-    style Dev fill:#2a2a3a,stroke:#6b7280,color:#fff
-    style Hub fill:#0f172a,stroke:#1e3a5f
-```
-
-### 2) 컴포넌트 구성
-
-```mermaid
-graph TB
-    subgraph Core["🧠 MCPER Core"]
-        MCPEP[MCP Endpoint<br/>Streamable HTTP]
-        Admin[Admin UI]
-        RBAC[RBAC<br/>domain × app × role]
-        Tools[51 MCP Tools]
-    end
-
-    subgraph Data["💾 Data Layer"]
-        PG[(Postgres<br/>+ pgvector)]
-        Redis[(Redis)]
-    end
-
-    subgraph Worker["⚙️ Worker"]
-        Celery[Celery<br/>임베딩 · 인덱싱]
-    end
-
-    MCPEP --> RBAC --> Tools
-    Admin --> Tools
-    Tools --> PG
-    Tools --> Redis
-    Tools -.publish/upload.-> Celery
-    Celery --> PG
-
-    style RBAC fill:#fee,stroke:#c44
-    style MCPEP fill:#eef,stroke:#44c
-    style Tools fill:#efe,stroke:#4a4
-```
-
-### 3) 3계층 규칙 해석 우선순위
-
-```mermaid
-flowchart LR
-    Req["에이전트 요청<br/>get_global_rule(app_name, origin_url)"]
-    Req --> Global[Global rule<br/>모든 앱 공통]
-    Req --> Repo{origin_url<br/>패턴 매칭}
-    Repo -->|match| RepoRule[Repository rule<br/>저장소 그룹]
-    Repo -->|no match| Skip[건너뜀]
-    Req --> App[App rule<br/>특정 앱만]
-
-    Global --> Merge[["🧩 머지된 마크다운<br/>Global + Repo + App"]]
-    RepoRule --> Merge
-    App --> Merge
-
-    Merge -->|CRITICAL 지시<br/>포함| Save["에이전트가<br/>로컬 파일 저장<br/>(CLAUDE.md, .cursor/rules/... 등)"]
-
-    style Global fill:#cfe
-    style RepoRule fill:#fec
-    style App fill:#cef
-    style Merge fill:#ffe
-```
-
-### 4) MCP 도구 호출 + 권한 흐름
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant A as LLM 에이전트
-    participant G as MCP Gate<br/>(OAuth + RBAC)
-    participant T as MCP Tool
-    participant D as Postgres
-
-    A->>G: POST /mcp<br/>Authorization: Bearer <JWT>
-    G->>G: JWT 검증 → CurrentUser 주입
-    G->>T: tool(app_name=X) 호출
-    alt admin (is_admin=True)
-        T-->>A: ✅ 정상 응답 (bypass)
-    else UserPermission(X, role) 보유
-        T->>D: 쿼리 (pgvector / FTS 등)
-        D-->>T: rows
-        T-->>A: {"ok": true, "results": [...]}
-    else 권한 없음
-        T-->>A: {"ok": false, "error": "Permission denied"}
-    end
-```
+**Client LLM ↔ MCPER ↔ RULE / SKILL / WORKFLOW** — MCP 프로토콜로 LLM 클라이언트가 버저닝된 컨텐츠 스토어에 접근.
 
 ---
 

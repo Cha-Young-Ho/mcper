@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ab8ff"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 배경 원 -->
+  <circle cx="120" cy="120" r="110" fill="url(#bg)" stroke="url(#stroke)" stroke-width="4"/>
+
+  <!-- 바깥 점선 링 (MCP 의 허브 느낌) -->
+  <circle cx="120" cy="120" r="92" fill="none" stroke="#4ab8ff" stroke-width="1.5"
+          stroke-dasharray="3 5" opacity="0.5"/>
+
+  <!-- 중앙 M 로고 (MCPER 의 M) — 기하학적 몽환 스타일 -->
+  <g filter="url(#glow)">
+    <!-- 왼쪽 기둥 -->
+    <path d="M 70 170 L 70 70 L 90 70 L 120 120 L 120 170"
+          fill="none" stroke="#4ab8ff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- 오른쪽 기둥 -->
+    <path d="M 120 170 L 120 120 L 150 70 L 170 70 L 170 170"
+          fill="none" stroke="#4ab8ff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+
+  <!-- 허브 노드 점 3개 (상단·좌·우) — MCP 프로토콜의 연결 감 -->
+  <circle cx="120" cy="40"  r="5" fill="#4ab8ff"/>
+  <circle cx="40"  cy="120" r="5" fill="#4ab8ff"/>
+  <circle cx="200" cy="120" r="5" fill="#4ab8ff"/>
+
+  <!-- 연결선 (허브 → 중앙) -->
+  <line x1="120" y1="40"  x2="120" y2="70"  stroke="#4ab8ff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="40"  y1="120" x2="70"  y2="120" stroke="#4ab8ff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="200" y1="120" x2="170" y2="120" stroke="#4ab8ff" stroke-width="1.5" opacity="0.6"/>
+</svg>

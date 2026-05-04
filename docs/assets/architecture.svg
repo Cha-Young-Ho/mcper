@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="mcperGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="ruleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="skillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="workflowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow-both" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4ab8ff"/>
+    </marker>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="900" height="400" fill="url(#bgGrad)" rx="12"/>
+
+  <!-- 왼쪽: Client LLM -->
+  <g transform="translate(60, 160)">
+    <rect x="0" y="0" width="160" height="80" rx="12" fill="url(#clientGrad)" stroke="#60a5fa" stroke-width="2"/>
+    <text x="80" y="36" text-anchor="middle" fill="#93c5fd" font-size="28" font-family="sans-serif">💻</text>
+    <text x="80" y="62" text-anchor="middle" fill="#e0e7ff" font-size="15" font-weight="600" font-family="sans-serif">Client LLM</text>
+  </g>
+
+  <!-- 중앙: MCPER 원형 노드 (커스텀 아이콘) -->
+  <g transform="translate(370, 130)" filter="url(#glow)">
+    <circle cx="70" cy="70" r="68" fill="url(#mcperGrad)" stroke="#4ab8ff" stroke-width="3"/>
+    <circle cx="70" cy="70" r="55" fill="none" stroke="#4ab8ff" stroke-width="1" stroke-dasharray="3 5" opacity="0.5"/>
+    <!-- M 로고 -->
+    <path d="M 35 100 L 35 45 L 50 45 L 70 75 L 70 100" fill="none" stroke="#4ab8ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M 70 100 L 70 75 L 90 45 L 105 45 L 105 100" fill="none" stroke="#4ab8ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- 외곽 연결 점 -->
+    <circle cx="70"  cy="10"  r="3" fill="#4ab8ff"/>
+    <circle cx="10"  cy="70"  r="3" fill="#4ab8ff"/>
+    <circle cx="130" cy="70"  r="3" fill="#4ab8ff"/>
+    <circle cx="70"  cy="130" r="3" fill="#4ab8ff"/>
+  </g>
+  <text x="440" y="310" text-anchor="middle" fill="#e0e7ff" font-size="22" font-weight="700" font-family="sans-serif">MCPER</text>
+
+  <!-- 오른쪽: 구름 3개 (RULE / SKILL / WORKFLOW) -->
+  <!-- 구름 공통 path: cloud shape -->
+  <!-- Cloud 1: RULE (위쪽) -->
+  <g transform="translate(640, 50)">
+    <path d="M 30 50
+             Q 30 25 55 25
+             Q 65 5 90 15
+             Q 110 0 130 20
+             Q 155 20 155 45
+             Q 170 55 155 75
+             Q 145 95 120 85
+             Q 100 100 75 85
+             Q 50 95 35 75
+             Q 15 70 30 50 Z"
+          fill="url(#ruleGrad)" stroke="#0ea5e9" stroke-width="2" opacity="0.95"/>
+    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">RULE</text>
+    <text x="92" y="78" text-anchor="middle" fill="#e0f2fe" font-size="10" font-family="sans-serif">행동 지침</text>
+  </g>
+
+  <!-- Cloud 2: SKILL (중앙) -->
+  <g transform="translate(640, 160)">
+    <path d="M 30 50
+             Q 30 25 55 25
+             Q 65 5 90 15
+             Q 110 0 130 20
+             Q 155 20 155 45
+             Q 170 55 155 75
+             Q 145 95 120 85
+             Q 100 100 75 85
+             Q 50 95 35 75
+             Q 15 70 30 50 Z"
+          fill="url(#skillGrad)" stroke="#d97706" stroke-width="2" opacity="0.95"/>
+    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">SKILL</text>
+    <text x="92" y="78" text-anchor="middle" fill="#fef3c7" font-size="10" font-family="sans-serif">재사용 패턴</text>
+  </g>
+
+  <!-- Cloud 3: WORKFLOW (아래쪽) -->
+  <g transform="translate(640, 270)">
+    <path d="M 30 50
+             Q 30 25 55 25
+             Q 65 5 90 15
+             Q 110 0 130 20
+             Q 155 20 155 45
+             Q 170 55 155 75
+             Q 145 95 120 85
+             Q 100 100 75 85
+             Q 50 95 35 75
+             Q 15 70 30 50 Z"
+          fill="url(#workflowGrad)" stroke="#16a34a" stroke-width="2" opacity="0.95"/>
+    <text x="92" y="60" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">WORKFLOW</text>
+    <text x="92" y="78" text-anchor="middle" fill="#dcfce7" font-size="10" font-family="sans-serif">작업 절차</text>
+  </g>
+
+  <!-- 화살표: Client ↔ MCPER -->
+  <line x1="225" y1="200" x2="365" y2="200" stroke="#4ab8ff" stroke-width="2.5"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+
+  <!-- 화살표: MCPER ↔ RULE -->
+  <line x1="505" y1="180" x2="635" y2="100" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+
+  <!-- 화살표: MCPER ↔ SKILL -->
+  <line x1="510" y1="200" x2="635" y2="210" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+
+  <!-- 화살표: MCPER ↔ WORKFLOW -->
+  <line x1="505" y1="220" x2="635" y2="320" stroke="#4ab8ff" stroke-width="2.5" opacity="0.85"
+        marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
+</svg>
