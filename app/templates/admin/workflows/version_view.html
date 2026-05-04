@@ -14,32 +14,29 @@
             id="btn-mermaid-view"
             style="margin-left:0.5rem">한눈에 보기</button>
   </div>
-  <div class="split-editor split-editor--view-mode">
-    <div class="split-editor__pane">
-      <label class="form-label">원문 (Markdown)</label>
-      <pre class="code-block">{{ row.body }}</pre>
+  <form method="post" action="{{ save_as_new_url }}" class="form-stack" id="edit-form">
+    {% set md_label = "본문 (Markdown) — 편집 후 '새 버전으로 저장'" %}
+    {% set md_name = "body" %}
+    {% set md_id = "body" %}
+    {% set md_value = row.body %}
+    {% set md_required = true %}
+    {% set md_rows = 22 %}
+    {% include "admin/partials/markdown_split_field.html" %}
+    <div class="page-actions page-actions--spread">
+      <div>
+        <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
+        <a href="{{ back_url }}" class="btn btn-secondary">취소</a>
+      </div>
+      {% if can_delete_version %}
+        <button type="button"
+                class="btn btn-danger"
+                id="btn-delete-version">이 버전 삭제</button>
+      {% endif %}
     </div>
-    <div class="split-editor__pane split-editor__preview-pane">
-      <label class="form-label">렌더링</label>
-      <div id="preview" class="split-editor__preview markdown-body"></div>
-    </div>
-  </div>
-  <hr style="margin:2rem 0" />
-  <div class="page-actions page-actions--spread">
-    <form method="post"
-          action="{{ save_as_new_url }}"
-          onsubmit="document.querySelector('#edit-body').value = document.querySelector('.code-block').textContent">
-      <input type="hidden" id="edit-body" name="body" value="{{ row.body | e }}" />
-      <button type="submit" class="btn btn-primary">새 버전으로 저장</button>
-    </form>
-    {% if can_delete_version %}
-      <form method="post"
-            action="{{ delete_version_url }}"
-            onsubmit="return confirm('버전 {{ row.version }}을 삭제할까요?');">
-        <button type="submit" class="btn btn-danger">이 버전 삭제</button>
-      </form>
-    {% endif %}
-  </div>
+  </form>
+  {% if can_delete_version %}
+    <form id="delete-form" method="post" action="{{ delete_version_url }}" style="display:none"></form>
+  {% endif %}
   <!-- Mermaid 모달 -->
   <div id="mermaid-modal"
        style="display:none;
@@ -85,18 +82,24 @@
       </div>
     </div>
   </div>
+{% endblock %}
+{% block scripts %}
+  {% include "admin/partials/markdown_editor_assets.html" %}
+  {{ super() }}
   <script>
+// 버전 삭제 버튼 — 본문 편집/미리보기는 markdown_split_field 파티셜이 담당.
 (function () {
-  const body = {{ row.body | tojson }};
-  const preview = document.getElementById('preview');
-  if (typeof marked !== 'undefined') {
-    preview.innerHTML = marked.parse(body);
-  } else {
-    const script = document.createElement('script');
-    script.src = '/static/admin/vendor/marked/marked.min.js';
-    script.onload = () => { preview.innerHTML = marked.parse(body); };
-    document.head.appendChild(script);
-  }
+  const delBtn = document.getElementById('btn-delete-version');
+  if (!delBtn) return;
+  delBtn.addEventListener('click', () => {
+    if (!window.confirm('버전 {{ row.version }}을 삭제할까요?')) return;
+    const f = document.getElementById('delete-form');
+    if (f && typeof f.requestSubmit === 'function') {
+      f.requestSubmit();
+    } else if (f) {
+      f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
 })();
 
 // ── Mermaid "한눈에 보기" ─────────────────────────────────────
