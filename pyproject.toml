@@ -21,6 +21,9 @@ testpaths     = ["tests"]
 python_files  = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# repo 루트를 import path 에 추가 — `import app.*` 가 PYTHONPATH 설정 없이 동작.
+# (CI 에서 `pytest tests/unit/` 단독 실행 시 `ModuleNotFoundError: app` 방지)
+pythonpath    = ["."]
 # -m 'not e2e': e2e tests require full-stack env (Redis/Celery/MCPER_AUTH_ENABLED=true).
 # Run them explicitly with `pytest -m e2e`.
 addopts       = "-v --tb=short -m 'not e2e'"
