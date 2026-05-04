@@ -40,7 +40,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/mcpdb_test
       ADMIN_USER: admin
-      ADMIN_PASSWORD: TestPassword123!
+      # 테스트 파일들이 기대하는 값 (admin / changeme). 운영과 무관한 CI 전용.
+      ADMIN_PASSWORD: changeme
       EMBEDDING_PROVIDER: local
       EMBEDDING_DIM: 384
       MCPER_AUTH_ENABLED: "false"
@@ -97,7 +98,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/mcpdb_test
       ADMIN_USER: admin
-      ADMIN_PASSWORD: TestPassword123!
+      # 테스트 파일들이 기대하는 값 (admin / changeme). 운영과 무관한 CI 전용.
+      ADMIN_PASSWORD: changeme
       EMBEDDING_PROVIDER: local
       EMBEDDING_DIM: 384
       MCPER_AUTH_ENABLED: "false"
