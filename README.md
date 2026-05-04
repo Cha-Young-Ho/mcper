@@ -22,73 +22,79 @@ AI 에이전트가 여러 저장소·프로젝트를 넘나들며 작업할 때 
 
 ## 아키텍처 다이어그램
 
-### 1) 큰 그림
+### 1) 한눈에 보기 — 에이전트 허브
+
+```mermaid
+flowchart LR
+    Dev(("👤<br/>Developer"))
+
+    subgraph Hub[" "]
+        direction TB
+        MCPER(("🚄<br/><b>MCPER</b>"))
+    end
+
+    subgraph Agents["🤖 AI Agents"]
+        A1[Cursor]
+        A2[Claude Code]
+        A3[Gemini / etc.]
+    end
+
+    subgraph Stores["📦 Content Stores"]
+        S1[Rules]
+        S2[Skills]
+        S3[Workflows]
+        S4[Docs / Specs]
+    end
+
+    subgraph Backends["🧠 Embedding Backends"]
+        B1[sentence-transformers]
+        B2[OpenAI]
+        B3[Bedrock]
+    end
+
+    Dev ==> MCPER
+    MCPER ==> Agents
+    MCPER ==> Stores
+    MCPER ==> Backends
+
+    style MCPER fill:#1e3a5f,stroke:#4ab8ff,stroke-width:3px,color:#fff
+    style Dev fill:#2a2a3a,stroke:#6b7280,color:#fff
+    style Hub fill:#0f172a,stroke:#1e3a5f
+```
+
+### 2) 컴포넌트 구성
 
 ```mermaid
 graph TB
-    subgraph Clients["🧑‍💻 LLM 에이전트 클라이언트"]
-        Cursor[Cursor IDE]
-        Claude[Claude Code]
-        Gemini[Gemini / Antigravity / etc.]
+    subgraph Core["🧠 MCPER Core"]
+        MCPEP[MCP Endpoint<br/>Streamable HTTP]
+        Admin[Admin UI]
+        RBAC[RBAC<br/>domain × app × role]
+        Tools[51 MCP Tools]
     end
 
-    subgraph Edge["🛡 엣지 / 인증"]
-        Caddy[Caddy HTTPS<br/>DuckDNS]
-        OAuth[OAuth 2.1 PKCE<br/>+ DCR]
+    subgraph Data["💾 Data Layer"]
+        PG[(Postgres<br/>+ pgvector)]
+        Redis[(Redis)]
     end
 
-    subgraph Admin["👤 Admin UI (/admin)"]
-        Login[로그인<br/>admin/pw or Google]
-        Dashboard[대시보드<br/>MCP 호출 통계]
-        AdminUI[Rules / Skills / Workflows<br/>Docs / Plans / Users]
+    subgraph Worker["⚙️ Worker"]
+        Celery[Celery<br/>임베딩 · 인덱싱]
     end
 
-    subgraph Core["🧠 MCPER Core (FastAPI + FastMCP)"]
-        MCPEP["MCP Endpoint<br/>/mcp (Streamable HTTP)"]
-        RBAC["RBAC 검증<br/>domain × app × role"]
-        Tools["51 MCP Tools<br/>Rules / Skills / Workflows<br/>Docs / Specs / Code"]
-    end
-
-    subgraph Data["💾 데이터 레이어"]
-        PG[(Postgres + pgvector<br/>버전 이력 + 벡터 검색)]
-        Redis[(Redis<br/>세션·캐시·Celery 브로커)]
-    end
-
-    subgraph Worker["⚙️ Worker (Celery)"]
-        Embed[임베딩 작업<br/>sentence-transformers]
-        Index[청킹·인덱싱<br/>Spec / Code / Rules]
-    end
-
-    Cursor --> Caddy
-    Claude --> Caddy
-    Gemini --> Caddy
-
-    Caddy --> OAuth
-    Caddy --> Login
-    Caddy --> MCPEP
-
-    OAuth --> MCPEP
-    Login --> Dashboard
-    Dashboard --> AdminUI
-    AdminUI -->|CRUD| PG
-
-    MCPEP --> RBAC
-    RBAC -->|허용| Tools
-    RBAC -.거절 {ok:false}.-> Cursor
+    MCPEP --> RBAC --> Tools
+    Admin --> Tools
     Tools --> PG
     Tools --> Redis
-    Tools -.publish/upload.-> Worker
-    Worker --> Embed
-    Embed --> Index
-    Index --> PG
+    Tools -.publish/upload.-> Celery
+    Celery --> PG
 
     style RBAC fill:#fee,stroke:#c44
     style MCPEP fill:#eef,stroke:#44c
-    style Core fill:#f5f5ff
-    style Data fill:#f5fff5
+    style Tools fill:#efe,stroke:#4a4
 ```
 
-### 2) 3계층 규칙 해석 우선순위
+### 3) 3계층 규칙 해석 우선순위
 
 ```mermaid
 flowchart LR
@@ -111,34 +117,28 @@ flowchart LR
     style Merge fill:#ffe
 ```
 
-### 3) MCP 도구 호출 + 권한 흐름
+### 4) MCP 도구 호출 + 권한 흐름
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant A as LLM 에이전트
-    participant C as Caddy (HTTPS)
-    participant G as MCP Gate<br/>(host_gate + OAuth)
+    participant G as MCP Gate<br/>(OAuth + RBAC)
     participant T as MCP Tool
-    participant P as RBAC<br/>(permissions.py)
     participant D as Postgres
 
-    A->>C: POST /mcp<br/>Authorization: Bearer <JWT>
-    C->>G: 전달
-    G->>G: Host 검증<br/>JWT/API Key 해석<br/>CurrentUser 컨텍스트 주입
+    A->>G: POST /mcp<br/>Authorization: Bearer <JWT>
+    G->>G: JWT 검증 → CurrentUser 주입
     G->>T: tool(app_name=X) 호출
-    T->>P: check_read(db, app=X)
     alt admin (is_admin=True)
-        P-->>T: ✅ 통과 (bypass)
-    else UserPermission(x, X, viewer+)
-        P-->>T: ✅ 통과
+        T-->>A: ✅ 정상 응답 (bypass)
+    else UserPermission(X, role) 보유
+        T->>D: 쿼리 (pgvector / FTS 등)
+        D-->>T: rows
+        T-->>A: {"ok": true, "results": [...]}
     else 권한 없음
-        P-->>T: ❌ 거절
         T-->>A: {"ok": false, "error": "Permission denied"}
     end
-    T->>D: select/insert (pgvector 검색 등)
-    D-->>T: rows
-    T-->>A: {"ok": true, "results": [...]}
 ```
 
 ---
@@ -248,13 +248,15 @@ export PYTHONPATH=.
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### ☁️ 운영 배포 (Caddy + DuckDNS 예시)
+### ☁️ 운영 배포 (HTTPS)
 
 ```bash
 cd infra/docker
 docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
 # Caddy 가 80/443 인계받아 Let's Encrypt 자동 발급
 ```
+
+`Caddyfile` 의 도메인을 본인 소유 도메인으로 수정하여 사용.
 
 ### 🔧 환경 설정
 
@@ -295,7 +297,7 @@ claude mcp add --transport http mcper http://localhost:8001/mcp
 
 **운영 (HTTPS + OAuth)**:
 ```bash
-claude mcp add --transport http mcper https://mcper.duckdns.org/mcp
+claude mcp add --transport http mcper https://<your-domain>/mcp
 # 첫 호출 시 브라우저로 OAuth 인증 페이지 열림
 ```
 
